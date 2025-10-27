@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "codevault": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "codevault",
+        "mcp"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key-here",
+        "OPENAI_BASE_URL": "https://api.openai.com/v1/",
+        "CODEVAULT_OPENAI_EMBEDDING_MODEL": "text-embedding-3-large",
+        "CODEVAULT_MAX_TOKENS": "8192",
+        "CODEVAULT_DIMENSIONS": "3072",
+        "CODEVAULT_RATE_LIMIT_RPM": "10000",
+        "CODEVAULT_RATE_LIMIT_TPM": "600000",
+        "CODEVAULT_RERANK_API_URL": "your-reranker-api-url-here",
+        "CODEVAULT_RERANK_API_KEY": "your-reranker-api-key-here",
+        "CODEVAULT_RERANK_MODEL": "your-reranker-model-name"
+      },
+      "alwaysAllow": [
+        "use_context_pack",
+        "search_code",
+        "get_code_chunk",
+        "index_project",
+        "get_project_stats",
+        "update_project",
+        "search_code_with_chunks"
+      ],
+      "timeout": 3600
+    }
+  }
+}

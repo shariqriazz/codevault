@@ -8,6 +8,20 @@
     "codevault": "dist/cli.js",
     "codevault-mcp": "dist/mcp-server.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shariqriazz/codevault-v2.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shariqriazz/codevault-v2/issues"
+  },
+  "homepage": "https://github.com/shariqriazz/codevault-v2#readme",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
