@@ -122,6 +122,21 @@ export const MODEL_PROFILES: Record<string, Omit<ModelProfile, 'tokenCounter'>> 
     tokenizerType: 'tiktoken',
     encoding: 'cl100k_base'
   },
+  'qwen3-embedding:0.6b': {
+    maxTokens: 32000,
+    optimalTokens: 26000,
+    minChunkTokens: 1000,
+    maxChunkTokens: 30000,
+    overlapTokens: 500,
+    optimalChars: 128000,
+    minChunkChars: 4000,
+    maxChunkChars: 120000,
+    overlapChars: 2000,
+    dimensions: 1024,
+    useTokens: true,
+    tokenizerType: 'tiktoken',
+    encoding: 'cl100k_base'
+  },
   'default': {
     maxTokens: 512,
     optimalTokens: 400,
