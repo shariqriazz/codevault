@@ -142,10 +142,12 @@ export async function getModelProfile(providerName: string, modelName: string | 
       profile.maxChunkTokens = Math.floor(maxTokens * 0.95);
       profile.overlapTokens = Math.floor(profile.overlapTokens * scalingRatio);
       
-      console.log(`Using custom max tokens: ${maxTokens}`);
-      console.log(`Auto-scaled optimal tokens: ${profile.optimalTokens} (82% of max)`);
-      console.log(`Auto-scaled min tokens: ${profile.minChunkTokens}`);
-      console.log(`Auto-scaled max chunk tokens: ${profile.maxChunkTokens} (95% of max)`);
+      if (!process.env.CODEVAULT_QUIET) {
+        console.log(`Using custom max tokens: ${maxTokens}`);
+        console.log(`Auto-scaled optimal tokens: ${profile.optimalTokens} (82% of max)`);
+        console.log(`Auto-scaled min tokens: ${profile.minChunkTokens}`);
+        console.log(`Auto-scaled max chunk tokens: ${profile.maxChunkTokens} (95% of max)`);
+      }
     }
   }
   
@@ -153,7 +155,9 @@ export async function getModelProfile(providerName: string, modelName: string | 
     const dimensions = parseInt(process.env.CODEVAULT_DIMENSIONS, 10);
     if (!isNaN(dimensions) && dimensions > 0) {
       profile.dimensions = dimensions;
-      console.log(`Using custom dimensions: ${dimensions}`);
+      if (!process.env.CODEVAULT_QUIET) {
+        console.log(`Using custom dimensions: ${dimensions}`);
+      }
     }
   }
   
@@ -162,7 +166,9 @@ export async function getModelProfile(providerName: string, modelName: string | 
     const counter = await getTokenCounter(modelName || providerName);
     
     if (!counter) {
-      console.warn(`Token counter unavailable for ${modelName}, using character estimation`);
+      if (!process.env.CODEVAULT_QUIET) {
+        console.warn(`Token counter unavailable for ${modelName}, using character estimation`);
+      }
       profile.useTokens = false;
       profile.tokenCounter = undefined;
     } else {

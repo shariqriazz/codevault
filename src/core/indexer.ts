@@ -144,29 +144,31 @@ export async function indexProject({
   const modelProfile = await getModelProfile(providerName, modelName || providerName);
   const limits = getSizeLimits(modelProfile);
   
-  console.log(`\n📊 Chunking Configuration:`);
-  console.log(`  Provider: ${providerName}`);
-  if (modelName) console.log(`  Model: ${modelName}`);
-  console.log(`  Dimensions: ${embeddingProvider.getDimensions()}`);
-  console.log(`  Chunking mode: ${limits.unit}`);
-  console.log(`  Optimal size: ${limits.optimal} ${limits.unit}`);
-  console.log(`  Min/Max: ${limits.min}-${limits.max} ${limits.unit}`);
-  console.log(`  Overlap: ${limits.overlap} ${limits.unit}`);
-  if (modelProfile.useTokens && modelProfile.tokenCounter) {
-    console.log(`  ✓ Token counting enabled`);
-  } else {
-    console.log(`  ℹ Using character estimation (token counting unavailable)`);
-  }
-  
-  if (embeddingProvider.rateLimiter) {
-    const rateLimiterStats = embeddingProvider.rateLimiter.getStats();
-    if (rateLimiterStats.isLimited) {
-      console.log(`  🔒 Rate limiting: ${rateLimiterStats.rpm} requests/minute`);
+  if (!process.env.CODEVAULT_QUIET) {
+    console.log(`\n📊 Chunking Configuration:`);
+    console.log(`  Provider: ${providerName}`);
+    if (modelName) console.log(`  Model: ${modelName}`);
+    console.log(`  Dimensions: ${embeddingProvider.getDimensions()}`);
+    console.log(`  Chunking mode: ${limits.unit}`);
+    console.log(`  Optimal size: ${limits.optimal} ${limits.unit}`);
+    console.log(`  Min/Max: ${limits.min}-${limits.max} ${limits.unit}`);
+    console.log(`  Overlap: ${limits.overlap} ${limits.unit}`);
+    if (modelProfile.useTokens && modelProfile.tokenCounter) {
+      console.log(`  ✓ Token counting enabled`);
     } else {
-      console.log(`  ⚡ Rate limiting: disabled (local model)`);
+      console.log(`  ℹ Using character estimation (token counting unavailable)`);
     }
+    
+    if (embeddingProvider.rateLimiter) {
+      const rateLimiterStats = embeddingProvider.rateLimiter.getStats();
+      if (rateLimiterStats.isLimited) {
+        console.log(`  🔒 Rate limiting: ${rateLimiterStats.rpm} requests/minute`);
+      } else {
+        console.log(`  ⚡ Rate limiting: disabled (local model)`);
+      }
+    }
+    console.log('');
   }
-  console.log('');
 
   await initDatabase(embeddingProvider.getDimensions(), repo);
 
@@ -732,41 +734,43 @@ export async function indexProject({
 
   const tokenStats = getTokenCountStats();
   
-  if (chunkingStats.totalNodes > 0) {
-    console.log(`\n📈 Chunking Statistics:`);
-    console.log(`  Total AST nodes analyzed: ${chunkingStats.totalNodes}`);
-    
-    if (chunkingStats.fileGrouped && chunkingStats.functionsGrouped) {
-      console.log(`  🎯 File-grouped chunks: ${chunkingStats.fileGrouped} (${chunkingStats.functionsGrouped} functions combined)`);
+  if (!process.env.CODEVAULT_QUIET) {
+    if (chunkingStats.totalNodes > 0) {
+      console.log(`\n📈 Chunking Statistics:`);
+      console.log(`  Total AST nodes analyzed: ${chunkingStats.totalNodes}`);
+      
+      if (chunkingStats.fileGrouped && chunkingStats.functionsGrouped) {
+        console.log(`  🎯 File-grouped chunks: ${chunkingStats.fileGrouped} (${chunkingStats.functionsGrouped} functions combined)`);
+      }
+      
+      console.log(`  Normal chunks (optimal size): ${chunkingStats.normalChunks || 0}`);
+      console.log(`  Subdivided (too large): ${chunkingStats.subdivided || 0}`);
+      console.log(`  Merged small chunks: ${chunkingStats.mergedSmall || 0}`);
+      console.log(`  Statement-level fallback: ${chunkingStats.statementFallback || 0}`);
+      console.log(`  Skipped (too small): ${chunkingStats.skippedSmall || 0}`);
+      console.log(`  Final chunk count: ${processedChunks}`);
+      
+      const reductionRatio = chunkingStats.totalNodes > 0
+        ? ((1 - processedChunks / chunkingStats.totalNodes) * 100).toFixed(1)
+        : 0;
+      console.log(`  Chunk reduction: ${reductionRatio}% fewer chunks vs naive approach`);
+      console.log('');
     }
     
-    console.log(`  Normal chunks (optimal size): ${chunkingStats.normalChunks || 0}`);
-    console.log(`  Subdivided (too large): ${chunkingStats.subdivided || 0}`);
-    console.log(`  Merged small chunks: ${chunkingStats.mergedSmall || 0}`);
-    console.log(`  Statement-level fallback: ${chunkingStats.statementFallback || 0}`);
-    console.log(`  Skipped (too small): ${chunkingStats.skippedSmall || 0}`);
-    console.log(`  Final chunk count: ${processedChunks}`);
-    
-    const reductionRatio = chunkingStats.totalNodes > 0 
-      ? ((1 - processedChunks / chunkingStats.totalNodes) * 100).toFixed(1)
-      : 0;
-    console.log(`  Chunk reduction: ${reductionRatio}% fewer chunks vs naive approach`);
-    console.log('');
-  }
-  
-  if (modelProfile.useTokens && tokenStats.totalRequests > 0) {
-    console.log(`⚡ Token Counting Performance:`);
-    console.log(`  Total size checks: ${tokenStats.totalRequests}`);
-    console.log(`  Character pre-filter: ${tokenStats.charFilterRate} (${tokenStats.charFilterSkips} skipped)`);
-    console.log(`  Cache hits: ${tokenStats.cacheHitRate} (${tokenStats.cacheHits} cached)`);
-    console.log(`  Actual tokenizations: ${tokenStats.actualTokenizations}`);
-    console.log(`  Batch operations: ${tokenStats.batchTokenizations}`);
-    
-    const efficiency = tokenStats.totalRequests > 0
-      ? (((tokenStats.charFilterSkips + tokenStats.cacheHits) / tokenStats.totalRequests) * 100).toFixed(1)
-      : 0;
-    console.log(`  Overall efficiency: ${efficiency}% avoided expensive tokenization`);
-    console.log('');
+    if (modelProfile.useTokens && tokenStats.totalRequests > 0) {
+      console.log(`⚡ Token Counting Performance:`);
+      console.log(`  Total size checks: ${tokenStats.totalRequests}`);
+      console.log(`  Character pre-filter: ${tokenStats.charFilterRate} (${tokenStats.charFilterSkips} skipped)`);
+      console.log(`  Cache hits: ${tokenStats.cacheHitRate} (${tokenStats.cacheHits} cached)`);
+      console.log(`  Actual tokenizations: ${tokenStats.actualTokenizations}`);
+      console.log(`  Batch operations: ${tokenStats.batchTokenizations}`);
+      
+      const efficiency = tokenStats.totalRequests > 0
+        ? (((tokenStats.charFilterSkips + tokenStats.cacheHits) / tokenStats.totalRequests) * 100).toFixed(1)
+        : 0;
+      console.log(`  Overall efficiency: ${efficiency}% avoided expensive tokenization`);
+      console.log('');
+    }
   }
 
   return {

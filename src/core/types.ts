@@ -25,6 +25,14 @@ export interface ProgressEvent {
   file?: string;
   symbol?: string;
   chunkId?: string;
+  fileCount?: number;
+  languages?: number;
+  stats?: {
+    chunks?: number;
+    merged?: number;
+    subdivided?: number;
+    skipped?: number;
+  };
 }
 
 export interface IndexError {
