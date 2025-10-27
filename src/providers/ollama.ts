@@ -1,5 +1,11 @@
 import { createRateLimiter } from '../utils/rate-limiter.js';
-import { EmbeddingProvider, getModelProfile, getSizeLimits } from './base.js';
+import {
+  EmbeddingProvider,
+  getModelProfile,
+  getSizeLimits,
+  estimateTokens,
+  MAX_ITEM_TOKENS
+} from './base.js';
 
 export class OllamaProvider extends EmbeddingProvider {
   private ollama: any = null;

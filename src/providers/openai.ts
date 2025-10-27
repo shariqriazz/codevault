@@ -1,6 +1,13 @@
 import { OpenAI } from 'openai';
 import { createRateLimiter } from '../utils/rate-limiter.js';
-import { EmbeddingProvider, getModelProfile, getSizeLimits } from './base.js';
+import {
+  EmbeddingProvider,
+  getModelProfile,
+  getSizeLimits,
+  MAX_BATCH_TOKENS,
+  MAX_ITEM_TOKENS,
+  estimateTokens
+} from './base.js';
 
 export class OpenAIProvider extends EmbeddingProvider {
   private openai: OpenAI | null = null;

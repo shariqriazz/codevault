@@ -22,7 +22,28 @@ export abstract class EmbeddingProvider {
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
   
+  // Batch processing support (optional - providers can override)
+  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+    // Default implementation: process one by one (backward compatible)
+    const embeddings: number[][] = [];
+    for (const text of texts) {
+      const embedding = await this.generateEmbedding(text);
+      embeddings.push(embedding);
+    }
+    return embeddings;
+  }
+  
   rateLimiter?: any;
+}
+
+// Batching constants
+export const BATCH_SIZE = 50; // Number of chunks per batch
+export const MAX_BATCH_TOKENS = 100000; // OpenAI limit
+export const MAX_ITEM_TOKENS = 8191; // Per-item limit
+
+// Estimate tokens from text (4 chars ≈ 1 token)
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
 }
 
 export const MODEL_PROFILES: Record<string, Omit<ModelProfile, 'tokenCounter'>> = {

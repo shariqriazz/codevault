@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import Parser from 'tree-sitter';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider } from '../providers/index.js';
+import { BATCH_SIZE } from '../providers/base.js';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk } from '../chunking/file-grouper.js';
 import { getTokenCountStats } from '../chunking/token-counter.js';
@@ -35,6 +36,7 @@ import {
   generateEnhancedEmbeddingText
 } from './metadata.js';
 import { Database, initDatabase } from '../database/db.js';
+import { BatchEmbeddingProcessor } from './batch-indexer.js';
 import type { IndexProjectOptions, IndexProjectResult, ChunkingStats } from './types.js';
 
 import type { TreeSitterNode } from '../types/ast.js';
@@ -153,6 +155,7 @@ export async function indexProject({
     console.log(`  Optimal size: ${limits.optimal} ${limits.unit}`);
     console.log(`  Min/Max: ${limits.min}-${limits.max} ${limits.unit}`);
     console.log(`  Overlap: ${limits.overlap} ${limits.unit}`);
+    console.log(`  Batch size: ${BATCH_SIZE} chunks per API call`);
     if (modelProfile.useTokens && modelProfile.tokenCounter) {
       console.log(`  ✓ Token counting enabled`);
     } else {
@@ -233,6 +236,9 @@ export async function indexProject({
   };
 
   const db = new Database(dbPath);
+  
+  // Create batch processor for efficient embedding generation
+  const batchProcessor = new BatchEmbeddingProcessor(embeddingProvider, db, BATCH_SIZE);
 
   async function deleteChunks(chunkIds: string[], metadataLookup = new Map<string, any>()): Promise<void> {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
