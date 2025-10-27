@@ -2,6 +2,32 @@ import { BATCH_SIZE } from '../providers/base.js';
 import type { EmbeddingProvider } from '../providers/base.js';
 import type { Database } from '../database/db.js';
 
+const MAX_BATCH_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
+
+function isRateLimitError(error: any): boolean {
+  const message = error?.message || String(error);
+  return (
+    error?.status === 429 ||
+    error?.statusCode === 429 ||
+    message.includes('rate limit') ||
+    message.includes('Rate limit') ||
+    message.includes('too many requests') ||
+    message.includes('429')
+  );
+}
+
+function isBatchSizeError(error: any): boolean {
+  const message = error?.message || String(error);
+  return (
+    error?.status === 413 ||
+    message.includes('too large') ||
+    message.includes('payload') ||
+    message.includes('request size') ||
+    message.includes('token limit')
+  );
+}
+
 interface ChunkToEmbed {
   chunkId: string;
   enhancedEmbeddingText: string;
