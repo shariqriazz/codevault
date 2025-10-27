@@ -102,7 +102,9 @@ export class BatchEmbeddingProcessor {
       }
     } catch (error) {
       // On batch failure, fall back to individual processing
-      console.warn(`Batch processing failed for ${currentBatch.length} chunks, falling back to individual processing`);
+      console.error(`\n❌ Batch processing failed for ${currentBatch.length} chunks`);
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(`⚠️  Falling back to individual processing (this will be slower)...\n`);
       
       for (const chunk of currentBatch) {
         try {
