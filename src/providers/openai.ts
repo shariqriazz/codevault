@@ -72,4 +72,78 @@ export class OpenAIProvider extends EmbeddingProvider {
   getModelName(): string {
     return this.model;
   }
+
+  // Batch processing implementation for OpenAI
+  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+    await this.init();
+    
+    const profile = await getModelProfile(this.getName(), this.model);
+    const maxChars = profile.maxChunkChars || 8000;
+    
+    const allEmbeddings: number[][] = [];
+    const remainingTexts = [...texts];
+    let batchCount = 0;
+    
+    while (remainingTexts.length > 0) {
+      batchCount++;
+      const currentBatch: string[] = [];
+      let currentBatchTokens = 0;
+      const processedIndices: number[] = [];
+      
+      // Build batch based on token limits
+      for (let i = 0; i < remainingTexts.length; i++) {
+        const text = remainingTexts[i];
+        const truncatedText = text.slice(0, maxChars);
+        const itemTokens = estimateTokens(truncatedText);
+        
+        // Skip items that exceed single item limit
+        if (itemTokens > MAX_ITEM_TOKENS) {
+          if (!process.env.CODEVAULT_QUIET) {
+            console.warn(`  ⚠️  Text at index ${i} exceeds max token limit (${itemTokens} > ${MAX_ITEM_TOKENS}), skipping`);
+          }
+          processedIndices.push(i);
+          // Add empty embedding as placeholder
+          allEmbeddings.push(new Array(this.getDimensions()).fill(0));
+          continue;
+        }
+        
+        // Add to batch if it fits
+        if (currentBatchTokens + itemTokens <= MAX_BATCH_TOKENS) {
+          currentBatch.push(truncatedText);
+          currentBatchTokens += itemTokens;
+          processedIndices.push(i);
+        } else {
+          break; // Batch is full
+        }
+      }
+      
+      // Remove processed items from remaining texts
+      for (let i = processedIndices.length - 1; i >= 0; i--) {
+        remainingTexts.splice(processedIndices[i], 1);
+      }
+      
+      // Process current batch if not empty
+      if (currentBatch.length > 0) {
+        if (!process.env.CODEVAULT_QUIET) {
+          console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
+        }
+        
+        const batchEmbeddings = await this.rateLimiter.execute(async () => {
+          const { data } = await this.openai!.embeddings.create({
+            model: this.model,
+            input: currentBatch
+          });
+          return data.map(item => item.embedding);
+        });
+        
+        allEmbeddings.push(...batchEmbeddings);
+      }
+    }
+    
+    if (!process.env.CODEVAULT_QUIET) {
+      console.log(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
+    }
+    
+    return allEmbeddings;
+  }
 }

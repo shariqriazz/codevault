@@ -272,24 +272,22 @@ export async function indexProject({
     symbolData: any;
   }): Promise<void> {
     try {
-      const embedding = await embeddingProvider.generateEmbedding(params.enhancedEmbeddingText);
-
-      await db.insertChunk({
-        id: params.chunkId,
-        file_path: params.rel,
-        symbol: params.symbol,
-        sha: params.sha,
-        lang: params.lang,
-        chunk_type: params.chunkType,
-        embedding,
-        embedding_provider: embeddingProvider.getName(),
-        embedding_dimensions: embeddingProvider.getDimensions(),
-        codevault_tags: params.codevaultMetadata.tags,
-        codevault_intent: params.codevaultMetadata.intent,
-        codevault_description: params.codevaultMetadata.description,
-        doc_comments: params.docComments,
-        variables_used: params.importantVariables,
-        context_info: params.contextInfo
+      // Add to batch processor instead of immediate embedding
+      await batchProcessor.addChunk({
+        chunkId: params.chunkId,
+        enhancedEmbeddingText: params.enhancedEmbeddingText,
+        params: {
+          code: params.code,
+          sha: params.sha,
+          lang: params.lang,
+          rel: params.rel,
+          symbol: params.symbol,
+          chunkType: params.chunkType,
+          codevaultMetadata: params.codevaultMetadata,
+          importantVariables: params.importantVariables,
+          docComments: params.docComments,
+          contextInfo: params.contextInfo
+        }
       });
 
       indexMutated = true;

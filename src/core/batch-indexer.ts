@@ -65,8 +65,17 @@ export class BatchEmbeddingProcessor {
       // Extract texts for embedding
       const texts = currentBatch.map(chunk => chunk.enhancedEmbeddingText);
       
+      // Log batching activity
+      if (!process.env.CODEVAULT_QUIET) {
+        console.log(`🚀 Processing batch of ${texts.length} chunks...`);
+      }
+      
       // Generate embeddings in batch (single API call for all)
       const embeddings = await this.embeddingProvider.generateEmbeddings(texts);
+      
+      if (!process.env.CODEVAULT_QUIET) {
+        console.log(`✓ Batch complete (${texts.length} embeddings generated)`);
+      }
       
       // Store all embeddings in database
       for (let i = 0; i < currentBatch.length; i++) {
