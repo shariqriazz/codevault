@@ -727,6 +727,14 @@ export async function indexProject({
     }
   }
 
+  // Notify that we're starting finalization
+  if (onProgress) {
+    onProgress({ type: 'finalizing' });
+  }
+  
+  // Process any remaining chunks in the batch
+  await batchProcessor.flush();
+  
   if (merkleDirty) {
     saveMerkle(repo, updatedMerkle);
   }

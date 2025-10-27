@@ -84,7 +84,24 @@ export class IndexerUI {
     if (stats.skipped !== undefined) this.stats.skipped = stats.skipped;
   }
 
+  showFinalizing() {
+    if (this.progressBar) {
+      this.progressBar.stop();
+      this.progressBar = null;
+    }
+    
+    this.spinner = ora({
+      text: chalk.white('Finalizing embeddings and building indexes...'),
+      color: 'cyan'
+    }).start();
+  }
+
   finishIndexing() {
+    if (this.spinner) {
+      this.spinner.stop();
+      this.spinner = null;
+    }
+    
     if (this.progressBar) {
       this.progressBar.stop();
       this.progressBar = null;

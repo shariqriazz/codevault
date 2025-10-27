@@ -93,6 +93,9 @@ program
             },
             onFileProgress: (current, total, fileName) => {
               ui.updateProgress(fileName);
+            },
+            onFinalizing: () => {
+              ui.showFinalizing();
             }
           }
         });

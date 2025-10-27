@@ -8,6 +8,7 @@ import type { IndexProjectOptions, IndexProjectResult } from '../core/types.js';
 export interface IndexWithProgressCallbacks {
   onScanComplete?: (fileCount: number) => void;
   onFileProgress?: (current: number, total: number, fileName: string) => void;
+  onFinalizing?: () => void;
 }
 
 export async function indexProjectWithProgress(
