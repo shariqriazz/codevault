@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { spawn } from 'child_process';
 import { Command } from 'commander';
 import fs from 'fs';
