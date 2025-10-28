@@ -19,10 +19,13 @@ export class RateLimiter {
   private requestTimes: number[] = [];
   private tokenUsage: TokenUsageEntry[] = [];
   private retryDelays = [1000, 2000, 5000, 10000];
+  // FIX: Add max queue size to prevent unbounded growth
+  private maxQueueSize: number;
 
-  constructor(requestsPerMinute: number | null = null, tokensPerMinute: number | null = null) {
+  constructor(requestsPerMinute: number | null = null, tokensPerMinute: number | null = null, maxQueueSize: number = 10000) {
     this.rpm = requestsPerMinute ?? this.getDefaultRPM();
     this.tpm = tokensPerMinute ?? this.getDefaultTPM();
+    this.maxQueueSize = maxQueueSize;
   }
 
   private getDefaultRPM(): number | null {
@@ -103,6 +106,12 @@ export class RateLimiter {
 
   async execute<T>(fn: () => Promise<T>, retryCount = 0, estimatedTokens = 0): Promise<T> {
     return new Promise((resolve, reject) => {
+      // FIX: Reject if queue is at max capacity to prevent memory exhaustion
+      if (this.queue.length >= this.maxQueueSize) {
+        reject(new Error(`Rate limiter queue is full (${this.maxQueueSize} items). Too many concurrent requests.`));
+        return;
+      }
+      
       this.queue.push({ fn, resolve, reject, retryCount, estimatedTokens });
       void this.processQueue();
     });
@@ -181,6 +190,8 @@ export class RateLimiter {
       rpm: this.rpm,
       tpm: this.tpm,
       queueLength: this.queue.length,
+      maxQueueSize: this.maxQueueSize,
+      queueUtilization: ((this.queue.length / this.maxQueueSize) * 100).toFixed(1) + '%',
       requestsInLastMinute: this.requestTimes.filter(t => t > oneMinuteAgo).length,
       tokensInLastMinute,
       isRpmLimited: this.rpm !== null,

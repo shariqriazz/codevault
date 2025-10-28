@@ -72,6 +72,7 @@ export function startWatch({
   const pendingDeletes = new Set<string>();
   let timer: NodeJS.Timeout | null = null;
   let processing = false;
+  let flushPromise: Promise<void> | null = null;
   let embeddingProviderInstance: EmbeddingProvider | null = null;
   let embeddingProviderInitPromise: Promise<EmbeddingProvider> | null = null;
   let providerInitErrorLogged = false;
@@ -134,8 +135,13 @@ export function startWatch({
   }
 
   async function flush(): Promise<void> {
-    if (processing) {
-      scheduleFlush();
+    // FIX: Prevent race condition by waiting for any in-progress flush
+    if (flushPromise) {
+      await flushPromise;
+      // After waiting, check if new changes came in and reschedule
+      if (pendingChanges.size > 0 || pendingDeletes.size > 0) {
+        scheduleFlush();
+      }
       return;
     }
 
@@ -143,50 +149,59 @@ export function startWatch({
       return;
     }
 
+    // Atomically capture and clear pending changes
     const changed = Array.from(pendingChanges);
     const deleted = Array.from(pendingDeletes);
     pendingChanges.clear();
     pendingDeletes.clear();
 
     processing = true;
-    try {
-      let embeddingProviderOverride: EmbeddingProvider | null = null;
-
+    
+    // Create promise that tracks this flush operation
+    flushPromise = (async () => {
       try {
-        embeddingProviderOverride = await getEmbeddingProviderInstance();
-      } catch (providerError) {
-        if (!providerInitErrorLogged && logger && typeof logger.error === 'function') {
-          logger.error('CodeVault watch provider initialization failed:', providerError);
-          providerInitErrorLogged = true;
+        let embeddingProviderOverride: EmbeddingProvider | null = null;
+
+        try {
+          embeddingProviderOverride = await getEmbeddingProviderInstance();
+        } catch (providerError) {
+          if (!providerInitErrorLogged && logger && typeof logger.error === 'function') {
+            logger.error('CodeVault watch provider initialization failed:', providerError);
+            providerInitErrorLogged = true;
+          }
+        }
+
+        await updateIndex({
+          repoPath: root,
+          provider,
+          changedFiles: changed,
+          deletedFiles: deleted,
+          embeddingProvider: embeddingProviderOverride,
+          encrypt
+        });
+
+        if (typeof onBatch === 'function') {
+          await onBatch({ changed, deleted });
+        } else if (logger && typeof logger.log === 'function') {
+          logger.log(
+            `CodeVault watch: indexed ${changed.length} changed / ${deleted.length} deleted files`
+          );
+        }
+      } catch (error) {
+        if (logger && typeof logger.error === 'function') {
+          logger.error('CodeVault watch update failed:', error);
+        }
+      } finally {
+        processing = false;
+        flushPromise = null;
+        // Check if new changes came in during processing
+        if (pendingChanges.size > 0 || pendingDeletes.size > 0) {
+          scheduleFlush();
         }
       }
+    })();
 
-      await updateIndex({
-        repoPath: root,
-        provider,
-        changedFiles: changed,
-        deletedFiles: deleted,
-        embeddingProvider: embeddingProviderOverride,
-        encrypt
-      });
-
-      if (typeof onBatch === 'function') {
-        await onBatch({ changed, deleted });
-      } else if (logger && typeof logger.log === 'function') {
-        logger.log(
-          `CodeVault watch: indexed ${changed.length} changed / ${deleted.length} deleted files`
-        );
-      }
-    } catch (error) {
-      if (logger && typeof logger.error === 'function') {
-        logger.error('CodeVault watch update failed:', error);
-      }
-    } finally {
-      processing = false;
-      if (pendingChanges.size > 0 || pendingDeletes.size > 0) {
-        scheduleFlush();
-      }
-    }
+    await flushPromise;
   }
 
   async function waitForProcessing(): Promise<void> {
@@ -247,6 +262,11 @@ export function startWatch({
       if (timer) {
         clearTimeout(timer);
         timer = null;
+      }
+      // FIX: Clean up embedding provider on close
+      if (embeddingProviderInstance) {
+        embeddingProviderInstance = null;
+        embeddingProviderInitPromise = null;
       }
       await watcher.close();
     },

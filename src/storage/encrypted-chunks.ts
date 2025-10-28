@@ -55,21 +55,22 @@ export function getActiveEncryptionKey(): Buffer | null {
   const raw = process.env[KEY_ENV_VAR];
   const normalized = typeof raw === 'string' ? raw.trim() : '';
 
-  if (normalized === cachedNormalizedKey) {
+  // FIX: Always check if env var changed to support runtime updates
+  if (normalized === cachedNormalizedKey && cachedKeyBuffer) {
     return cachedKeyBuffer;
   }
 
+  // Invalidate cache when environment variable changes
   cachedNormalizedKey = normalized;
   cachedKeyError = null;
+  cachedKeyBuffer = null;
 
   if (!normalized) {
-    cachedKeyBuffer = null;
     return null;
   }
 
   const decoded = decodeKey(normalized);
   if (!decoded) {
-    cachedKeyBuffer = null;
     cachedKeyError = new Error(`${KEY_ENV_VAR} must be a 32-byte key encoded as base64 or hex.`);
     return null;
   }

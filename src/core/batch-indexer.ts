@@ -48,6 +48,8 @@ interface ChunkToEmbed {
 export class BatchEmbeddingProcessor {
   private batch: ChunkToEmbed[] = [];
   private batchSize: number;
+  // FIX: Add mutex to prevent concurrent batch processing
+  private processing = false;
 
   constructor(
     private embeddingProvider: EmbeddingProvider,
@@ -63,6 +65,11 @@ export class BatchEmbeddingProcessor {
   async addChunk(chunk: ChunkToEmbed): Promise<void> {
     this.batch.push(chunk);
     
+    // FIX: Wait for any ongoing processing to complete before checking batch size
+    while (this.processing) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
     // Process batch when it reaches the threshold
     if (this.batch.length >= this.batchSize) {
       await this.processBatch();
@@ -73,6 +80,11 @@ export class BatchEmbeddingProcessor {
    * Process any remaining chunks in the batch
    */
   async flush(): Promise<void> {
+    // FIX: Wait for any ongoing processing to complete
+    while (this.processing) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
     if (this.batch.length > 0) {
       await this.processBatch();
     }
@@ -82,8 +94,10 @@ export class BatchEmbeddingProcessor {
    * Process the current batch of chunks
    */
   private async processBatch(): Promise<void> {
-    if (this.batch.length === 0) return;
+    // FIX: Prevent concurrent batch processing
+    if (this.batch.length === 0 || this.processing) return;
 
+    this.processing = true;
     const currentBatch = [...this.batch];
     this.batch = [];
 
@@ -132,6 +146,9 @@ export class BatchEmbeddingProcessor {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       console.log(`⚠️  Falling back to individual processing (this will be slower)...\n`);
       
+      // FIX: Collect errors but continue processing all chunks to avoid data loss
+      const errors: Array<{ chunkId: string; error: Error }> = [];
+      
       for (const chunk of currentBatch) {
         try {
           const embedding = await this.embeddingProvider.generateEmbedding(chunk.enhancedEmbeddingText);
@@ -155,9 +172,24 @@ export class BatchEmbeddingProcessor {
           });
         } catch (individualError) {
           console.error(`Failed to process chunk ${chunk.chunkId}:`, individualError);
-          throw individualError;
+          errors.push({
+            chunkId: chunk.chunkId,
+            error: individualError as Error
+          });
         }
       }
+      
+      // Report errors but don't throw to allow indexing to continue
+      if (errors.length > 0) {
+        console.warn(`⚠️  ${errors.length}/${currentBatch.length} chunks failed in fallback processing`);
+        if (errors.length === currentBatch.length) {
+          // Only throw if ALL chunks failed
+          throw new Error(`All ${errors.length} chunks failed to process: ${errors[0].error.message}`);
+        }
+      }
+    } finally {
+      // FIX: Always release the lock, even on error
+      this.processing = false;
     }
   }
 

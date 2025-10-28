@@ -14,9 +14,57 @@ import type { ScopeFilters } from '../types/search.js';
 import type { SearchCodeResult, SearchResult, GetChunkResult } from './types.js';
 import type { DatabaseChunk } from '../database/db.js';
 
-const bm25IndexCache = new Map<string, { index: BM25Index; added: Set<string> }>();
-const chunkTextCache = new Map<string, string | null>();
+// FIX: Add cache size limits to prevent memory leaks in long-running processes
+const MAX_BM25_CACHE_SIZE = Number.parseInt(process.env.CODEVAULT_MAX_BM25_CACHE || '10', 10);
+const MAX_CHUNK_TEXT_CACHE_SIZE = Number.parseInt(process.env.CODEVAULT_MAX_CHUNK_CACHE || '1000', 10);
+
+const bm25IndexCache = new Map<string, { index: BM25Index; added: Set<string>; lastAccess: number }>();
+const chunkTextCache = new Map<string, { text: string | null; lastAccess: number }>();
 const RERANKER_MAX_CANDIDATES = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX || '50', 10);
+
+// Cache eviction helper for BM25 index cache (LRU)
+function evictOldestBm25Index(): void {
+  if (bm25IndexCache.size >= MAX_BM25_CACHE_SIZE) {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    
+    for (const [key, value] of bm25IndexCache.entries()) {
+      if (value.lastAccess < oldestTime) {
+        oldestTime = value.lastAccess;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      bm25IndexCache.delete(oldestKey);
+    }
+  }
+}
+
+// Cache eviction helper for chunk text cache (LRU)
+function evictOldestChunkText(): void {
+  if (chunkTextCache.size >= MAX_CHUNK_TEXT_CACHE_SIZE) {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    
+    for (const [key, value] of chunkTextCache.entries()) {
+      if (value.lastAccess < oldestTime) {
+        oldestTime = value.lastAccess;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      chunkTextCache.delete(oldestKey);
+    }
+  }
+}
+
+// Public function to clear caches (useful for long-running processes)
+export function clearSearchCaches(): void {
+  bm25IndexCache.clear();
+  chunkTextCache.clear();
+}
 
 function normalizeQuery(query: string): string {
   return query
@@ -56,17 +104,22 @@ function readChunkTextCached(sha: string, chunkDir: string, basePath: string): s
   }
 
   const cacheKey = getChunkCacheKey(basePath, sha);
-  if (chunkTextCache.has(cacheKey)) {
-    return chunkTextCache.get(cacheKey)!;
+  const cached = chunkTextCache.get(cacheKey);
+  if (cached) {
+    // Update access time for LRU
+    cached.lastAccess = Date.now();
+    return cached.text;
   }
 
   try {
     const result = readChunkFromDisk({ chunkDir, sha });
     const code = result ? result.code : null;
-    chunkTextCache.set(cacheKey, code);
+    evictOldestChunkText();
+    chunkTextCache.set(cacheKey, { text: code, lastAccess: Date.now() });
     return code;
   } catch (error) {
-    chunkTextCache.set(cacheKey, null);
+    evictOldestChunkText();
+    chunkTextCache.set(cacheKey, { text: null, lastAccess: Date.now() });
     return null;
   }
 }
@@ -102,8 +155,12 @@ function ensureBm25IndexForChunks(
   let entry = bm25IndexCache.get(key);
   
   if (!entry) {
-    entry = { index: new BM25Index(), added: new Set() };
+    evictOldestBm25Index();
+    entry = { index: new BM25Index(), added: new Set(), lastAccess: Date.now() };
     bm25IndexCache.set(key, entry);
+  } else {
+    // Update access time for LRU
+    entry.lastAccess = Date.now();
   }
 
   const toAdd: Array<{ id: string; text: string }> = [];
@@ -155,6 +212,9 @@ export async function searchCode(
 
   const embeddingProvider = createEmbeddingProvider(effectiveProvider);
 
+  // FIX: Ensure database is always closed, even on error paths
+  let db: Database | null = null;
+  
   try {
     if (!fs.existsSync(dbPath)) {
       return {
@@ -171,12 +231,11 @@ export async function searchCode(
       };
     }
 
-    const db = new Database(dbPath);
+    db = new Database(dbPath);
     const chunks = await db.getChunks(embeddingProvider.getName(), embeddingProvider.getDimensions());
     const codemapData = readCodemap(codemapPath);
 
     if (chunks.length === 0) {
-      db.close();
       return {
         success: false,
         error: 'no_chunks_found',
@@ -440,7 +499,6 @@ export async function searchCode(
     });
 
     if (combinedResults.length === 0) {
-      db.close();
       return {
         success: false,
         error: 'no_relevant_matches',
@@ -468,8 +526,6 @@ export async function searchCode(
       .trim();
 
     await db.recordQueryPattern(pattern);
-
-    db.close();
 
     return {
       success: true,
@@ -505,6 +561,15 @@ export async function searchCode(
       reranker: normalizedScope.reranker,
       results: []
     };
+  } finally {
+    // FIX: Always close database connection in finally block
+    if (db) {
+      try {
+        db.close();
+      } catch (closeError) {
+        // Ignore close errors during cleanup
+      }
+    }
   }
 }
 

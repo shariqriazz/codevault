@@ -23,6 +23,39 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
 let currentWorkingPath = '.';
 let sessionContextPack: any = null;
 
+// FIX: Add periodic cache clearing to prevent memory leaks in long-running MCP server
+const CACHE_CLEAR_INTERVAL_MS = Number.parseInt(process.env.CODEVAULT_CACHE_CLEAR_INTERVAL || '3600000', 10); // Default: 1 hour
+let cacheCleanupTimer: NodeJS.Timeout | null = null;
+
+function scheduleCacheCleanup() {
+  if (cacheCleanupTimer) {
+    clearInterval(cacheCleanupTimer);
+  }
+  
+  cacheCleanupTimer = setInterval(() => {
+    try {
+      // Clear search caches
+      const { clearSearchCaches } = require('./core/search.js');
+      if (typeof clearSearchCaches === 'function') {
+        clearSearchCaches();
+      }
+      
+      // Clear token counter cache
+      const { clearTokenCache } = require('./chunking/token-counter.js');
+      if (typeof clearTokenCache === 'function') {
+        clearTokenCache();
+      }
+      
+      console.error(JSON.stringify({
+        event: 'cache_cleared',
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      // Ignore errors during cleanup
+    }
+  }, CACHE_CLEAR_INTERVAL_MS);
+}
+
 const server = new Server(
   {
     name: 'codevault-code-memory',
@@ -149,7 +182,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'search_code': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
             path_glob: typedArgs.path_glob,
@@ -202,7 +236,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'search_code_with_chunks': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
             path_glob: typedArgs.path_glob,
@@ -268,7 +303,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_code_chunk': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const result = await getChunk(typedArgs.sha, cleanPath);
 
         if (!result.success) {
@@ -298,7 +334,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'index_project': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
 
         if (!fs.existsSync(cleanPath)) {
           throw new Error(`Directory ${cleanPath} does not exist`);
@@ -326,7 +363,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'update_project': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const result = await indexProject({ repoPath: cleanPath, provider: typedArgs.provider || 'auto' });
 
         if (!result.success) {
@@ -349,7 +387,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_project_stats': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const overviewResult = await getOverview(50, cleanPath);
 
         if (!overviewResult.success) {
@@ -382,7 +421,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'use_context_pack': {
-        const cleanPath = typedArgs.path?.trim() || '.';
+        // FIX: Standardize path handling - support project/directory aliases like CLI
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         const name = typedArgs.name;
 
         if (name === 'default' || name === 'none' || name === 'clear') {
@@ -432,6 +472,55 @@ async function main() {
     start: 'CodeVault MCP Server started',
     version: packageJson.version,
   }));
+  
+  // FIX: Start periodic cache cleanup
+  scheduleCacheCleanup();
+  
+  // FIX: Add cleanup handlers for graceful shutdown
+  const cleanup = () => {
+    // Stop cache cleanup timer
+    if (cacheCleanupTimer) {
+      clearInterval(cacheCleanupTimer);
+      cacheCleanupTimer = null;
+    }
+    
+    // Clear session context pack
+    sessionContextPack = null;
+    
+    // Clear search caches to free memory
+    try {
+      const { clearSearchCaches } = require('./core/search.js');
+      if (typeof clearSearchCaches === 'function') {
+        clearSearchCaches();
+      }
+    } catch (error) {
+      // Ignore if module doesn't export the function yet
+    }
+    
+    // Clear token counter cache
+    try {
+      const { clearTokenCache } = require('./chunking/token-counter.js');
+      if (typeof clearTokenCache === 'function') {
+        clearTokenCache();
+      }
+    } catch (error) {
+      // Ignore if module doesn't export the function yet
+    }
+  };
+  
+  process.on('SIGINT', () => {
+    cleanup();
+    process.exit(0);
+  });
+  
+  process.on('SIGTERM', () => {
+    cleanup();
+    process.exit(0);
+  });
+  
+  process.on('exit', () => {
+    cleanup();
+  });
 }
 
 main().catch((error) => {
