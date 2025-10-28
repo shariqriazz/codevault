@@ -356,7 +356,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `✅ Project indexed successfully!\n\n📊 Statistics:\n- Processed chunks: ${result.processedChunks}\n- Total chunks: ${result.totalChunks}\n- Provider: ${result.provider}\n\n🔍 You can now use search_code with path="${cleanPath}"`,
+              text: `✅ Project indexed successfully!\n\n📊 Statistics:\n- Processed chunks: ${result.processedChunks}\n- Total chunks: ${result.totalChunks}\n- Provider: ${result.provider}\n\n🔍 Ready to search!\n- Quick search: search_code with path="${cleanPath}"\n- With code: search_code_with_chunks with path="${cleanPath}"`,
             },
           ],
         };

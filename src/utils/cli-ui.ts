@@ -146,7 +146,8 @@ export class IndexerUI {
     }
 
     console.log(chalk.cyan('\n🚀 Ready to search!'));
-    console.log(chalk.gray(`   Try: ${chalk.white('codevault search "your query"')}\n`));
+    console.log(chalk.gray(`   Quick search:  ${chalk.white('codevault search "your query"')}`));
+    console.log(chalk.gray(`   With code:     ${chalk.white('codevault search-with-code "your query"')}\n`));
   }
 
   showError(message: string) {
