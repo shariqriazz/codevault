@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { registerConfigCommands } from './cli/commands/config-cmd.js';
 import { registerContextCommands } from './cli/commands/context.js';
 import { resolveScopeWithPack } from './context/packs.js';
 import { readCodemap } from './codemap/io.js';
@@ -14,12 +15,17 @@ import { searchCode } from './core/search.js';
 import { startWatch } from './indexer/watch.js';
 import { IndexerUI } from './utils/cli-ui.js';
 import { indexProjectWithProgress } from './utils/indexer-with-progress.js';
+import { applyConfigToEnv } from './config/apply-env.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from './providers/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+
+// Apply config to environment variables (CLI only - MCP uses env vars directly)
+// This allows CLI users to use global config while MCP continues using env vars
+applyConfigToEnv();
 
 const program = new Command();
 program
@@ -346,6 +352,7 @@ program
       process.exit(1);
     }
   });
+registerConfigCommands(program);
 
 registerContextCommands(program);
 
