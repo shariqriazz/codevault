@@ -42,8 +42,8 @@ codevault index
 #### From Source
 
 ```bash
-git clone https://github.com/shariqriazz/codevault-v2.git
-cd codevault-v2
+git clone https://github.com/shariqriazz/codevault.git
+cd codevault
 npm install
 npm run build
 npm link
@@ -177,7 +177,7 @@ Or use local installation:
   "mcpServers": {
     "codevault": {
       "command": "node",
-      "args": ["/path/to/codevault-v2/dist/mcp-server.js"],
+      "args": ["/path/to/codevault/dist/mcp-server.js"],
       "env": {
         "OPENAI_API_KEY": "your-api-key-here"
       }
@@ -498,9 +498,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
-- **GitHub**: https://github.com/shariqriazz/codevault-v2
+- **GitHub**: https://github.com/shariqriazz/codevault
 - **NPM**: https://www.npmjs.com/package/codevault
-- **Issues**: https://github.com/shariqriazz/codevault-v2/issues
+- **Issues**: https://github.com/shariqriazz/codevault/issues
 - **Configuration Guide**: [CONFIGURATION.md](CONFIGURATION.md)
 
 ## 🙏 Acknowledgments

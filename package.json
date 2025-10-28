@@ -16,12 +16,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shariqriazz/codevault-v2.git"
+    "url": "git+https://github.com/shariqriazz/codevault.git"
   },
   "bugs": {
-    "url": "https://github.com/shariqriazz/codevault-v2/issues"
+    "url": "https://github.com/shariqriazz/codevault/issues"
   },
-  "homepage": "https://github.com/shariqriazz/codevault-v2#readme",
+  "homepage": "https://github.com/shariqriazz/codevault#readme",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

@@ -3,7 +3,7 @@
     "codevault": {
       "command": "node",
       "args": [
-        "/path/to/codevault-v2/dist/mcp-server.js"
+        "/path/to/codevault/dist/mcp-server.js"
       ],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key-here",
