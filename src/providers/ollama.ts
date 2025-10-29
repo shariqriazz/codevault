@@ -12,7 +12,7 @@ export class OllamaProvider extends EmbeddingProvider {
   private model: string;
   rateLimiter: any;
 
-  constructor(model = process.env.CODEVAULT_OLLAMA_MODEL || 'nomic-embed-text') {
+  constructor(model = process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL || process.env.CODEVAULT_OLLAMA_MODEL || 'nomic-embed-text') {
     super();
     this.model = model;
     this.rateLimiter = createRateLimiter('Ollama');
@@ -45,8 +45,8 @@ export class OllamaProvider extends EmbeddingProvider {
   }
 
   getDimensions(): number {
-    if (process.env.CODEVAULT_DIMENSIONS) {
-      const dims = parseInt(process.env.CODEVAULT_DIMENSIONS, 10);
+    if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
+      const dims = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
       if (!isNaN(dims) && dims > 0) return dims;
     }
     

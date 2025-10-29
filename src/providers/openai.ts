@@ -16,8 +16,9 @@ export class OpenAIProvider extends EmbeddingProvider {
 
   constructor() {
     super();
-    this.model = process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL
-                 || process.env.OPENAI_MODEL
+    this.model = process.env.CODEVAULT_EMBEDDING_MODEL
+                 || process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL // Backward compatibility
+                 || process.env.OPENAI_MODEL // Backward compatibility
                  || 'text-embedding-3-large';
     this.rateLimiter = createRateLimiter('OpenAI');
   }
@@ -26,12 +27,12 @@ export class OpenAIProvider extends EmbeddingProvider {
     if (!this.openai) {
       const config: any = {};
       
-      if (process.env.OPENAI_API_KEY) {
-        config.apiKey = process.env.OPENAI_API_KEY;
+      if (process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY) {
+        config.apiKey = process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
       }
       
-      if (process.env.OPENAI_BASE_URL) {
-        config.baseURL = process.env.OPENAI_BASE_URL;
+      if (process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL) {
+        config.baseURL = process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
       }
       
       this.openai = new OpenAI(config);
@@ -55,8 +56,8 @@ export class OpenAIProvider extends EmbeddingProvider {
   }
 
   getDimensions(): number {
-    if (process.env.CODEVAULT_DIMENSIONS) {
-      const dims = parseInt(process.env.CODEVAULT_DIMENSIONS, 10);
+    if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
+      const dims = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
       if (!isNaN(dims) && dims > 0) return dims;
     }
     

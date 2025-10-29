@@ -29,7 +29,7 @@ export class RateLimiter {
   }
 
   private getDefaultRPM(): number | null {
-    const envVar = process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT;
+    const envVar = process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT;
     if (envVar) {
       const limit = parseInt(envVar, 10);
       if (!isNaN(limit) && limit > 0) {
@@ -40,8 +40,9 @@ export class RateLimiter {
   }
 
   private getDefaultTPM(): number | null {
-    if (process.env.CODEVAULT_RATE_LIMIT_TPM) {
-      const limit = parseInt(process.env.CODEVAULT_RATE_LIMIT_TPM, 10);
+    const envVar = process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM || process.env.CODEVAULT_RATE_LIMIT_TPM;
+    if (envVar) {
+      const limit = parseInt(envVar, 10);
       if (!isNaN(limit) && limit > 0) {
         return limit;
       }

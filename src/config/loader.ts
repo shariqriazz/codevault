@@ -49,34 +49,34 @@ export function readProjectConfig(basePath = '.'): CodevaultConfig | null {
 export function readEnvConfig(): CodevaultConfig {
   const config: CodevaultConfig = {};
 
-  // Provider settings
-  if (process.env.OPENAI_API_KEY) {
+  // Provider settings - New variables with backward compatibility
+  if (process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY) {
     config.providers = config.providers || {};
     config.providers.openai = config.providers.openai || {};
-    config.providers.openai.apiKey = process.env.OPENAI_API_KEY;
+    config.providers.openai.apiKey = process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
   }
 
-  if (process.env.OPENAI_BASE_URL) {
+  if (process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL) {
     config.providers = config.providers || {};
     config.providers.openai = config.providers.openai || {};
-    config.providers.openai.baseUrl = process.env.OPENAI_BASE_URL;
+    config.providers.openai.baseUrl = process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
   }
 
-  if (process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL || process.env.OPENAI_MODEL) {
+  if (process.env.CODEVAULT_EMBEDDING_MODEL || process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL || process.env.OPENAI_MODEL) {
     config.providers = config.providers || {};
     config.providers.openai = config.providers.openai || {};
-    config.providers.openai.model = process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL || process.env.OPENAI_MODEL;
+    config.providers.openai.model = process.env.CODEVAULT_EMBEDDING_MODEL || process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL || process.env.OPENAI_MODEL;
   }
 
-  if (process.env.CODEVAULT_OLLAMA_MODEL) {
+  if (process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL || process.env.CODEVAULT_OLLAMA_MODEL) {
     config.providers = config.providers || {};
     config.providers.ollama = config.providers.ollama || {};
-    config.providers.ollama.model = process.env.CODEVAULT_OLLAMA_MODEL;
+    config.providers.ollama.model = process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL || process.env.CODEVAULT_OLLAMA_MODEL;
   }
 
-  // Dimensions
-  if (process.env.CODEVAULT_DIMENSIONS) {
-    const dims = parseInt(process.env.CODEVAULT_DIMENSIONS, 10);
+  // Dimensions - New variable with backward compatibility
+  if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
+    const dims = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
     if (!isNaN(dims) && dims > 0) {
       if (config.providers?.openai) {
         config.providers.openai.dimensions = dims;
@@ -87,25 +87,25 @@ export function readEnvConfig(): CodevaultConfig {
     }
   }
 
-  // Max tokens
-  if (process.env.CODEVAULT_MAX_TOKENS) {
-    const tokens = parseInt(process.env.CODEVAULT_MAX_TOKENS, 10);
+  // Max tokens - New variable with backward compatibility
+  if (process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS) {
+    const tokens = parseInt(process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS || '0', 10);
     if (!isNaN(tokens) && tokens > 0) {
       config.maxTokens = tokens;
     }
   }
 
-  // Rate limiting
-  if (process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT) {
-    const rpm = parseInt(process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT || '0', 10);
+  // Rate limiting - New variables with backward compatibility
+  if (process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT) {
+    const rpm = parseInt(process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT_RPM || process.env.CODEVAULT_RATE_LIMIT || '0', 10);
     if (!isNaN(rpm) && rpm > 0) {
       config.rateLimit = config.rateLimit || {};
       config.rateLimit.rpm = rpm;
     }
   }
 
-  if (process.env.CODEVAULT_RATE_LIMIT_TPM) {
-    const tpm = parseInt(process.env.CODEVAULT_RATE_LIMIT_TPM, 10);
+  if (process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM || process.env.CODEVAULT_RATE_LIMIT_TPM) {
+    const tpm = parseInt(process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM || process.env.CODEVAULT_RATE_LIMIT_TPM || '0', 10);
     if (!isNaN(tpm) && tpm > 0) {
       config.rateLimit = config.rateLimit || {};
       config.rateLimit.tpm = tpm;

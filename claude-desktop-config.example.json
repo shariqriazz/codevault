@@ -6,16 +6,16 @@
         "/path/to/codevault/dist/mcp-server.js"
       ],
       "env": {
-        "OPENAI_API_KEY": "your-openai-api-key-here",
-        "OPENAI_BASE_URL": "https://api.openai.com/v1/",
-        "CODEVAULT_OPENAI_EMBEDDING_MODEL": "text-embedding-3-large",
-        "CODEVAULT_MAX_TOKENS": "8192",
-        "CODEVAULT_DIMENSIONS": "3072",
-        "CODEVAULT_RATE_LIMIT_RPM": "10000",
-        "CODEVAULT_RATE_LIMIT_TPM": "600000",
-        "CODEVAULT_RERANK_API_URL": "your-reranker-api-url-here",
-        "CODEVAULT_RERANK_API_KEY": "your-reranker-api-key-here",
-        "CODEVAULT_RERANK_MODEL": "your-reranker-model-name"
+        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-jwt-token-here",
+        "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
+        "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
+        "CODEVAULT_EMBEDDING_MAX_TOKENS": "32000",
+        "CODEVAULT_EMBEDDING_DIMENSIONS": "4096",
+        "CODEVAULT_EMBEDDING_RATE_LIMIT_RPM": "10000",
+        "CODEVAULT_EMBEDDING_RATE_LIMIT_TPM": "600000",
+        "CODEVAULT_RERANK_API_URL": "https://ai.api.nvidia.com/v1/retrieval/nvidia/nv-rerankqa-mistral-4b-v3/reranking",
+        "CODEVAULT_RERANK_API_KEY": "your-nvidia-api-key-here",
+        "CODEVAULT_RERANK_MODEL": "nvidia/nv-rerankqa-mistral-4b-v3"
       },
       "alwaysAllow": [
         "use_context_pack",

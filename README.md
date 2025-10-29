@@ -86,17 +86,30 @@ codevault config list --sources
 #### Option 3: Environment Variables (MCP / CI/CD)
 
 ```bash
-# OpenAI
-export OPENAI_API_KEY=sk-your-key-here
-export CODEVAULT_OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+# Embedding Provider (OpenAI-compatible APIs)
+export CODEVAULT_EMBEDDING_API_KEY=sk-your-key-here
+export CODEVAULT_EMBEDDING_BASE_URL=https://api.openai.com/v1
+export CODEVAULT_EMBEDDING_MODEL=text-embedding-3-large
 
-# Ollama
-export CODEVAULT_OLLAMA_MODEL=nomic-embed-text
+# Ollama (local, no API key needed)
+export CODEVAULT_OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 
 # Custom settings
-export CODEVAULT_MAX_TOKENS=8192
-export CODEVAULT_DIMENSIONS=3072
+export CODEVAULT_EMBEDDING_MAX_TOKENS=8192
+export CODEVAULT_EMBEDDING_DIMENSIONS=3072
+export CODEVAULT_EMBEDDING_RATE_LIMIT_RPM=10000
+export CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000
 ```
+
+**Note:** Old variable names are still supported for backward compatibility:
+- `OPENAI_API_KEY` → `CODEVAULT_EMBEDDING_API_KEY`
+- `OPENAI_BASE_URL` → `CODEVAULT_EMBEDDING_BASE_URL`
+- `CODEVAULT_OPENAI_EMBEDDING_MODEL` → `CODEVAULT_EMBEDDING_MODEL`
+- `CODEVAULT_OLLAMA_MODEL` → `CODEVAULT_OLLAMA_EMBEDDING_MODEL`
+- `CODEVAULT_MAX_TOKENS` → `CODEVAULT_EMBEDDING_MAX_TOKENS`
+- `CODEVAULT_DIMENSIONS` → `CODEVAULT_EMBEDDING_DIMENSIONS`
+- `CODEVAULT_RATE_LIMIT_RPM` → `CODEVAULT_EMBEDDING_RATE_LIMIT_RPM`
+- `CODEVAULT_RATE_LIMIT_TPM` → `CODEVAULT_EMBEDDING_RATE_LIMIT_TPM`
 
 #### Option 4: Project-Specific Config
 
@@ -122,9 +135,9 @@ export OPENAI_API_KEY=your-key-here
 codevault index --provider openai
 
 # Using Qwen (via Nebius AI Studio)
-export OPENAI_API_KEY=your-nebius-api-key
-export OPENAI_BASE_URL=https://api.studio.nebius.com/v1/
-export CODEVAULT_OPENAI_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+export CODEVAULT_EMBEDDING_API_KEY=your-nebius-api-key
+export CODEVAULT_EMBEDDING_BASE_URL=https://api.studio.nebius.com/v1
+export CODEVAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
 codevault index --provider openai
 
 # With encryption
@@ -162,8 +175,8 @@ Add to your `claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "codevault@beta", "mcp"],
       "env": {
-        "OPENAI_API_KEY": "your-api-key-here",
-        "CODEVAULT_OPENAI_EMBEDDING_MODEL": "text-embedding-3-large"
+        "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here",
+        "CODEVAULT_EMBEDDING_MODEL": "text-embedding-3-large"
       }
     }
   }
@@ -179,7 +192,7 @@ Or use local installation:
       "command": "node",
       "args": ["/path/to/codevault/dist/mcp-server.js"],
       "env": {
-        "OPENAI_API_KEY": "your-api-key-here"
+        "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here"
       }
     }
   }
@@ -268,19 +281,19 @@ When used via MCP, CodeVault provides these tools:
 ### Environment Variables
 
 ```bash
-# Provider Configuration
-OPENAI_API_KEY=sk-...
-OPENAI_BASE_URL=https://api.openai.com/v1  # For custom endpoints
-CODEVAULT_OPENAI_EMBEDDING_MODEL=text-embedding-3-large
-CODEVAULT_OLLAMA_MODEL=nomic-embed-text
+# Embedding Provider Configuration
+CODEVAULT_EMBEDDING_API_KEY=sk-...                       # API key for embeddings
+CODEVAULT_EMBEDDING_BASE_URL=https://api.openai.com/v1  # Embedding API endpoint
+CODEVAULT_EMBEDDING_MODEL=text-embedding-3-large        # Embedding model name
+CODEVAULT_OLLAMA_EMBEDDING_MODEL=nomic-embed-text       # Ollama embedding model
 
-# Chunking Configuration
-CODEVAULT_MAX_TOKENS=8192                  # Max tokens per chunk
-CODEVAULT_DIMENSIONS=3072                  # Embedding dimensions
+# Embedding Chunking Configuration
+CODEVAULT_EMBEDDING_MAX_TOKENS=8192                     # Max tokens per embedding chunk
+CODEVAULT_EMBEDDING_DIMENSIONS=3072                     # Embedding vector dimensions
 
-# Rate Limiting
-CODEVAULT_RATE_LIMIT_RPM=10000            # Requests per minute
-CODEVAULT_RATE_LIMIT_TPM=600000           # Tokens per minute
+# Embedding API Rate Limiting
+CODEVAULT_EMBEDDING_RATE_LIMIT_RPM=10000               # Embedding API requests/min
+CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000              # Embedding API tokens/min
 
 # Encryption
 CODEVAULT_ENCRYPTION_KEY=...              # 32-byte key (base64 or hex)

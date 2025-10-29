@@ -32,8 +32,10 @@ codevault index
       "command": "node",
       "args": ["/path/to/dist/mcp-server.js"],
       "env": {
-        "OPENAI_API_KEY": "sk-your-key-here",
-        "CODEVAULT_OPENAI_EMBEDDING_MODEL": "text-embedding-3-large"
+        "CODEVAULT_EMBEDDING_API_KEY": "sk-your-key-here",
+        "CODEVAULT_EMBEDDING_MODEL": "text-embedding-3-large",
+        "CODEVAULT_EMBEDDING_DIMENSIONS": "3072",
+        "CODEVAULT_EMBEDDING_MAX_TOKENS": "8192"
       }
     }
   }
@@ -315,6 +317,7 @@ codevault config init
 
 ```bash
 codevault config set providers.openai.apiKey sk-proj-...
+codevault config set providers.openai.baseUrl https://api.openai.com/v1
 codevault config set providers.openai.model text-embedding-3-large
 codevault config set providers.openai.dimensions 3072
 codevault config set maxTokens 8192
@@ -326,6 +329,17 @@ codevault config set maxTokens 8192
 codevault config set provider ollama
 codevault config set providers.ollama.model nomic-embed-text
 codevault config set providers.ollama.dimensions 768
+codevault config set maxTokens 8192
+```
+
+### Example: Nebius/Qwen Setup
+
+```bash
+codevault config set providers.openai.apiKey your-nebius-jwt-token
+codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
+codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
+codevault config set providers.openai.dimensions 4096
+codevault config set maxTokens 32000
 ```
 
 ### Example: Rate Limiting
@@ -349,8 +363,8 @@ If you have existing `.env` files in multiple projects:
 ```bash
 # Option 1: Move to global config (recommended)
 # Copy your common settings once
-codevault config set providers.openai.apiKey $OPENAI_API_KEY
-codevault config set providers.openai.model $CODEVAULT_OPENAI_EMBEDDING_MODEL
+codevault config set providers.openai.apiKey $CODEVAULT_EMBEDDING_API_KEY
+codevault config set providers.openai.model $CODEVAULT_EMBEDDING_MODEL
 
 # Option 2: Keep .env files (still works)
 # No changes needed, .env continues to work

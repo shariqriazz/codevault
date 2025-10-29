@@ -166,8 +166,8 @@ export async function getModelProfile(providerName: string, modelName: string | 
   
   const profile: ModelProfile = { ...baseProfile } as ModelProfile;
   
-  if (process.env.CODEVAULT_MAX_TOKENS) {
-    const maxTokens = parseInt(process.env.CODEVAULT_MAX_TOKENS, 10);
+  if (process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS) {
+    const maxTokens = parseInt(process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS || '0', 10);
     if (!isNaN(maxTokens) && maxTokens > 0) {
       const originalMaxTokens = profile.maxTokens;
       const scalingRatio = maxTokens / originalMaxTokens;
@@ -187,8 +187,8 @@ export async function getModelProfile(providerName: string, modelName: string | 
     }
   }
   
-  if (process.env.CODEVAULT_DIMENSIONS) {
-    const dimensions = parseInt(process.env.CODEVAULT_DIMENSIONS, 10);
+  if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
+    const dimensions = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
     if (!isNaN(dimensions) && dimensions > 0) {
       profile.dimensions = dimensions;
       if (!process.env.CODEVAULT_QUIET) {

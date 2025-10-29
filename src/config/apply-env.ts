@@ -13,49 +13,58 @@ export function applyConfigToEnv(basePath = '.'): void {
   
   // Only set env vars if they're not already set (env vars have priority)
   
-  // OpenAI provider
+  // OpenAI provider - Set new variables with backward compatibility
   if (config.providers?.openai) {
-    if (!process.env.OPENAI_API_KEY && config.providers.openai.apiKey) {
-      process.env.OPENAI_API_KEY = config.providers.openai.apiKey;
+    if (!process.env.CODEVAULT_EMBEDDING_API_KEY && !process.env.OPENAI_API_KEY && config.providers.openai.apiKey) {
+      process.env.CODEVAULT_EMBEDDING_API_KEY = config.providers.openai.apiKey;
+      process.env.OPENAI_API_KEY = config.providers.openai.apiKey; // Backward compatibility
     }
     
-    if (!process.env.OPENAI_BASE_URL && config.providers.openai.baseUrl) {
-      process.env.OPENAI_BASE_URL = config.providers.openai.baseUrl;
+    if (!process.env.CODEVAULT_EMBEDDING_BASE_URL && !process.env.OPENAI_BASE_URL && config.providers.openai.baseUrl) {
+      process.env.CODEVAULT_EMBEDDING_BASE_URL = config.providers.openai.baseUrl;
+      process.env.OPENAI_BASE_URL = config.providers.openai.baseUrl; // Backward compatibility
     }
     
-    if (!process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL && config.providers.openai.model) {
-      process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL = config.providers.openai.model;
+    if (!process.env.CODEVAULT_EMBEDDING_MODEL && !process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL && config.providers.openai.model) {
+      process.env.CODEVAULT_EMBEDDING_MODEL = config.providers.openai.model;
+      process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL = config.providers.openai.model; // Backward compatibility
     }
     
-    if (!process.env.CODEVAULT_DIMENSIONS && config.providers.openai.dimensions) {
-      process.env.CODEVAULT_DIMENSIONS = String(config.providers.openai.dimensions);
+    if (!process.env.CODEVAULT_EMBEDDING_DIMENSIONS && !process.env.CODEVAULT_DIMENSIONS && config.providers.openai.dimensions) {
+      process.env.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.openai.dimensions);
+      process.env.CODEVAULT_DIMENSIONS = String(config.providers.openai.dimensions); // Backward compatibility
     }
   }
   
-  // Ollama provider
+  // Ollama provider - Set new variable with backward compatibility
   if (config.providers?.ollama) {
-    if (!process.env.CODEVAULT_OLLAMA_MODEL && config.providers.ollama.model) {
-      process.env.CODEVAULT_OLLAMA_MODEL = config.providers.ollama.model;
+    if (!process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL && !process.env.CODEVAULT_OLLAMA_MODEL && config.providers.ollama.model) {
+      process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL = config.providers.ollama.model;
+      process.env.CODEVAULT_OLLAMA_MODEL = config.providers.ollama.model; // Backward compatibility
     }
     
-    if (!process.env.CODEVAULT_DIMENSIONS && config.providers.ollama.dimensions) {
-      process.env.CODEVAULT_DIMENSIONS = String(config.providers.ollama.dimensions);
+    if (!process.env.CODEVAULT_EMBEDDING_DIMENSIONS && !process.env.CODEVAULT_DIMENSIONS && config.providers.ollama.dimensions) {
+      process.env.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.ollama.dimensions);
+      process.env.CODEVAULT_DIMENSIONS = String(config.providers.ollama.dimensions); // Backward compatibility
     }
   }
   
-  // Max tokens
-  if (!process.env.CODEVAULT_MAX_TOKENS && config.maxTokens) {
-    process.env.CODEVAULT_MAX_TOKENS = String(config.maxTokens);
+  // Max tokens - Set new variable with backward compatibility
+  if (!process.env.CODEVAULT_EMBEDDING_MAX_TOKENS && !process.env.CODEVAULT_MAX_TOKENS && config.maxTokens) {
+    process.env.CODEVAULT_EMBEDDING_MAX_TOKENS = String(config.maxTokens);
+    process.env.CODEVAULT_MAX_TOKENS = String(config.maxTokens); // Backward compatibility
   }
   
-  // Rate limiting
+  // Rate limiting - Set new variables with backward compatibility
   if (config.rateLimit) {
-    if (!process.env.CODEVAULT_RATE_LIMIT_RPM && config.rateLimit.rpm) {
-      process.env.CODEVAULT_RATE_LIMIT_RPM = String(config.rateLimit.rpm);
+    if (!process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM && !process.env.CODEVAULT_RATE_LIMIT_RPM && config.rateLimit.rpm) {
+      process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM = String(config.rateLimit.rpm);
+      process.env.CODEVAULT_RATE_LIMIT_RPM = String(config.rateLimit.rpm); // Backward compatibility
     }
     
-    if (!process.env.CODEVAULT_RATE_LIMIT_TPM && config.rateLimit.tpm) {
-      process.env.CODEVAULT_RATE_LIMIT_TPM = String(config.rateLimit.tpm);
+    if (!process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM && !process.env.CODEVAULT_RATE_LIMIT_TPM && config.rateLimit.tpm) {
+      process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM = String(config.rateLimit.tpm);
+      process.env.CODEVAULT_RATE_LIMIT_TPM = String(config.rateLimit.tpm); // Backward compatibility
     }
   }
   
