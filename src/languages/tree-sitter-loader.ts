@@ -2,7 +2,7 @@ import LangBash from 'tree-sitter-bash';
 import LangC from 'tree-sitter-c';
 import LangCSharp from 'tree-sitter-c-sharp';
 import LangCpp from 'tree-sitter-cpp';
-import LangCSS from 'tree-sitter-css';
+import LangCSS from 'tree-sitter-css/bindings/node/index.js';
 import LangElixir from 'tree-sitter-elixir';
 import LangGo from 'tree-sitter-go';
 import LangHaskell from 'tree-sitter-haskell';
