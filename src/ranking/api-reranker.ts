@@ -72,6 +72,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
   }
 
   const isNvidiaAPI = apiUrl.includes('ai.api.nvidia.com');
+  const isNovitaAPI = apiUrl.includes('api.novita.ai');
 
   let requestBody: any;
   
@@ -83,7 +84,16 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
       },
       passages: documents.map(text => ({ text }))
     };
+  } else if (isNovitaAPI) {
+    // Novita reranker uses OpenAI-compatible format
+    requestBody = {
+      model: model,
+      query: query,
+      documents: documents,
+      top_n: documents.length
+    };
   } else {
+    // Cohere, Jina, Voyage format
     requestBody = {
       model: model,
       query: query,
@@ -108,6 +118,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
 
   const data = await response.json() as any;
 
+  // Handle NVIDIA format
   if (isNvidiaAPI && data.rankings && Array.isArray(data.rankings)) {
     return (data.rankings as NvidiaRankingItem[]).map(item => ({
       index: item.index,
@@ -115,6 +126,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     }));
   }
 
+  // Handle Novita, Cohere, Jina, Voyage format (all use results array)
   if (data.results && Array.isArray(data.results)) {
     return data.results;
   }
