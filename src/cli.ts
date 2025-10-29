@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerConfigCommands } from './cli/commands/config-cmd.js';
 import { registerContextCommands } from './cli/commands/context.js';
+import { registerAskCommand } from './cli/commands/ask-cmd.js';
 import { resolveScopeWithPack } from './context/packs.js';
 import { readCodemap } from './codemap/io.js';
 import { indexProject } from './core/indexer.js';
@@ -355,6 +356,8 @@ program
 registerConfigCommands(program);
 
 registerContextCommands(program);
+
+registerAskCommand(program);
 
 program
   .command('mcp')

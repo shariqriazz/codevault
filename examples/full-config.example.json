@@ -1,0 +1,42 @@
+{
+  "comment": "Complete CodeVault configuration example with all features",
+  "defaultProvider": "openai",
+  "providers": {
+    "openai": {
+      "apiKey": "sk-your-openai-api-key-here",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "text-embedding-3-large",
+      "dimensions": 3072
+    },
+    "ollama": {
+      "model": "nomic-embed-text",
+      "dimensions": 768
+    }
+  },
+  "chatLLM": {
+    "openai": {
+      "apiKey": "sk-your-openai-api-key-here",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "gpt-4o",
+      "maxTokens": 4096,
+      "temperature": 0.7
+    },
+    "ollama": {
+      "model": "llama3.1"
+    }
+  },
+  "maxTokens": 8192,
+  "rateLimit": {
+    "rpm": 10000,
+    "tpm": 600000
+  },
+  "encryption": {
+    "enabled": false,
+    "key": "your-32-byte-base64-or-hex-key-here"
+  },
+  "reranker": {
+    "apiUrl": "https://ai.api.nvidia.com/v1/retrieval/nvidia/nv-rerankqa-mistral-4b-v3/reranking",
+    "apiKey": "your-nvidia-api-key-here",
+    "model": "nvidia/nv-rerankqa-mistral-4b-v3"
+  }
+}

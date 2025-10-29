@@ -1,0 +1,31 @@
+{
+  "comment": "CodeVault configuration for Qwen models via Nebius AI Studio",
+  "defaultProvider": "openai",
+  "providers": {
+    "openai": {
+      "apiKey": "your-nebius-jwt-token-here",
+      "baseUrl": "https://api.studio.nebius.com/v1",
+      "model": "Qwen/Qwen3-Embedding-8B",
+      "dimensions": 4096
+    }
+  },
+  "chatLLM": {
+    "openai": {
+      "apiKey": "your-nebius-jwt-token-here",
+      "baseUrl": "https://api.studio.nebius.com/v1",
+      "model": "Qwen/Qwen2.5-72B-Instruct",
+      "maxTokens": 4096,
+      "temperature": 0.7
+    }
+  },
+  "maxTokens": 32000,
+  "rateLimit": {
+    "rpm": 10000,
+    "tpm": 600000
+  },
+  "reranker": {
+    "apiUrl": "https://ai.api.nvidia.com/v1/retrieval/nvidia/nv-rerankqa-mistral-4b-v3/reranking",
+    "apiKey": "your-nvidia-api-key-here",
+    "model": "nvidia/nv-rerankqa-mistral-4b-v3"
+  }
+}

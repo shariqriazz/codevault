@@ -135,6 +135,49 @@ export function readEnvConfig(): CodevaultConfig {
     config.reranker.model = process.env.CODEVAULT_RERANK_MODEL;
   }
 
+  // Chat LLM Configuration
+  if (process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.apiKey = process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY;
+  }
+
+  if (process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.baseUrl = process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL;
+  }
+
+  if (process.env.CODEVAULT_CHAT_MODEL || process.env.CODEVAULT_OPENAI_CHAT_MODEL) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.model = process.env.CODEVAULT_CHAT_MODEL || process.env.CODEVAULT_OPENAI_CHAT_MODEL;
+  }
+
+  if (process.env.CODEVAULT_CHAT_MAX_TOKENS) {
+    const maxTokens = parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS, 10);
+    if (!isNaN(maxTokens) && maxTokens > 0) {
+      config.chatLLM = config.chatLLM || {};
+      config.chatLLM.openai = config.chatLLM.openai || {};
+      config.chatLLM.openai.maxTokens = maxTokens;
+    }
+  }
+
+  if (process.env.CODEVAULT_CHAT_TEMPERATURE) {
+    const temperature = parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE);
+    if (!isNaN(temperature)) {
+      config.chatLLM = config.chatLLM || {};
+      config.chatLLM.openai = config.chatLLM.openai || {};
+      config.chatLLM.openai.temperature = temperature;
+    }
+  }
+
+  if (process.env.CODEVAULT_OLLAMA_CHAT_MODEL) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.ollama = config.chatLLM.ollama || {};
+    config.chatLLM.ollama.model = process.env.CODEVAULT_OLLAMA_CHAT_MODEL;
+  }
+
   return config;
 }
 
@@ -193,6 +236,24 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
         ...result.reranker,
         ...config.reranker
       };
+    }
+
+    if (config.chatLLM) {
+      result.chatLLM = result.chatLLM || {};
+      
+      if (config.chatLLM.openai) {
+        result.chatLLM.openai = {
+          ...result.chatLLM.openai,
+          ...config.chatLLM.openai
+        };
+      }
+
+      if (config.chatLLM.ollama) {
+        result.chatLLM.ollama = {
+          ...result.chatLLM.ollama,
+          ...config.chatLLM.ollama
+        };
+      }
     }
   }
 

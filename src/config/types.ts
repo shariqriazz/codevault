@@ -15,11 +15,23 @@ export interface EncryptionConfig {
   key?: string;
 }
 
+export interface ChatLLMConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 export interface CodevaultConfig {
   defaultProvider?: string;
   providers?: {
     openai?: ProviderConfig;
     ollama?: ProviderConfig;
+  };
+  chatLLM?: {
+    openai?: ChatLLMConfig;
+    ollama?: ChatLLMConfig;
   };
   rateLimit?: RateLimitConfig;
   encryption?: EncryptionConfig;

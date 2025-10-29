@@ -89,6 +89,35 @@ export function applyConfigToEnv(basePath = '.'): void {
       process.env.CODEVAULT_RERANK_MODEL = config.reranker.model;
     }
   }
+  
+  // Chat LLM
+  if (config.chatLLM?.openai) {
+    if (!process.env.CODEVAULT_CHAT_API_KEY && config.chatLLM.openai.apiKey) {
+      process.env.CODEVAULT_CHAT_API_KEY = config.chatLLM.openai.apiKey;
+    }
+    
+    if (!process.env.CODEVAULT_CHAT_BASE_URL && config.chatLLM.openai.baseUrl) {
+      process.env.CODEVAULT_CHAT_BASE_URL = config.chatLLM.openai.baseUrl;
+    }
+    
+    if (!process.env.CODEVAULT_CHAT_MODEL && config.chatLLM.openai.model) {
+      process.env.CODEVAULT_CHAT_MODEL = config.chatLLM.openai.model;
+    }
+    
+    if (!process.env.CODEVAULT_CHAT_MAX_TOKENS && config.chatLLM.openai.maxTokens) {
+      process.env.CODEVAULT_CHAT_MAX_TOKENS = String(config.chatLLM.openai.maxTokens);
+    }
+    
+    if (!process.env.CODEVAULT_CHAT_TEMPERATURE && config.chatLLM.openai.temperature) {
+      process.env.CODEVAULT_CHAT_TEMPERATURE = String(config.chatLLM.openai.temperature);
+    }
+  }
+  
+  if (config.chatLLM?.ollama) {
+    if (!process.env.CODEVAULT_OLLAMA_CHAT_MODEL && config.chatLLM.ollama.model) {
+      process.env.CODEVAULT_OLLAMA_CHAT_MODEL = config.chatLLM.ollama.model;
+    }
+  }
 }
 
 /**

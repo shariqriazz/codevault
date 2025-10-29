@@ -14,6 +14,8 @@ import { fileURLToPath } from 'url';
 import { searchCode, getChunk, getOverview } from './core/search.js';
 import { indexProject } from './core/indexer.js';
 import { resolveScopeWithPack } from './context/packs.js';
+import { synthesizeAnswer } from './synthesis/synthesizer.js';
+import { formatSynthesisResult, formatErrorMessage, formatNoResultsMessage } from './synthesis/markdown-formatter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -167,6 +169,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           path: { type: 'string', description: 'Project root directory', default: '.' },
         },
         required: ['name'],
+      },
+    },
+    {
+      name: 'ask_codebase',
+      description: 'Ask a question and get LLM-synthesized answer with code citations',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          question: { type: 'string', description: 'Natural language question about the codebase' },
+          provider: { type: 'string', description: 'Embedding provider (auto|openai|ollama)', default: 'auto' },
+          chat_provider: { type: 'string', description: 'Chat LLM provider (auto|openai|ollama)', default: 'auto' },
+          path: { type: 'string', description: 'Project root directory', default: '.' },
+          max_chunks: { type: 'number', description: 'Max code chunks to analyze', default: 10 },
+          path_glob: { type: ['string', 'array'], description: 'File patterns to filter' },
+          tags: { type: ['string', 'array'], description: 'Tags to filter' },
+          lang: { type: ['string', 'array'], description: 'Languages to filter' },
+          reranker: { type: 'string', enum: ['on', 'off'], default: 'on', description: 'Use API reranking' },
+          multi_query: { type: 'boolean', default: false, description: 'Break complex questions into sub-queries' },
+          temperature: { type: 'number', minimum: 0, maximum: 2, default: 0.7, description: 'LLM temperature' },
+        },
+        required: ['question'],
       },
     },
   ];
@@ -448,6 +471,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } catch (error) {
           return {
             content: [{ type: 'text', text: `Error: ${(error as Error).message}` }],
+            isError: true,
+          };
+        }
+      }
+
+      case 'ask_codebase': {
+        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        
+        const scopeFilters: any = {
+          path_glob: typedArgs.path_glob,
+          tags: typedArgs.tags,
+          lang: typedArgs.lang
+        };
+
+        try {
+          const result = await synthesizeAnswer(typedArgs.question, {
+            provider: typedArgs.provider || 'auto',
+            chatProvider: typedArgs.chat_provider || 'auto',
+            workingPath: cleanPath,
+            scope: scopeFilters,
+            maxChunks: typedArgs.max_chunks || 10,
+            useReranking: typedArgs.reranker !== 'off',
+            useMultiQuery: typedArgs.multi_query || false,
+            temperature: typedArgs.temperature || 0.7
+          });
+
+          if (!result.success) {
+            let errorText: string;
+            if (result.error === 'no_results') {
+              errorText = formatNoResultsMessage(result.query, result.queriesUsed);
+            } else {
+              errorText = formatErrorMessage(result.error || 'Unknown error', result.query);
+            }
+            
+            return {
+              content: [{ type: 'text', text: errorText }],
+            };
+          }
+
+          const formattedResult = formatSynthesisResult(result, {
+            includeMetadata: true,
+            includeStats: true
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: formattedResult
+              }
+            ],
+          };
+        } catch (error) {
+          const errorText = formatErrorMessage((error as Error).message, typedArgs.question);
+          return {
+            content: [{ type: 'text', text: errorText }],
             isError: true,
           };
         }

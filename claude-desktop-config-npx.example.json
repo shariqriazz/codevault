@@ -17,7 +17,12 @@
         "CODEVAULT_EMBEDDING_RATE_LIMIT_TPM": "600000",
         "CODEVAULT_RERANK_API_URL": "https://ai.api.nvidia.com/v1/retrieval/nvidia/nv-rerankqa-mistral-4b-v3/reranking",
         "CODEVAULT_RERANK_API_KEY": "your-nvidia-api-key-here",
-        "CODEVAULT_RERANK_MODEL": "nvidia/nv-rerankqa-mistral-4b-v3"
+        "CODEVAULT_RERANK_MODEL": "nvidia/nv-rerankqa-mistral-4b-v3",
+        "CODEVAULT_CHAT_API_KEY": "your-nebius-jwt-token-here",
+        "CODEVAULT_CHAT_BASE_URL": "https://api.studio.nebius.com/v1",
+        "CODEVAULT_CHAT_MODEL": "Qwen/Qwen2.5-72B-Instruct",
+        "CODEVAULT_CHAT_MAX_TOKENS": "4096",
+        "CODEVAULT_CHAT_TEMPERATURE": "0.7"
       },
       "alwaysAllow": [
         "use_context_pack",
@@ -26,7 +31,8 @@
         "index_project",
         "get_project_stats",
         "update_project",
-        "search_code_with_chunks"
+        "search_code_with_chunks",
+        "ask_codebase"
       ],
       "timeout": 3600
     }

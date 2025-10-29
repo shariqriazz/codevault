@@ -7,7 +7,8 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 ## 🌟 Features
 
 - **🔍 Semantic Search**: Find code by meaning, not just keywords using vector embeddings
-- **🤖 MCP Integration**: Native support for Claude Desktop and other MCP clients  
+- **🤖 MCP Integration**: Native support for Claude Desktop and other MCP clients
+- **💬 LLM-Synthesized Answers**: Ask questions in natural language, get markdown responses with code citations
 - **🎯 Symbol-Aware Ranking**: Boost results based on function signatures, parameters, and relationships
 - **⚡ Hybrid Retrieval**: Combines vector embeddings with BM25 keyword matching via Reciprocal Rank Fusion
 - **🚀 Batch Processing**: Efficient API usage with configurable batching (50 chunks/batch by default)
@@ -160,6 +161,10 @@ codevault search "stripe checkout" --tags stripe --lang php
 # Search with full code chunks
 codevault search-with-code "database connection" --limit 5
 
+# Ask questions with LLM-synthesized answers
+codevault ask "How does authentication work in this codebase?"
+codevault ask "How do I add a new payment provider?" --multi-query --stream
+
 # View project stats
 codevault info
 ```
@@ -237,6 +242,21 @@ codevault search <query> [path]          # Search code (metadata only)
 codevault search-with-code <query>       # Search with full code chunks
   --max-code-size <bytes>                # Max code size per chunk
 
+# Ask Questions (LLM Synthesis)
+codevault ask <question>                 # Ask a question, get synthesized answer
+  -p, --provider <name>                  # Embedding provider
+  -c, --chat-provider <name>             # Chat LLM provider (auto|openai|ollama)
+  -k, --max-chunks <num>                 # Max code chunks to analyze (default: 10)
+  --path_glob <pattern...>               # Filter by file pattern
+  --tags <tag...>                        # Filter by tags
+  --lang <language...>                   # Filter by language
+  --reranker <on|off>                    # Use API reranking (default: on)
+  --multi-query                          # Break complex questions into sub-queries
+  --temperature <num>                    # LLM temperature 0-2 (default: 0.7)
+  --stream                               # Stream response in real-time
+  --citations                            # Add citation footer
+  --no-metadata                          # Hide search metadata
+
 # Context Packs
 codevault context list                   # List saved contexts
 codevault context show <name>            # Show context pack details
@@ -255,6 +275,7 @@ When used via MCP, CodeVault provides these tools:
 - **`search_code`**: Semantic search returning metadata (paths, symbols, scores, SHAs)
 - **`search_code_with_chunks`**: Search + retrieve full code for each result
 - **`get_code_chunk`**: Get specific code chunk by SHA
+- **`ask_codebase`**: ✨ Ask questions and get LLM-synthesized answers with code citations
 - **`index_project`**: Index a new project
 - **`update_project`**: Update existing index
 - **`get_project_stats`**: Get project overview and statistics
@@ -305,6 +326,62 @@ CODEVAULT_RERANK_MODEL=...
 
 # Memory Management
 CODEVAULT_CACHE_CLEAR_INTERVAL=3600000    # Cache cleanup interval (ms)
+```
+
+### Ask Questions (LLM Synthesis)
+
+The `ask` command combines semantic search with LLM synthesis to answer natural language questions about your codebase:
+
+```bash
+# Basic question
+codevault ask "How does authentication work in this codebase?"
+
+# With filters
+codevault ask "How do I add Stripe checkout?" --tags stripe --lang php
+
+# Complex question with multi-query
+codevault ask "What are the main components and how do they interact?" --multi-query
+
+# Streaming response
+codevault ask "Explain the database connection pooling" --stream
+
+# With custom settings
+codevault ask "How does error handling work?" \
+  --chat-provider openai \
+  --temperature 0.5 \
+  --max-chunks 15 \
+  --reranker on
+
+# Using Ollama for local processing
+codevault ask "What routes are available?" --chat-provider ollama
+```
+
+**How it works:**
+1. 🔍 Searches codebase using embeddings (+ optional reranking)
+2. 📚 Retrieves top N most relevant code chunks
+3. 🤖 Sends context to LLM with structured prompt
+4. 📝 LLM synthesizes natural language answer with code citations
+5. ✨ Returns formatted markdown with file references
+
+**Example Output:**
+```markdown
+# How Authentication Works
+
+The authentication system uses a middleware-based approach...
+
+The main authentication flow is handled by `AuthMiddleware` in [`src/middleware/auth.ts`](src/middleware/auth.ts):
+
+```typescript
+export function authenticate(req, res, next) {
+  // Token validation logic
+  ...
+}
+```
+
+Key components:
+- **Session Management**: [`src/auth/session.ts`](src/auth/session.ts)
+- **Token Validation**: [`src/auth/token.ts`](src/auth/token.ts)
+- **User Model**: [`src/models/user.ts`](src/models/user.ts)
 ```
 
 ## 🏗️ Architecture
@@ -515,6 +592,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **NPM**: https://www.npmjs.com/package/codevault
 - **Issues**: https://github.com/shariqriazz/codevault/issues
 - **Configuration Guide**: [CONFIGURATION.md](CONFIGURATION.md)
+- **Ask Feature Guide**: [ASK_FEATURE.md](ASK_FEATURE.md)
 
 ## 🙏 Acknowledgments
 
