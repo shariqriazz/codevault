@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
+// Suppress Node.js warnings for cleaner CLI output
+process.env.NODE_NO_WARNINGS = '1';
+
 import 'dotenv/config';
 import { spawn } from 'child_process';
 import { Command } from 'commander';
+import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -240,6 +244,9 @@ program
   .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
   .action(async (query, projectPath = '.', options) => {
     try {
+      // Suppress verbose logs
+      process.env.CODEVAULT_QUIET = 'true';
+      
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const limit = parseInt(options.limit);
       
@@ -247,29 +254,30 @@ program
       const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
 
       if (!results.success) {
-        console.log(`No results found for: "${query}"`);
+        console.log(chalk.yellow(`\nNo results found for "${query}"`));
         if (results.suggestion) {
-          console.log(`Suggestion: ${results.suggestion}`);
+          console.log(chalk.gray(`Suggestion: ${results.suggestion}`));
         }
         return;
       }
 
       if (results.results.length === 0) {
-        console.log(`No results found for: "${query}"`);
+        console.log(chalk.yellow(`\nNo results found for "${query}"`));
         return;
       }
 
-      console.log(`Found ${results.results.length} results for: "${query}"\n`);
+      console.log(chalk.cyan(`\n🔍 Found ${results.results.length} results for "${query}"\n`));
 
       results.results.forEach((result, index) => {
-        console.log(`${index + 1}. FILE: ${result.path}`);
-        console.log(`   SYMBOL: ${result.meta.symbol} (${result.lang})`);
-        console.log(`   SIMILARITY: ${result.meta.score}`);
-        console.log(`   SHA: ${result.sha}`);
-        console.log('');
+        const score = (result.meta.score * 100).toFixed(0);
+        console.log(chalk.white(`${index + 1}. ${result.path}`));
+        console.log(chalk.gray(`   ${result.meta.symbol}() · ${result.lang}`));
+        console.log(chalk.gray(`   Score: ${score}%\n`));
       });
+      
+      delete process.env.CODEVAULT_QUIET;
     } catch (error) {
-      console.error('Search error:', (error as Error).message);
+      console.error(chalk.red('\n❌ Search error:'), (error as Error).message);
       process.exit(1);
     }
   });
@@ -291,6 +299,9 @@ program
   .option('--max-code-size <bytes>', 'max code size to display per chunk', '100000')
   .action(async (query, projectPath = '.', options) => {
     try {
+      // Suppress verbose logs
+      process.env.CODEVAULT_QUIET = 'true';
+      
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const limit = parseInt(options.limit);
       const maxCodeSize = parseInt(options.maxCodeSize || '100000');
@@ -299,30 +310,29 @@ program
       const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
 
       if (!results.success) {
-        console.log(`No results found for: "${query}"`);
+        console.log(chalk.yellow(`\nNo results found for "${query}"`));
         if (results.suggestion) {
-          console.log(`Suggestion: ${results.suggestion}`);
+          console.log(chalk.gray(`Suggestion: ${results.suggestion}`));
         }
         return;
       }
 
       if (results.results.length === 0) {
-        console.log(`No results found for: "${query}"`);
+        console.log(chalk.yellow(`\nNo results found for "${query}"`));
         return;
       }
 
-      console.log(`Found ${results.results.length} results with code for: "${query}"\n`);
+      console.log(chalk.cyan(`\n🔍 Found ${results.results.length} results with code for "${query}"\n`));
 
       const { getChunk } = await import('./core/search.js');
       
       for (let index = 0; index < results.results.length; index++) {
         const result = results.results[index];
+        const score = (result.meta.score * 100).toFixed(0);
         
-        console.log(`${'='.repeat(80)}`);
-        console.log(`${index + 1}. FILE: ${result.path}`);
-        console.log(`   SYMBOL: ${result.meta.symbol} (${result.lang})`);
-        console.log(`   SIMILARITY: ${result.meta.score}`);
-        console.log(`   SHA: ${result.sha}`);
+        console.log(chalk.gray('━'.repeat(80)));
+        console.log(chalk.white(`📄 ${result.path} · ${result.meta.symbol}() · Score: ${score}%`));
+        console.log(chalk.gray('━'.repeat(80)));
         
         const chunkResult = await getChunk(result.sha, resolvedPath);
         
@@ -335,21 +345,22 @@ program
             truncated = true;
           }
           
-          console.log(`\n${'-'.repeat(80)}`);
+          console.log();
           console.log(code);
-          console.log(`${'-'.repeat(80)}`);
           
           if (truncated) {
-            console.log(`   ⚠️  Code truncated (${chunkResult.code.length} chars, showing ${maxCodeSize})`);
+            console.log(chalk.yellow(`\n⚠️  Code truncated (${chunkResult.code.length} chars, showing ${maxCodeSize})`));
           }
         } else {
-          console.log(`   ❌ Error retrieving code: ${chunkResult.error}`);
+          console.log(chalk.red(`\n❌ Error retrieving code: ${chunkResult.error}`));
         }
         
         console.log('');
       }
+      
+      delete process.env.CODEVAULT_QUIET;
     } catch (error) {
-      console.error('Search error:', (error as Error).message);
+      console.error(chalk.red('\n❌ Search error:'), (error as Error).message);
       process.exit(1);
     }
   });

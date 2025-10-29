@@ -31,6 +31,9 @@ export function registerAskCommand(program: Command): void {
     .option('--no-metadata', 'hide search metadata')
     .action(async (question, options) => {
       try {
+        // Suppress verbose logs
+        process.env.CODEVAULT_QUIET = 'true';
+        
         const resolvedPath = options.project || options.directory || options.path || '.';
         const maxChunks = parseInt(options.maxChunks, 10);
         const temperature = parseFloat(options.temperature);
@@ -47,11 +50,8 @@ export function registerAskCommand(program: Command): void {
 
         // Streaming mode
         if (options.stream) {
-          console.log(chalk.cyan('\n🤖 Asking CodeVault...\n'));
-          console.log(chalk.gray(`Question: ${question}\n`));
-          
           const spinner = ora({
-            text: 'Searching codebase...',
+            text: chalk.cyan('🔍 Searching...'),
             color: 'cyan'
           }).start();
 
@@ -68,8 +68,10 @@ export function registerAskCommand(program: Command): void {
               temperature
             })) {
               if (firstChunk) {
-                spinner.stop();
-                console.log(chalk.white('Answer:\n'));
+                spinner.succeed(chalk.cyan('🔍 Searching...  ✓'));
+                console.log(chalk.cyan('🤖 Generating answer...\n'));
+                console.log(chalk.gray('━'.repeat(80)));
+                console.log();
                 firstChunk = false;
               }
               process.stdout.write(chunk);
@@ -77,17 +79,18 @@ export function registerAskCommand(program: Command): void {
             
             console.log('\n');
           } catch (error) {
-            spinner.fail('Error generating answer');
+            spinner.fail(chalk.red('Error generating answer'));
             console.error(chalk.red(`\n${(error as Error).message}\n`));
             process.exit(1);
           }
           
+          delete process.env.CODEVAULT_QUIET;
           return;
         }
 
         // Non-streaming mode
         const spinner = ora({
-          text: chalk.white('Searching codebase and synthesizing answer...'),
+          text: chalk.cyan('🔍 Searching...'),
           color: 'cyan'
         }).start();
 
@@ -102,7 +105,14 @@ export function registerAskCommand(program: Command): void {
           temperature
         });
 
-        spinner.stop();
+        spinner.succeed(chalk.cyan(`🔍 Searching...  ✓ ${result.chunksAnalyzed || maxChunks} chunks found`));
+        
+        const genSpinner = ora({
+          text: chalk.cyan('🤖 Generating answer...'),
+          color: 'cyan'
+        }).start();
+        
+        genSpinner.succeed(chalk.cyan('🤖 Generating answer...  ✓'));
 
         if (!result.success) {
           if (result.error === 'no_results') {
@@ -113,12 +123,13 @@ export function registerAskCommand(program: Command): void {
           process.exit(1);
         }
 
-        console.log(chalk.cyan('\n🤖 CodeVault Answer\n'));
-        console.log(chalk.gray(`Question: ${question}\n`));
+        console.log();
+        console.log(chalk.gray('━'.repeat(80)));
+        console.log();
 
         let output = formatSynthesisResult(result, {
-          includeMetadata: options.metadata !== false,
-          includeStats: true
+          includeMetadata: false,  // Hide verbose metadata by default
+          includeStats: false
         });
 
         if (options.citations && result.answer) {
@@ -126,6 +137,16 @@ export function registerAskCommand(program: Command): void {
         }
 
         console.log(output);
+        
+        // Show concise footer
+        console.log();
+        console.log(chalk.gray('━'.repeat(80)));
+        const searchType = result.metadata?.searchType || 'hybrid';
+        const provider = result.chatProvider || 'auto';
+        console.log(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
+        console.log();
+
+        delete process.env.CODEVAULT_QUIET;
 
       } catch (error) {
         console.error(chalk.red('\n❌ Error:'), (error as Error).message);

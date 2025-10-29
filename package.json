@@ -5,10 +5,11 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "codevault": "dist/cli.js",
+    "codevault": "bin/codevault.sh",
     "codevault-mcp": "dist/mcp-server.js"
   },
   "files": [
+    "bin",
     "dist",
     "README.md",
     "LICENSE",
