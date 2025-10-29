@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 
-// Suppress Node.js warnings for cleaner CLI output
-process.env.NODE_NO_WARNINGS = '1';
-
 import 'dotenv/config';
 import { spawn } from 'child_process';
 import { Command } from 'commander';
