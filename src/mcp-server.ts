@@ -479,11 +479,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'ask_codebase': {
         const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
         
-        const scopeFilters: any = {
-          path_glob: typedArgs.path_glob,
-          tags: typedArgs.tags,
-          lang: typedArgs.lang
-        };
+        // Use resolveScopeWithPack like other search tools for consistency
+        const { scope: scopeFilters } = resolveScopeWithPack(
+          {
+            path_glob: typedArgs.path_glob,
+            tags: typedArgs.tags,
+            lang: typedArgs.lang,
+            reranker: typedArgs.reranker,
+          },
+          { basePath: cleanPath, sessionPack: sessionContextPack }
+        );
 
         try {
           const result = await synthesizeAnswer(typedArgs.question, {

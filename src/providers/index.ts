@@ -14,7 +14,8 @@ export function createEmbeddingProvider(providerName = 'auto'): EmbeddingProvide
       return new OllamaProvider();
     case 'auto':
     default:
-      if (process.env.OPENAI_API_KEY) {
+      // Check for OpenAI-compatible API keys (including custom endpoints like Nebius)
+      if (process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY) {
         return new OpenAIProvider();
       } else {
         return new OllamaProvider();

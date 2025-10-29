@@ -190,6 +190,7 @@ export function createChatLLMProvider(providerName = 'auto'): ChatLLMProvider {
       return new OllamaChatProvider();
     case 'auto':
     default:
+      // Check for chat API keys (including custom endpoints like OpenRouter, Nebius)
       if (process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY) {
         return new OpenAIChatProvider();
       } else {
