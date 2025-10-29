@@ -3,7 +3,7 @@
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "your-nebius-jwt-token-here",
+      "apiKey": "your-nebius-api-token-here",
       "baseUrl": "https://api.studio.nebius.com/v1",
       "model": "Qwen/Qwen3-Embedding-8B",
       "dimensions": 4096
@@ -11,11 +11,11 @@
   },
   "chatLLM": {
     "openai": {
-      "apiKey": "your-nebius-jwt-token-here",
-      "baseUrl": "https://api.studio.nebius.com/v1",
-      "model": "Qwen/Qwen2.5-72B-Instruct",
-      "maxTokens": 4096,
-      "temperature": 0.7
+      "apiKey": "your-openrouter-api-token-here",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "anthropic/claude-sonnet-4.5",
+      "maxTokens": 32000,
+      "temperature": 0.1
     }
   },
   "maxTokens": 32000,

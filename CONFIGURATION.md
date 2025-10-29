@@ -335,7 +335,7 @@ codevault config set maxTokens 8192
 ### Example: Nebius/Qwen Setup
 
 ```bash
-codevault config set providers.openai.apiKey your-nebius-jwt-token
+codevault config set providers.openai.apiKey your-nebius-api-token
 codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
 codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
 codevault config set providers.openai.dimensions 4096

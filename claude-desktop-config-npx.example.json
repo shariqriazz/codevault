@@ -8,7 +8,7 @@
         "mcp"
       ],
       "env": {
-        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-jwt-token-here",
+        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-api-token-here",
         "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
         "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
         "CODEVAULT_EMBEDDING_MAX_TOKENS": "32000",
@@ -18,11 +18,11 @@
         "CODEVAULT_RERANK_API_URL": "https://api.novita.ai/openai/v1/rerank",
         "CODEVAULT_RERANK_API_KEY": "your-novita-api-key-here",
         "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b",
-        "CODEVAULT_CHAT_API_KEY": "your-nebius-jwt-token-here",
-        "CODEVAULT_CHAT_BASE_URL": "https://api.studio.nebius.com/v1",
-        "CODEVAULT_CHAT_MODEL": "Qwen/Qwen2.5-72B-Instruct",
-        "CODEVAULT_CHAT_MAX_TOKENS": "4096",
-        "CODEVAULT_CHAT_TEMPERATURE": "0.7"
+        "CODEVAULT_CHAT_API_KEY": "your-openrouter-api-token-here",
+        "CODEVAULT_CHAT_BASE_URL": "https://openrouter.ai/api/v1",
+        "CODEVAULT_CHAT_MODEL": "anthropic/claude-sonnet-4.5",
+        "CODEVAULT_CHAT_MAX_TOKENS": "32000",
+        "CODEVAULT_CHAT_TEMPERATURE": "0.1"
       },
       "alwaysAllow": [
         "use_context_pack",
