@@ -44,7 +44,7 @@ codevault index
 ```bash
 git clone https://github.com/shariqriazz/codevault.git
 cd codevault
-npm install
+npm npm install --legacy-peer-deps
 npm run build
 npm link
 ```
