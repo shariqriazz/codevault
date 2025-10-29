@@ -16,8 +16,8 @@ function getMaxFromEnv(): number {
 }
 
 function getMaxTokensFromEnv(): number {
-  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX_TOKENS || '512', 10);
-  return Number.isFinite(envMax) && envMax > 0 ? envMax : 512;
+  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX_TOKENS || '8192', 10);
+  return Number.isFinite(envMax) && envMax > 0 ? envMax : 8192;
 }
 
 function truncateText(text: string, maxTokens: number): string {
@@ -53,11 +53,6 @@ interface RerankResult {
   logit?: number;
 }
 
-interface NvidiaRankingItem {
-  index: number;
-  logit: number;
-}
-
 async function callRerankAPI(query: string, documents: string[], config: RerankAPIConfig = {}): Promise<RerankResult[]> {
   const apiUrl = config.apiUrl || getAPIUrl();
   const apiKey = config.apiKey || getAPIKey();
@@ -71,36 +66,13 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error('CODEVAULT_RERANK_API_KEY is not configured');
   }
 
-  const isNvidiaAPI = apiUrl.includes('ai.api.nvidia.com');
-  const isNovitaAPI = apiUrl.includes('api.novita.ai');
-
-  let requestBody: any;
-  
-  if (isNvidiaAPI) {
-    requestBody = {
-      model: model,
-      query: {
-        text: query
-      },
-      passages: documents.map(text => ({ text }))
-    };
-  } else if (isNovitaAPI) {
-    // Novita reranker uses OpenAI-compatible format
-    requestBody = {
-      model: model,
-      query: query,
-      documents: documents,
-      top_n: documents.length
-    };
-  } else {
-    // Cohere, Jina, Voyage format
-    requestBody = {
-      model: model,
-      query: query,
-      documents: documents,
-      top_n: documents.length
-    };
-  }
+  // Standard reranking API format (Novita, Cohere, Jina AI, Voyage AI)
+  const requestBody = {
+    model: model,
+    query: query,
+    documents: documents,
+    top_n: documents.length
+  };
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -118,28 +90,23 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
 
   const data = await response.json() as any;
 
-  // Handle NVIDIA format
-  if (isNvidiaAPI && data.rankings && Array.isArray(data.rankings)) {
-    return (data.rankings as NvidiaRankingItem[]).map(item => ({
-      index: item.index,
-      relevance_score: item.logit
-    }));
-  }
-
-  // Handle Novita, Cohere, Jina, Voyage format (all use results array)
+  // Handle standard reranking response format
+  // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
   if (data.results && Array.isArray(data.results)) {
     return data.results;
   }
 
+  // Alternative response format (some providers use data array)
   if (data.data && Array.isArray(data.data)) {
     return data.data;
   }
 
+  // Fallback for direct array response
   if (Array.isArray(data)) {
     return data;
   }
 
-  throw new Error('Unexpected rerank API response format');
+  throw new Error(`Unexpected rerank API response format. Expected {results: [...]} but got: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
 interface Candidate {
