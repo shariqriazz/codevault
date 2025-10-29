@@ -35,8 +35,8 @@
     "key": "your-32-byte-base64-or-hex-key-here"
   },
   "reranker": {
-    "apiUrl": "https://ai.api.nvidia.com/v1/retrieval/nvidia/nv-rerankqa-mistral-4b-v3/reranking",
-    "apiKey": "your-nvidia-api-key-here",
-    "model": "nvidia/nv-rerankqa-mistral-4b-v3"
+    "apiUrl": "https://api.novita.ai/openai/v1/rerank",
+    "apiKey": "your-novita-api-key-here",
+    "model": "qwen/qwen3-reranker-8b"
   }
 }

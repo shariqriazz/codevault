@@ -319,10 +319,16 @@ CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000              # Embedding API tokens/mi
 # Encryption
 CODEVAULT_ENCRYPTION_KEY=...              # 32-byte key (base64 or hex)
 
-# API Reranking
-CODEVAULT_RERANK_API_URL=...
-CODEVAULT_RERANK_API_KEY=...
-CODEVAULT_RERANK_MODEL=...
+# API Reranking (Optional)
+# Novita Qwen3-Reranker (32K context, great for code)
+CODEVAULT_RERANK_API_URL=https://api.novita.ai/openai/v1/rerank
+CODEVAULT_RERANK_API_KEY=your-novita-key
+CODEVAULT_RERANK_MODEL=qwen/qwen3-reranker-8b
+
+# Or Cohere (4K context, $25 free credits)
+# CODEVAULT_RERANK_API_URL=https://api.cohere.ai/v1/rerank
+# CODEVAULT_RERANK_API_KEY=your-cohere-key
+# CODEVAULT_RERANK_MODEL=rerank-english-v3.0
 
 # Memory Management
 CODEVAULT_CACHE_CLEAR_INTERVAL=3600000    # Cache cleanup interval (ms)
