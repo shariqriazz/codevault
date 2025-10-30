@@ -68,21 +68,12 @@ export function readEnvConfig(): CodevaultConfig {
     config.providers.openai.model = process.env.CODEVAULT_EMBEDDING_MODEL || process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL || process.env.OPENAI_MODEL;
   }
 
-  if (process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL || process.env.CODEVAULT_OLLAMA_MODEL) {
-    config.providers = config.providers || {};
-    config.providers.ollama = config.providers.ollama || {};
-    config.providers.ollama.model = process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL || process.env.CODEVAULT_OLLAMA_MODEL;
-  }
-
   // Dimensions - New variable with backward compatibility
   if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
     const dims = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
     if (!isNaN(dims) && dims > 0) {
       if (config.providers?.openai) {
         config.providers.openai.dimensions = dims;
-      }
-      if (config.providers?.ollama) {
-        config.providers.ollama.dimensions = dims;
       }
     }
   }
@@ -172,11 +163,7 @@ export function readEnvConfig(): CodevaultConfig {
     }
   }
 
-  if (process.env.CODEVAULT_OLLAMA_CHAT_MODEL) {
-    config.chatLLM = config.chatLLM || {};
-    config.chatLLM.ollama = config.chatLLM.ollama || {};
-    config.chatLLM.ollama.model = process.env.CODEVAULT_OLLAMA_CHAT_MODEL;
-  }
+
 
   return config;
 }
@@ -209,12 +196,7 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
         };
       }
 
-      if (config.providers.ollama) {
-        result.providers.ollama = {
-          ...result.providers.ollama,
-          ...config.providers.ollama
-        };
-      }
+
     }
 
     if (config.rateLimit) {
@@ -248,12 +230,7 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
         };
       }
 
-      if (config.chatLLM.ollama) {
-        result.chatLLM.ollama = {
-          ...result.chatLLM.ollama,
-          ...config.chatLLM.ollama
-        };
-      }
+
     }
   }
 

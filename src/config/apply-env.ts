@@ -36,18 +36,7 @@ export function applyConfigToEnv(basePath = '.'): void {
     }
   }
   
-  // Ollama provider - Set new variable with backward compatibility
-  if (config.providers?.ollama) {
-    if (!process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL && !process.env.CODEVAULT_OLLAMA_MODEL && config.providers.ollama.model) {
-      process.env.CODEVAULT_OLLAMA_EMBEDDING_MODEL = config.providers.ollama.model;
-      process.env.CODEVAULT_OLLAMA_MODEL = config.providers.ollama.model; // Backward compatibility
-    }
-    
-    if (!process.env.CODEVAULT_EMBEDDING_DIMENSIONS && !process.env.CODEVAULT_DIMENSIONS && config.providers.ollama.dimensions) {
-      process.env.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.ollama.dimensions);
-      process.env.CODEVAULT_DIMENSIONS = String(config.providers.ollama.dimensions); // Backward compatibility
-    }
-  }
+
   
   // Max tokens - Set new variable with backward compatibility
   if (!process.env.CODEVAULT_EMBEDDING_MAX_TOKENS && !process.env.CODEVAULT_MAX_TOKENS && config.maxTokens) {
@@ -113,11 +102,7 @@ export function applyConfigToEnv(basePath = '.'): void {
     }
   }
   
-  if (config.chatLLM?.ollama) {
-    if (!process.env.CODEVAULT_OLLAMA_CHAT_MODEL && config.chatLLM.ollama.model) {
-      process.env.CODEVAULT_OLLAMA_CHAT_MODEL = config.chatLLM.ollama.model;
-    }
-  }
+
 }
 
 /**

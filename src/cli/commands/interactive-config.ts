@@ -120,12 +120,11 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
       message: 'Choose your embedding provider',
       choices: [
         { title: 'OpenAI', value: 'openai', description: 'Cloud API, requires API key, best quality' },
-        { title: 'Ollama', value: 'ollama', description: 'Local, free, no API key needed' },
-        { title: 'Custom', value: 'custom', description: 'Custom OpenAI-compatible API' }
+        { title: 'Custom OpenAI-compatible', value: 'custom', description: 'Ollama, Nebius, or other OpenAI-compatible API' }
       ]
     });
 
-    config.defaultProvider = provider === 'custom' ? 'openai' : provider;
+    config.defaultProvider = 'openai';
 
     // OpenAI / Custom configuration
     if (provider === 'openai' || provider === 'custom') {
@@ -202,38 +201,7 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
       }
     }
 
-    // Ollama configuration
-    if (provider === 'ollama') {
-      console.log(chalk.bold('\n📝 Ollama Configuration\n'));
-      
-      config.providers!.ollama = {};
 
-      const useCustomModel = await prompt.confirm({
-        message: 'Use custom Ollama model?',
-        default: 'n'
-      });
-
-      if (useCustomModel) {
-        const model = await prompt.text({
-          message: 'Model name',
-          default: 'nomic-embed-text',
-          validate: (val) => val.length > 0 || 'Model name is required'
-        });
-        config.providers!.ollama.model = model;
-      } else {
-        config.providers!.ollama.model = 'nomic-embed-text';
-      }
-
-      const dims = await prompt.text({
-        message: 'Embedding dimensions',
-        default: '768',
-        validate: (val) => {
-          const num = parseInt(val, 10);
-          return (num > 0 && num <= 10000) || 'Must be between 1 and 10000';
-        }
-      });
-      config.providers!.ollama.dimensions = parseInt(dims, 10);
-    }
 
     // Advanced settings
     console.log(chalk.bold('\n⚙️  Advanced Settings\n'));

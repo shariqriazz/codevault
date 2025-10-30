@@ -38,7 +38,7 @@ program
 program
   .command('index [path]')
   .description('Index project and build codevault.codemap.json')
-  .option('-p, --provider <provider>', 'embedding provider (auto|openai|ollama)', 'auto')
+  .option('-p, --provider <provider>', 'embedding provider (auto|openai)', 'auto')
   .option('--project <path>', 'alias for project path')
   .option('--directory <path>', 'alias for project directory')
   .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
@@ -160,7 +160,7 @@ program
 program
   .command('update [path]')
   .description('Update index by re-scanning all files')
-  .option('-p, --provider <provider>', 'embedding provider (auto|openai|ollama)', 'auto')
+  .option('-p, --provider <provider>', 'embedding provider (auto|openai)', 'auto')
   .option('--project <path>', 'alias for project path')
   .option('--directory <path>', 'alias for project directory')
   .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
@@ -180,7 +180,7 @@ program
 program
   .command('watch [path]')
   .description('Watch project files and update index on changes')
-  .option('-p, --provider <provider>', 'embedding provider (auto|openai|ollama)', 'auto')
+  .option('-p, --provider <provider>', 'embedding provider (auto|openai)', 'auto')
   .option('--project <path>', 'alias for project path')
   .option('--directory <path>', 'alias for project directory')
   .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')

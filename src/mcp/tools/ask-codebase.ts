@@ -145,8 +145,8 @@ export function registerAskCodebaseTool(server: any, options: CreateHandlerOptio
     'ask_codebase',
     {
       question: z.string().min(1).describe('Natural language question about the codebase'),
-      provider: z.string().optional().describe('Embedding provider (auto|openai|ollama)'),
-      chat_provider: z.string().optional().describe('Chat LLM provider (auto|openai|ollama)'),
+      provider: z.string().optional().describe('Embedding provider (auto|openai)'),
+      chat_provider: z.string().optional().describe('Chat LLM provider (auto|openai)'),
       path: z.string().optional().describe('Project root directory (default: ".")'),
       max_chunks: z.number().optional().describe('Maximum code chunks to analyze (default: 10)'),
       path_glob: z.union([z.string(), z.array(z.string())]).optional().describe('File patterns to filter'),
