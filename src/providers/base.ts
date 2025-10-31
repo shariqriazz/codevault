@@ -158,8 +158,7 @@ export async function getModelProfile(providerName: string, modelName: string | 
   
   if (!baseProfile) {
     const providerDefaults: Record<string, Omit<ModelProfile, 'tokenCounter'>> = {
-      'OpenAI': MODEL_PROFILES['text-embedding-3-large'],
-      'Ollama': MODEL_PROFILES['nomic-embed-text']
+      'OpenAI': MODEL_PROFILES['text-embedding-3-large']
     };
     baseProfile = providerDefaults[providerName] || MODEL_PROFILES['default'];
   }
