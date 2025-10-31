@@ -1,5 +1,5 @@
 {
-  "comment": "CodeVault configuration for Qwen models via Nebius AI Studio",
+  "comment": "Recommended setup: Nebius (embeddings) + OpenRouter (chat) + Novita (reranking)",
   "defaultProvider": "openai",
   "providers": {
     "openai": {
@@ -11,7 +11,7 @@
   },
   "chatLLM": {
     "openai": {
-      "apiKey": "your-openrouter-api-token-here",
+      "apiKey": "your-openrouter-api-key-here",
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
@@ -27,5 +27,9 @@
     "apiUrl": "https://api.novita.ai/openai/v1/rerank",
     "apiKey": "your-novita-api-key-here",
     "model": "qwen/qwen3-reranker-8b"
+  },
+  "encryption": {
+    "enabled": false,
+    "key": ""
   }
 }

@@ -1,0 +1,18 @@
+{
+  "comment": "Claude Desktop with Ollama (local, privacy-focused, free)",
+  "mcpServers": {
+    "codevault": {
+      "command": "npx",
+      "args": ["-y", "codevault", "mcp"],
+      "env": {
+        "CODEVAULT_EMBEDDING_BASE_URL": "http://localhost:11434/v1",
+        "CODEVAULT_EMBEDDING_MODEL": "nomic-embed-text",
+        "CODEVAULT_EMBEDDING_DIMENSIONS": "768",
+        "CODEVAULT_EMBEDDING_MAX_TOKENS": "8192",
+        "CODEVAULT_CHAT_BASE_URL": "http://localhost:11434/v1",
+        "CODEVAULT_CHAT_MODEL": "qwen2.5-coder:7b",
+        "CODEVAULT_CHAT_MAX_TOKENS": "32000"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-# CodeVault Ask Feature
+# Ask Feature Guide
 
 > LLM-synthesized answers to natural language questions about your codebase
 
@@ -48,12 +48,12 @@ User Question
    Find most relevant code chunks
     ↓
 3. Reranking (optional)
-   Improve relevance with API reranker
+   Improve relevance with API reranker (Qwen3-Reranker-8B)
     ↓
 4. Code Retrieval
    Get full code for top N chunks
     ↓
-5. LLM Synthesis
+5. LLM Synthesis (Claude Sonnet 4.5)
    Generate natural language answer
     ↓
 6. Formatted Markdown
@@ -65,18 +65,22 @@ User Question
 ### Environment Variables
 
 ```bash
-# Chat LLM Configuration
-CODEVAULT_CHAT_API_KEY=your-api-key              # API key for chat LLM
-CODEVAULT_CHAT_BASE_URL=https://api.openai.com/v1  # Chat API endpoint
-CODEVAULT_CHAT_MODEL=gpt-4o                      # Chat model name
-CODEVAULT_CHAT_MAX_TOKENS=4096                   # Max tokens in response
-CODEVAULT_CHAT_TEMPERATURE=0.7                   # LLM temperature (0-2)
+# Chat LLM Configuration (OpenRouter + Claude)
+export CODEVAULT_CHAT_API_KEY=your-openrouter-api-key
+export CODEVAULT_CHAT_BASE_URL=https://openrouter.ai/api/v1
+export CODEVAULT_CHAT_MODEL=anthropic/claude-sonnet-4.5
+export CODEVAULT_CHAT_MAX_TOKENS=32000
+export CODEVAULT_CHAT_TEMPERATURE=0.1
 
-# Ollama Chat (local alternative)
-CODEVAULT_OLLAMA_CHAT_MODEL=llama3.1             # Local chat model
+# Ollama (Local Alternative)
+export CODEVAULT_CHAT_BASE_URL=http://localhost:11434/v1
+export CODEVAULT_CHAT_MODEL=qwen2.5-coder:7b
+export CODEVAULT_CHAT_MAX_TOKENS=32000
 
-# Can reuse embedding API credentials
-# If CODEVAULT_CHAT_* not set, falls back to OPENAI_* or embedding vars
+# Reranking (Novita + Qwen)
+export CODEVAULT_RERANK_API_URL=https://api.novita.ai/openai/v1/rerank
+export CODEVAULT_RERANK_API_KEY=your-novita-api-key
+export CODEVAULT_RERANK_MODEL=qwen/qwen3-reranker-8b
 ```
 
 ### Config File
@@ -85,15 +89,17 @@ CODEVAULT_OLLAMA_CHAT_MODEL=llama3.1             # Local chat model
 {
   "chatLLM": {
     "openai": {
-      "apiKey": "sk-...",
-      "baseUrl": "https://api.openai.com/v1",
-      "model": "gpt-4o",
-      "maxTokens": 4096,
-      "temperature": 0.7
-    },
-    "ollama": {
-      "model": "llama3.1"
+      "apiKey": "your-openrouter-api-key",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "anthropic/claude-sonnet-4.5",
+      "maxTokens": 32000,
+      "temperature": 0.1
     }
+  },
+  "reranker": {
+    "apiUrl": "https://api.novita.ai/openai/v1/rerank",
+    "apiKey": "your-novita-api-key",
+    "model": "qwen/qwen3-reranker-8b"
   }
 }
 ```
@@ -208,6 +214,14 @@ codevault ask "What is the database schema?" --temperature 0.3
 codevault ask "How could I improve error handling?" --temperature 1.0
 ```
 
+### Reranking for Better Results
+
+Enable API reranking to improve relevance by 5-10%:
+
+```bash
+codevault ask "How does the payment flow work?" --reranker on
+```
+
 ## 🔧 MCP Tool Reference
 
 ### Tool: `ask_codebase`
@@ -239,9 +253,10 @@ codevault ask "How could I improve error handling?" --temperature 1.0
 **Search Metadata**
 
 - Search Type: hybrid
-- Embedding Provider: OpenAI
-- Chat Provider: OpenAI-Chat
+- Embedding Provider: OpenAI (Qwen3-Embedding-8B)
+- Chat Provider: OpenAI-Chat (Claude Sonnet 4.5)
 - Chunks Analyzed: 5
+- Reranking: Enabled (Qwen3-Reranker-8B)
 
 ---
 
@@ -249,7 +264,31 @@ codevault ask "How could I improve error handling?" --temperature 1.0
 
 The authentication system uses a middleware-based approach with JWT tokens...
 
-[Full synthesized answer with code citations]
+## Middleware Implementation
+
+The main authentication middleware is in [`src/auth/middleware.ts`](src/auth/middleware.ts:45):
+
+```typescript
+export function authenticate(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+```
+
+## Session Management
+
+Sessions are managed in [`src/auth/session.ts`](src/auth/session.ts:12) using Redis for distributed caching...
 
 ---
 
@@ -278,10 +317,10 @@ If `--multi-query` is enabled and the question is complex, the system:
 
 ### 2. Code Search
 
-- Performs semantic search using embeddings
+- Performs semantic search using Qwen3-Embedding-8B (4096 dims, 32K context)
 - Applies BM25 keyword matching (hybrid search)
 - Boosts results based on symbol matches
-- Optionally reranks with API reranker
+- Optionally reranks with Qwen3-Reranker-8B (32K context)
 
 ### 3. Context Building
 
@@ -294,7 +333,7 @@ If `--multi-query` is enabled and the question is complex, the system:
 
 - Sends system prompt (expert code analyst role)
 - Includes all code context and metadata
-- Generates natural language answer
+- Generates natural language answer using Claude Sonnet 4.5
 - Maintains code citations and formatting
 
 ## 💡 Best Practices
@@ -321,15 +360,15 @@ If `--multi-query` is enabled and the question is complex, the system:
 
 ### Provider Selection
 
-**OpenAI (Cloud):**
+**OpenRouter + Claude (Recommended):**
 - Best quality responses
-- GPT-4o, GPT-4-turbo recommended
+- Claude Sonnet 4.5 for superior code understanding
 - Requires API key
 - Use for production
 
 **Ollama (Local):**
 - Free, no API costs
-- llama3.1, mistral recommended
+- qwen2.5-coder:7b, llama3.1 recommended
 - Privacy-focused
 - Good for development
 
@@ -362,16 +401,12 @@ If `--multi-query` is enabled and the question is complex, the system:
 - Change `--max-chunks` to control context
 - Use more specific questions
 
-## 🔮 Future Enhancements
+### Reranking errors
 
-Planned features:
-- [ ] Conversation history (follow-up questions)
-- [ ] Code generation suggestions
-- [ ] Diff generation for feature additions
-- [ ] Multiple LLM provider support (Anthropic, etc.)
-- [ ] Custom system prompts
-- [ ] Response caching
-- [ ] Interactive mode
+- Verify `CODEVAULT_RERANK_API_KEY` is set
+- Check `CODEVAULT_RERANK_API_URL` is correct
+- Ensure Novita API key has credits
+- Try disabling: `--reranker off`
 
 ## 📚 Examples by Use Case
 
@@ -380,7 +415,8 @@ Planned features:
 ```bash
 codevault ask "Are there any security concerns in the authentication code?" \
   --tags auth,security \
-  --temperature 0.5
+  --temperature 0.5 \
+  --reranker on
 ```
 
 ### Onboarding
@@ -388,7 +424,8 @@ codevault ask "Are there any security concerns in the authentication code?" \
 ```bash
 codevault ask "What are the main entry points of this application?" \
   --multi-query \
-  --max-chunks 15
+  --max-chunks 15 \
+  --stream
 ```
 
 ### Feature Planning
@@ -404,7 +441,8 @@ codevault ask "How would I add email notifications to this system?" \
 ```bash
 codevault ask "Where could the memory leak be coming from?" \
   --tags performance,memory \
-  --reranker on
+  --reranker on \
+  --max-chunks 12
 ```
 
 ### Documentation
@@ -415,8 +453,61 @@ codevault ask "Explain the API endpoints available in this service" \
   --citations
 ```
 
+## 🔮 Tips & Tricks
+
+### 1. Combine Multiple Filters
+
+```bash
+codevault ask "How is Stripe checkout implemented?" \
+  --tags stripe,payment \
+  --lang typescript,javascript \
+  --path_glob "src/payments/**"
+```
+
+### 2. Use Streaming for Long Answers
+
+```bash
+codevault ask "Explain the entire authentication flow from login to logout" \
+  --stream \
+  --max-chunks 20
+```
+
+### 3. Adjust Temperature Based on Task
+
+```bash
+# Factual (temperature 0.1-0.3)
+codevault ask "What database is being used?" --temperature 0.1
+
+# Balanced (temperature 0.5-0.7)
+codevault ask "How does caching work?" --temperature 0.7
+
+# Creative (temperature 0.8-1.2)
+codevault ask "How could I improve performance?" --temperature 1.0
+```
+
+### 4. Multi-Query for Comprehensive Answers
+
+```bash
+codevault ask "What are all the payment integrations and how do they work?" \
+  --multi-query \
+  --max-chunks 20 \
+  --reranker on
+```
+
+## 🌟 Recommended Models
+
+### Embeddings
+- **Nebius + Qwen3-Embedding-8B** (4096 dims, 32K context) - Best quality
+- **Ollama + nomic-embed-text** (768 dims, 8K context) - Local option
+
+### Chat LLM
+- **OpenRouter + Claude Sonnet 4.5** (200K context) - Best code understanding
+- **Ollama + qwen2.5-coder:7b** (32K context) - Code-specialized local
+
+### Reranking
+- **Novita + Qwen3-Reranker-8B** (32K context) - Best for code
+
 ---
 
-**Version:** 1.3.0+  
-**Status:** Experimental (exp-llm-synthesize branch)  
-**Last Updated:** January 2025
+**Version:** 1.5.0  
+**Last Updated:** October 2025

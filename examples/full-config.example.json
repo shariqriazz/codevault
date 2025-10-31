@@ -1,31 +1,31 @@
 {
-  "comment": "Complete CodeVault configuration example with all features",
+  "comment": "Complete CodeVault configuration with all available options",
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "sk-your-openai-api-key-here",
-      "baseUrl": "https://api.openai.com/v1",
-      "model": "text-embedding-3-large",
-      "dimensions": 3072
+      "apiKey": "your-nebius-api-token-here",
+      "baseUrl": "https://api.studio.nebius.com/v1",
+      "model": "Qwen/Qwen3-Embedding-8B",
+      "dimensions": 4096
     }
   },
   "chatLLM": {
     "openai": {
-      "apiKey": "sk-your-openrouter-api-key-here",
+      "apiKey": "your-openrouter-api-key-here",
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
       "temperature": 0.1
     }
   },
-  "maxTokens": 8192,
+  "maxTokens": 32000,
   "rateLimit": {
     "rpm": 10000,
     "tpm": 600000
   },
   "encryption": {
     "enabled": false,
-    "key": "your-32-byte-base64-or-hex-key-here"
+    "key": ""
   },
   "reranker": {
     "apiUrl": "https://api.novita.ai/openai/v1/rerank",

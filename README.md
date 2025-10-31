@@ -14,7 +14,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 - **🚀 Batch Processing**: Efficient API usage with configurable batching (50 chunks/batch by default)
 - **📦 Smart Chunking**: Token-aware semantic code splitting with overlap for optimal context
 - **🔄 Context Packs**: Save and reuse search scopes for different features/modules
-- **🏠 Local-First**: Works with local models (Ollama) or cloud APIs (OpenAI, Nebius)
+- **🏠 Local-First**: Works with local models (Ollama) or cloud APIs (OpenAI, Nebius, OpenRouter)
 - **🔐 Optional Encryption**: AES-256-GCM encryption for indexed code chunks
 - **⚙️ Global Configuration**: One-time setup with interactive wizard for CLI convenience
 - **📊 Multi-Language Support**: 25+ programming languages via Tree-sitter
@@ -45,7 +45,7 @@ codevault index
 ```bash
 git clone https://github.com/shariqriazz/codevault.git
 cd codevault
-npm npm install --legacy-peer-deps
+npm install --legacy-peer-deps
 npm run build
 npm link
 ```
@@ -70,58 +70,49 @@ Guides you through:
 
 Configuration saved to `~/.codevault/config.json`
 
-#### Option 2: Manual CLI Configuration
+#### Option 2: Quick Setup with Nebius (Qwen Embeddings)
 
 ```bash
-# Set API key
-codevault config set providers.openai.apiKey sk-your-key-here
-codevault config set providers.openai.model text-embedding-3-large
+# Set up Nebius for embeddings (Qwen3-Embedding-8B)
+codevault config set providers.openai.apiKey your-nebius-api-key
+codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
+codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
+codevault config set providers.openai.dimensions 4096
+codevault config set maxTokens 32000
 
-# View configuration
-codevault config list
+# Set up OpenRouter for chat (Claude Sonnet 4.5)
+codevault config set chatLLM.openai.apiKey your-openrouter-api-key
+codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
 
-# See all config sources
-codevault config list --sources
+# Optional: Enable reranking with Novita (Qwen3-Reranker)
+codevault config set reranker.apiUrl https://api.novita.ai/openai/v1/rerank
+codevault config set reranker.apiKey your-novita-api-key
+codevault config set reranker.model qwen/qwen3-reranker-8b
 ```
 
 #### Option 3: Environment Variables (MCP / CI/CD)
 
 ```bash
-# Embedding Provider (OpenAI-compatible APIs)
-export CODEVAULT_EMBEDDING_API_KEY=sk-your-key-here
-export CODEVAULT_EMBEDDING_BASE_URL=https://api.openai.com/v1
-export CODEVAULT_EMBEDDING_MODEL=text-embedding-3-large
+# Embedding Provider (Nebius + Qwen)
+export CODEVAULT_EMBEDDING_API_KEY=your-nebius-api-key
+export CODEVAULT_EMBEDDING_BASE_URL=https://api.studio.nebius.com/v1
+export CODEVAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+export CODEVAULT_EMBEDDING_DIMENSIONS=4096
+export CODEVAULT_EMBEDDING_MAX_TOKENS=32000
 
-# Ollama (local, no API key needed - via OpenAI-compatible endpoint)
-export CODEVAULT_EMBEDDING_BASE_URL=http://localhost:11434/v1
-export CODEVAULT_EMBEDDING_MODEL=nomic-embed-text
+# Chat LLM (OpenRouter + Claude)
+export CODEVAULT_CHAT_API_KEY=your-openrouter-api-key
+export CODEVAULT_CHAT_BASE_URL=https://openrouter.ai/api/v1
+export CODEVAULT_CHAT_MODEL=anthropic/claude-sonnet-4.5
 
-# Custom settings
-export CODEVAULT_EMBEDDING_MAX_TOKENS=8192
-export CODEVAULT_EMBEDDING_DIMENSIONS=3072
-export CODEVAULT_EMBEDDING_RATE_LIMIT_RPM=10000
-export CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000
+# Reranking (Novita + Qwen)
+export CODEVAULT_RERANK_API_URL=https://api.novita.ai/openai/v1/rerank
+export CODEVAULT_RERANK_API_KEY=your-novita-api-key
+export CODEVAULT_RERANK_MODEL=qwen/qwen3-reranker-8b
 ```
 
-**Note:** Old variable names are still supported for backward compatibility:
-- `OPENAI_API_KEY` → `CODEVAULT_EMBEDDING_API_KEY`
-- `OPENAI_BASE_URL` → `CODEVAULT_EMBEDDING_BASE_URL`
-- `CODEVAULT_OPENAI_EMBEDDING_MODEL` → `CODEVAULT_EMBEDDING_MODEL`
-- `CODEVAULT_OLLAMA_MODEL` → `CODEVAULT_OLLAMA_EMBEDDING_MODEL`
-- `CODEVAULT_MAX_TOKENS` → `CODEVAULT_EMBEDDING_MAX_TOKENS`
-- `CODEVAULT_DIMENSIONS` → `CODEVAULT_EMBEDDING_DIMENSIONS`
-- `CODEVAULT_RATE_LIMIT_RPM` → `CODEVAULT_EMBEDDING_RATE_LIMIT_RPM`
-- `CODEVAULT_RATE_LIMIT_TPM` → `CODEVAULT_EMBEDDING_RATE_LIMIT_TPM`
-
-#### Option 4: Project-Specific Config
-
-```bash
-# Set local config (project-specific, e.g., for Ollama)
-codevault config set --local providers.openai.baseUrl http://localhost:11434/v1
-codevault config set --local providers.openai.model nomic-embed-text
-```
-
-See [`CONFIGURATION.md`](CONFIGURATION.md) for complete configuration guide.
+See [Configuration Guide](docs/CONFIGURATION.md) for complete details.
 
 ### Index Your Project
 
@@ -129,20 +120,16 @@ See [`CONFIGURATION.md`](CONFIGURATION.md) for complete configuration guide.
 # Using global config (if set via codevault config init)
 codevault index
 
-# Using Ollama (local, no API key required - via OpenAI-compatible endpoint)
+# Using Nebius + Qwen embeddings
+export CODEVAULT_EMBEDDING_API_KEY=your-key
+export CODEVAULT_EMBEDDING_BASE_URL=https://api.studio.nebius.com/v1
+export CODEVAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+codevault index
+
+# Using local Ollama
 export CODEVAULT_EMBEDDING_BASE_URL=http://localhost:11434/v1
 export CODEVAULT_EMBEDDING_MODEL=nomic-embed-text
 codevault index
-
-# Using OpenAI with custom settings
-export OPENAI_API_KEY=your-key-here
-codevault index --provider openai
-
-# Using Qwen (via Nebius AI Studio)
-export CODEVAULT_EMBEDDING_API_KEY=your-nebius-api-key
-export CODEVAULT_EMBEDDING_BASE_URL=https://api.studio.nebius.com/v1
-export CODEVAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
-codevault index --provider openai
 
 # With encryption
 export CODEVAULT_ENCRYPTION_KEY=$(openssl rand -base64 32)
@@ -174,7 +161,9 @@ codevault info
 
 ### Use with Claude Desktop
 
-Add to your `claude_desktop_config.json`:
+See complete setup guide: **[MCP Setup Guide](docs/MCP_SETUP.md)**
+
+**Quick setup** - Add to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -183,216 +172,61 @@ Add to your `claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "codevault", "mcp"],
       "env": {
-        "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here",
-        "CODEVAULT_EMBEDDING_MODEL": "text-embedding-3-large"
+        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-api-key",
+        "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
+        "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
+        "CODEVAULT_EMBEDDING_DIMENSIONS": "4096",
+        "CODEVAULT_CHAT_API_KEY": "your-openrouter-api-key",
+        "CODEVAULT_CHAT_BASE_URL": "https://openrouter.ai/api/v1",
+        "CODEVAULT_CHAT_MODEL": "anthropic/claude-sonnet-4.5",
+        "CODEVAULT_RERANK_API_URL": "https://api.novita.ai/openai/v1/rerank",
+        "CODEVAULT_RERANK_API_KEY": "your-novita-api-key",
+        "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b"
       }
     }
   }
 }
 ```
 
-Or use local installation:
-
-```json
-{
-  "mcpServers": {
-    "codevault": {
-      "command": "node",
-      "args": ["/path/to/codevault/dist/mcp-server.js"],
-      "env": {
-        "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+**Example configs:**
+- [NPX (Recommended)](examples/claude-desktop-config-npx.example.json)
+- [Full Options](examples/claude-desktop-config.example.json)
+- [Ollama Local](examples/claude-desktop-ollama.example.json)
 
 ## 📖 Documentation
 
-### CLI Commands
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Complete configuration options
+- **[MCP Setup Guide](docs/MCP_SETUP.md)** - Claude Desktop integration
+- **[Ask Feature Guide](docs/ASK_FEATURE.md)** - LLM-synthesized Q&A
+- **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
+- **[API Providers](docs/PROVIDERS.md)** - Embedding, chat, and reranking providers
+- **[Advanced Features](docs/ADVANCED.md)** - Chunking, encryption, context packs
+
+### Quick Links
 
 ```bash
 # Configuration Management
 codevault config init                    # Interactive setup wizard
 codevault config set <key> <value>       # Set global config value
-codevault config set --local <key> <val> # Set project config value
-codevault config get <key>               # Get config value
 codevault config list                    # Show merged config
-codevault config list --sources          # Show all config sources
-codevault config unset <key>             # Remove config value
-codevault config path                    # Show config file paths
 
 # Indexing
 codevault index [path]                   # Index project
-codevault index --provider openai        # Use specific provider
-codevault index --encrypt on             # Enable encryption
 codevault update [path]                  # Update existing index
 codevault watch [path]                   # Watch for changes
-codevault watch --debounce 1000          # Custom debounce interval
 
 # Searching  
-codevault search <query> [path]          # Search code (metadata only)
-  --limit <num>                          # Max results (default: 10)
-  --provider <name>                      # Embedding provider
-  --path_glob <pattern>                  # Filter by file pattern
-  --tags <tag...>                        # Filter by tags
-  --lang <language...>                   # Filter by language
-  --reranker <off|api>                   # Enable API reranking
-  --hybrid <on|off>                      # Hybrid search (default: on)
-  --bm25 <on|off>                        # BM25 keyword search (default: on)
-  --symbol_boost <on|off>                # Symbol boosting (default: on)
-
+codevault search <query>                 # Search code (metadata only)
 codevault search-with-code <query>       # Search with full code chunks
-  --max-code-size <bytes>                # Max code size per chunk
-
-# Ask Questions (LLM Synthesis)
-codevault ask <question>                 # Ask a question, get synthesized answer
-  -p, --provider <name>                  # Embedding provider
-  -c, --chat-provider <name>             # Chat LLM provider (auto|openai|ollama)
-  -k, --max-chunks <num>                 # Max code chunks to analyze (default: 10)
-  --path_glob <pattern...>               # Filter by file pattern
-  --tags <tag...>                        # Filter by tags
-  --lang <language...>                   # Filter by language
-  --reranker <on|off>                    # Use API reranking (default: on)
-  --multi-query                          # Break complex questions into sub-queries
-  --temperature <num>                    # LLM temperature 0-2 (default: 0.7)
-  --stream                               # Stream response in real-time
-  --citations                            # Add citation footer
-  --no-metadata                          # Hide search metadata
+codevault ask <question>                 # Ask questions, get synthesized answers
 
 # Context Packs
 codevault context list                   # List saved contexts
-codevault context show <name>            # Show context pack details
 codevault context use <name>             # Activate context pack
 
 # Utilities
 codevault info                           # Project statistics
 codevault mcp                            # Start MCP server
-codevault --version                      # Show version
-```
-
-### MCP Tools
-
-When used via MCP, CodeVault provides these tools:
-
-- **`search_code`**: Semantic search returning metadata (paths, symbols, scores, SHAs)
-- **`search_code_with_chunks`**: Search + retrieve full code for each result
-- **`get_code_chunk`**: Get specific code chunk by SHA
-- **`ask_codebase`**: ✨ Ask questions and get LLM-synthesized answers with code citations
-- **`index_project`**: Index a new project
-- **`update_project`**: Update existing index
-- **`get_project_stats`**: Get project overview and statistics
-- **`use_context_pack`**: Apply saved search context/scope
-
-### Supported Languages
-
-- **Web**: JavaScript, TypeScript, TSX, HTML, CSS, JSON, Markdown
-- **Backend**: Python, PHP, Go, Java, Kotlin, C#, Ruby, Scala, Swift
-- **Systems**: C, C++, Rust
-- **Functional**: Haskell, OCaml, Elixir
-- **Scripting**: Bash, Lua
-
-### Embedding Providers
-
-| Provider | Model | Dimensions | Context | Best For | API Key Required |
-|----------|-------|------------|---------|----------|------------------|
-| **openai** | text-embedding-3-large | 3072 | 8K | Highest quality | ✅ Yes |
-| **openai** | text-embedding-3-small | 1536 | 8K | Faster, cheaper | ✅ Yes |
-| **openai** | Qwen/Qwen3-Embedding-8B | 4096 | 32K | Large context, high quality | ✅ Yes (Nebius) |
-| **openai** | nomic-embed-text | 768 | 8K | Local via Ollama | ❌ No (local) |
-| **custom** | Your choice | Custom | Custom | Any OpenAI-compatible API | Varies |
-
-### Environment Variables
-
-```bash
-# Embedding Provider Configuration
-CODEVAULT_EMBEDDING_API_KEY=sk-...                       # API key for embeddings
-CODEVAULT_EMBEDDING_BASE_URL=https://api.openai.com/v1  # Embedding API endpoint
-CODEVAULT_EMBEDDING_MODEL=text-embedding-3-large        # Embedding model name
-CODEVAULT_OLLAMA_EMBEDDING_MODEL=nomic-embed-text       # Ollama embedding model
-
-# Embedding Chunking Configuration
-CODEVAULT_EMBEDDING_MAX_TOKENS=8192                     # Max tokens per embedding chunk
-CODEVAULT_EMBEDDING_DIMENSIONS=3072                     # Embedding vector dimensions
-
-# Embedding API Rate Limiting
-CODEVAULT_EMBEDDING_RATE_LIMIT_RPM=10000               # Embedding API requests/min
-CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000              # Embedding API tokens/min
-
-# Encryption
-CODEVAULT_ENCRYPTION_KEY=...              # 32-byte key (base64 or hex)
-
-# API Reranking (Optional)
-# Novita Qwen3-Reranker (32K context, great for code)
-CODEVAULT_RERANK_API_URL=https://api.novita.ai/openai/v1/rerank
-CODEVAULT_RERANK_API_KEY=your-novita-key
-CODEVAULT_RERANK_MODEL=qwen/qwen3-reranker-8b
-
-# Or Cohere (4K context, $25 free credits)
-# CODEVAULT_RERANK_API_URL=https://api.cohere.ai/v1/rerank
-# CODEVAULT_RERANK_API_KEY=your-cohere-key
-# CODEVAULT_RERANK_MODEL=rerank-english-v3.0
-
-# Memory Management
-CODEVAULT_CACHE_CLEAR_INTERVAL=3600000    # Cache cleanup interval (ms)
-```
-
-### Ask Questions (LLM Synthesis)
-
-The `ask` command combines semantic search with LLM synthesis to answer natural language questions about your codebase:
-
-```bash
-# Basic question
-codevault ask "How does authentication work in this codebase?"
-
-# With filters
-codevault ask "How do I add Stripe checkout?" --tags stripe --lang php
-
-# Complex question with multi-query
-codevault ask "What are the main components and how do they interact?" --multi-query
-
-# Streaming response
-codevault ask "Explain the database connection pooling" --stream
-
-# With custom settings
-codevault ask "How does error handling work?" \
-  --chat-provider openai \
-  --temperature 0.5 \
-  --max-chunks 15 \
-  --reranker on
-
-# Using Ollama for local processing (via OpenAI-compatible endpoint)
-export CODEVAULT_CHAT_BASE_URL=http://localhost:11434/v1
-export CODEVAULT_CHAT_MODEL=llama3.1
-codevault ask "What routes are available?"
-```
-
-**How it works:**
-1. 🔍 Searches codebase using embeddings (+ optional reranking)
-2. 📚 Retrieves top N most relevant code chunks
-3. 🤖 Sends context to LLM with structured prompt
-4. 📝 LLM synthesizes natural language answer with code citations
-5. ✨ Returns formatted markdown with file references
-
-**Example Output:**
-```markdown
-# How Authentication Works
-
-The authentication system uses a middleware-based approach...
-
-The main authentication flow is handled by `AuthMiddleware` in [`src/middleware/auth.ts`](src/middleware/auth.ts):
-
-```typescript
-export function authenticate(req, res, next) {
-  // Token validation logic
-  ...
-}
-```
-
-Key components:
-- **Session Management**: [`src/auth/session.ts`](src/auth/session.ts)
-- **Token Validation**: [`src/auth/token.ts`](src/auth/token.ts)
-- **User Model**: [`src/models/user.ts`](src/models/user.ts)
 ```
 
 ## 🏗️ Architecture
@@ -415,115 +249,30 @@ Key components:
    - Optionally applies API reranking
    - Returns ranked results with metadata
 
-3. **Retrieval Phase**
-   - Fetches code chunks by SHA
-   - Decompresses and decrypts (if encrypted)
-   - Returns full code with context
+3. **LLM Synthesis Phase** (Ask Feature)
+   - Searches for relevant code chunks
+   - Retrieves full code content
+   - Builds context prompt with metadata
+   - Generates natural language answer via chat LLM
+   - Returns markdown with code citations
 
-### Project Structure
+### Supported Languages
 
-```
-.codevault/
-├── codevault.db              # SQLite: embeddings + metadata
-├── chunks/                   # Compressed code chunks
-│   ├── <sha>.gz              # Plain compressed
-│   └── <sha>.gz.enc          # Encrypted compressed
-└── contextpacks/             # Saved search contexts
-    └── feature-auth.json     # Example context pack
+- **Web**: JavaScript, TypeScript, TSX, HTML, CSS, JSON, Markdown
+- **Backend**: Python, PHP, Go, Java, Kotlin, C#, Ruby, Scala, Swift
+- **Systems**: C, C++, Rust
+- **Functional**: Haskell, OCaml, Elixir
+- **Scripting**: Bash, Lua
 
-codevault.codemap.json        # Lightweight index (symbol graph)
+### Recommended Providers
 
-~/.codevault/                 # Global CLI configuration
-└── config.json               # User-wide settings
-```
-
-### Advanced Features
-
-#### Batch Processing
-
-Embeddings are generated in batches of 50 for optimal API efficiency:
-
-```typescript
-// Automatic batching - no configuration needed
-// Processes 50 chunks per API call
-// Falls back to individual processing on error
-```
-
-#### Smart Chunking
-
-Token-aware semantic chunking with configurable limits:
-
-- Respects function/class boundaries
-- Applies overlap for context continuity
-- Subdivides large functions intelligently
-- Merges small chunks when beneficial
-
-#### Symbol-Aware Ranking
-
-Boosts search results based on:
-- Exact symbol name matches
-- Function signature matches  
-- Parameter name matches
-- Symbol neighbor relationships (calls, imports)
-
-#### Hybrid Search
-
-Combines multiple ranking signals:
-- Vector similarity (semantic understanding)
-- BM25 keyword matching (exact term matches)
-- Symbol boost (code structure awareness)
-- Reciprocal Rank Fusion (combines rankings)
-
-#### Context Packs
-
-Save search scopes for reuse:
-
-```json
-{
-  "key": "feature-auth",
-  "name": "Authentication Feature",
-  "description": "Login, signup, password reset",
-  "scope": {
-    "path_glob": ["src/auth/**", "src/middleware/auth.ts"],
-    "tags": ["auth", "security"],
-    "lang": ["typescript", "javascript"]
-  }
-}
-```
-
-Usage:
-```bash
-codevault context use feature-auth
-codevault search "token validation"  # Scoped to auth files
-```
-
-#### File Watching
-
-Real-time index updates with intelligent debouncing:
-
-```bash
-codevault watch --debounce 500
-```
-
-- Detects file changes, additions, deletions
-- Batches rapid changes (debouncing)
-- Updates only affected chunks
-- Preserves index consistency
-
-#### Encryption
-
-AES-256-GCM encryption for code chunks:
-
-```bash
-# Generate secure key
-export CODEVAULT_ENCRYPTION_KEY=$(openssl rand -base64 32)
-
-# Index with encryption
-codevault index --encrypt on
-
-# Files stored as .gz.enc instead of .gz
-# Automatic decryption on read (requires key)
-```
+| Purpose | Provider | Model | Context | Best For |
+|---------|----------|-------|---------|----------|
+| **Embeddings** | Nebius | Qwen/Qwen3-Embedding-8B | 32K | High quality, large context |
+| **Embeddings** | Ollama | nomic-embed-text | 8K | Local, privacy-focused |
+| **Chat LLM** | OpenRouter | anthropic/claude-sonnet-4.5 | 200K | Best code understanding |
+| **Chat LLM** | Ollama | qwen2.5-coder:7b | 32K | Local, code-specialized |
+| **Reranking** | Novita | qwen/qwen3-reranker-8b | 32K | Best for code reranking |
 
 ## 🔧 Performance & Optimization
 
@@ -602,8 +351,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **GitHub**: https://github.com/shariqriazz/codevault
 - **NPM**: https://www.npmjs.com/package/codevault
 - **Issues**: https://github.com/shariqriazz/codevault/issues
-- **Configuration Guide**: [CONFIGURATION.md](CONFIGURATION.md)
-- **Ask Feature Guide**: [ASK_FEATURE.md](ASK_FEATURE.md)
 
 ## 🙏 Acknowledgments
 
@@ -612,9 +359,12 @@ Built with:
 - [Tree-sitter](https://tree-sitter.github.io/) - Parsing infrastructure
 - [OpenAI](https://openai.com/) - Embedding models
 - [Ollama](https://ollama.ai/) - Local model support
+- [Nebius AI Studio](https://nebius.com/) - Qwen embeddings
+- [OpenRouter](https://openrouter.ai/) - LLM access
+- [Novita AI](https://novita.ai/) - Reranking API
 
 ---
 
-**Version**: 1.5.0
-**Built by**: Shariq Riaz
-**Last Updated**: January 2025
+**Version**: 1.5.0  
+**Built by**: Shariq Riaz  
+**Last Updated**: October 2025
