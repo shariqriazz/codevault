@@ -14,8 +14,8 @@ export function registerAskCommand(program: Command): void {
   program
     .command('ask <question>')
     .description('Ask a question and get LLM-synthesized answer with code citations')
-    .option('-p, --provider <provider>', 'embedding provider (auto|openai|ollama)', 'auto')
-    .option('-c, --chat-provider <provider>', 'chat LLM provider (auto|openai|ollama)', 'auto')
+    .option('-p, --provider <provider>', 'embedding provider (auto|openai)', 'auto')
+    .option('-c, --chat-provider <provider>', 'chat LLM provider (auto|openai)', 'auto')
     .option('--path <path>', 'project root directory', '.')
     .option('--project <path>', 'alias for project path')
     .option('--directory <path>', 'alias for project directory')

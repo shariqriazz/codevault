@@ -81,7 +81,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           query: { type: 'string', description: 'Search query' },
           limit: { type: 'number', description: 'Max results (default: 50, max: 200)', default: 50 },
-          provider: { type: 'string', description: 'Embedding provider (auto|openai|ollama)', default: 'auto' },
+          provider: { type: 'string', description: 'Embedding provider (auto|openai)', default: 'auto' },
           path: { type: 'string', description: 'Project root directory', default: '.' },
           path_glob: { type: ['string', 'array'], description: 'File patterns to filter' },
           tags: { type: ['string', 'array'], description: 'Tags to filter' },
@@ -178,8 +178,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         type: 'object',
         properties: {
           question: { type: 'string', description: 'Natural language question about the codebase' },
-          provider: { type: 'string', description: 'Embedding provider (auto|openai|ollama)', default: 'auto' },
-          chat_provider: { type: 'string', description: 'Chat LLM provider (auto|openai|ollama)', default: 'auto' },
+          provider: { type: 'string', description: 'Embedding provider (auto|openai)', default: 'auto' },
+          chat_provider: { type: 'string', description: 'Chat LLM provider (auto|openai)', default: 'auto' },
           path: { type: 'string', description: 'Project root directory', default: '.' },
           max_chunks: { type: 'number', description: 'Max code chunks to analyze', default: 10 },
           path_glob: { type: ['string', 'array'], description: 'File patterns to filter' },

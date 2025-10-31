@@ -212,7 +212,6 @@ export class RateLimiter {
 export function createRateLimiter(providerName: string): RateLimiter {
   const defaultLimits: Record<string, { rpm: number | null; tpm: number | null }> = {
     'OpenAI': { rpm: 50, tpm: null },
-    'Ollama': { rpm: null, tpm: null },
     'Qwen': { rpm: 10000, tpm: 600000 },
   };
 

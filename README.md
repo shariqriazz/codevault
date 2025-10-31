@@ -29,8 +29,8 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 #### NPM (Global - Recommended)
 
 ```bash
-# Install latest beta
-npm install -g codevault@beta
+# Install latest version
+npm install -g codevault
 
 # Interactive configuration setup (one-time)
 codevault config init
@@ -92,8 +92,9 @@ export CODEVAULT_EMBEDDING_API_KEY=sk-your-key-here
 export CODEVAULT_EMBEDDING_BASE_URL=https://api.openai.com/v1
 export CODEVAULT_EMBEDDING_MODEL=text-embedding-3-large
 
-# Ollama (local, no API key needed)
-export CODEVAULT_OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+# Ollama (local, no API key needed - via OpenAI-compatible endpoint)
+export CODEVAULT_EMBEDDING_BASE_URL=http://localhost:11434/v1
+export CODEVAULT_EMBEDDING_MODEL=nomic-embed-text
 
 # Custom settings
 export CODEVAULT_EMBEDDING_MAX_TOKENS=8192
@@ -115,9 +116,9 @@ export CODEVAULT_EMBEDDING_RATE_LIMIT_TPM=600000
 #### Option 4: Project-Specific Config
 
 ```bash
-# Set local config (project-specific)
-codevault config set --local provider ollama
-codevault config set --local providers.ollama.model nomic-embed-text
+# Set local config (project-specific, e.g., for Ollama)
+codevault config set --local providers.openai.baseUrl http://localhost:11434/v1
+codevault config set --local providers.openai.model nomic-embed-text
 ```
 
 See [`CONFIGURATION.md`](CONFIGURATION.md) for complete configuration guide.
@@ -128,8 +129,10 @@ See [`CONFIGURATION.md`](CONFIGURATION.md) for complete configuration guide.
 # Using global config (if set via codevault config init)
 codevault index
 
-# Using Ollama (local, no API key required)
-codevault index --provider ollama
+# Using Ollama (local, no API key required - via OpenAI-compatible endpoint)
+export CODEVAULT_EMBEDDING_BASE_URL=http://localhost:11434/v1
+export CODEVAULT_EMBEDDING_MODEL=nomic-embed-text
+codevault index
 
 # Using OpenAI with custom settings
 export OPENAI_API_KEY=your-key-here
@@ -178,7 +181,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "codevault": {
       "command": "npx",
-      "args": ["-y", "codevault@beta", "mcp"],
+      "args": ["-y", "codevault", "mcp"],
       "env": {
         "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here",
         "CODEVAULT_EMBEDDING_MODEL": "text-embedding-3-large"
@@ -293,11 +296,11 @@ When used via MCP, CodeVault provides these tools:
 
 | Provider | Model | Dimensions | Context | Best For | API Key Required |
 |----------|-------|------------|---------|----------|------------------|
-| **ollama** | nomic-embed-text | 768 | 8K | Local, no API costs | ❌ No |
 | **openai** | text-embedding-3-large | 3072 | 8K | Highest quality | ✅ Yes |
 | **openai** | text-embedding-3-small | 1536 | 8K | Faster, cheaper | ✅ Yes |
 | **openai** | Qwen/Qwen3-Embedding-8B | 4096 | 32K | Large context, high quality | ✅ Yes (Nebius) |
-| **custom** | Your choice | Custom | Custom | Any OpenAI-compatible API | ✅ Yes |
+| **openai** | nomic-embed-text | 768 | 8K | Local via Ollama | ❌ No (local) |
+| **custom** | Your choice | Custom | Custom | Any OpenAI-compatible API | Varies |
 
 ### Environment Variables
 
@@ -358,8 +361,10 @@ codevault ask "How does error handling work?" \
   --max-chunks 15 \
   --reranker on
 
-# Using Ollama for local processing
-codevault ask "What routes are available?" --chat-provider ollama
+# Using Ollama for local processing (via OpenAI-compatible endpoint)
+export CODEVAULT_CHAT_BASE_URL=http://localhost:11434/v1
+export CODEVAULT_CHAT_MODEL=llama3.1
+codevault ask "What routes are available?"
 ```
 
 **How it works:**
@@ -610,6 +615,6 @@ Built with:
 
 ---
 
-**Version**: 1.3.0-beta.7  
-**Built by**: Shariq Riaz  
+**Version**: 1.5.0
+**Built by**: Shariq Riaz
 **Last Updated**: January 2025
