@@ -29,8 +29,8 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 #### NPM (Global - Recommended)
 
 ```bash
-# Install latest beta
-npm install -g codevault@beta
+# Install latest version
+npm install -g codevault
 
 # Interactive configuration setup (one-time)
 codevault config init
@@ -181,7 +181,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "codevault": {
       "command": "npx",
-      "args": ["-y", "codevault@beta", "mcp"],
+      "args": ["-y", "codevault", "mcp"],
       "env": {
         "CODEVAULT_EMBEDDING_API_KEY": "your-api-key-here",
         "CODEVAULT_EMBEDDING_MODEL": "text-embedding-3-large"
