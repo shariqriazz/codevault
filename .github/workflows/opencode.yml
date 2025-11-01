@@ -26,7 +26,7 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Run opencode
+      - name: Run opencode with specialized CodeVault reviewer
         uses: sst/opencode/github@latest
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -35,9 +35,11 @@ jobs:
           # Profile: openai/gpt-5-medium -> actual model: openai/gpt-5
           # Options: reasoningEffort=medium, textVerbosity=low
           model: openrouter/openai/gpt-5-medium
+          agent: codevault-reviewer
           share: false
           # OpenCode will:
-          # - Read opencode.json for custom model profile
-          # - Read AGENTS.md for PR review guidelines
-          # - Auto-review PRs (feedback only, no code changes)
-          # - Execute manual commands (can make code changes and commit)
+          # - Use codevault-reviewer agent (specialized, read-only)
+          # - Read AGENTS.md for comprehensive CodeVault guidelines
+          # - Perform deep analysis with 8-category checklist (50+ checks)
+          # - Auto-review PRs (feedback only, cannot make code changes)
+          # - For fixes, use manual commands: /opencode fix [issue]

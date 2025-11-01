@@ -16,5 +16,26 @@
       }
     }
   },
-  "instructions": ["AGENTS.md"]
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "codevault-reviewer": {
+      "description": "Specialized code reviewer for CodeVault with deep knowledge of semantic search, indexing, and TypeScript best practices",
+      "mode": "subagent",
+      "model": "openrouter/openai/gpt-5-medium",
+      "temperature": 0.1,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "bash": {
+          "git diff": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "*": "deny"
+        }
+      }
+    }
+  }
 }
