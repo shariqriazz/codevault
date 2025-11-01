@@ -1,0 +1,43 @@
+name: opencode-pr-review
+
+on:
+  # Auto-review when PR is opened or updated
+  pull_request:
+    types: [opened, synchronize]
+  # Manual trigger with /oc or /opencode comments
+  issue_comment:
+    types: [created]
+
+jobs:
+  opencode:
+    if: |
+      github.event_name == 'pull_request' ||
+      contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '/opencode')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write        # Allows OpenCode to commit changes
+      pull-requests: write   # Allows OpenCode to comment on PRs
+      issues: write          # Allows OpenCode to comment on issues
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run opencode
+        uses: sst/opencode/github@latest
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        with:
+          # Uses custom profile from opencode.json in repo root
+          # Profile: openai/gpt-5-medium -> actual model: openai/gpt-5
+          # Options: reasoningEffort=medium, textVerbosity=low
+          model: openrouter/openai/gpt-5-medium
+          share: false
+          # OpenCode will:
+          # - Read opencode.json for custom model profile
+          # - Read AGENTS.md for PR review guidelines
+          # - Auto-review PRs (feedback only, no code changes)
+          # - Execute manual commands (can make code changes and commit)
