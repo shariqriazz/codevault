@@ -6,18 +6,12 @@ temperature: 0.1
 tools:
   write: false
   edit: false
-  bash:
-    "git diff": allow
-    "git log*": allow
-    "git show*": allow
-    "*": deny
+  bash: false
 permission:
-  edit: deny
-  write: deny
   bash:
-    "git diff": allow
-    "git log*": allow
-    "git show*": allow
+    git diff: allow
+    git log*: allow
+    git show*: allow
     "*": deny
 ---
 
