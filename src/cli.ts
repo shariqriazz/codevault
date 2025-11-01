@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { registerConfigCommands } from './cli/commands/config-cmd.js';
 import { registerContextCommands } from './cli/commands/context.js';
 import { registerAskCommand } from './cli/commands/ask-cmd.js';
+import { registerChatCommand } from './cli/commands/chat-cmd.js';
 import { resolveScopeWithPack } from './context/packs.js';
 import { readCodemap } from './codemap/io.js';
 import { indexProject } from './core/indexer.js';
@@ -366,6 +367,8 @@ registerConfigCommands(program);
 registerContextCommands(program);
 
 registerAskCommand(program);
+
+registerChatCommand(program);
 
 program
   .command('mcp')
