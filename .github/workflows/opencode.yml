@@ -7,11 +7,10 @@ on:
 
 jobs:
   opencode:
-    # Trigger on /oc, /opencode, or @codevault-reviewer
+    # Only trigger on /oc or /opencode (required by OpenCode)
     if: |
       contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode') ||
-      contains(github.event.comment.body, '@codevault-reviewer')
+      contains(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -24,20 +23,13 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Run opencode with specialized CodeVault reviewer
+      - name: Run opencode
         uses: sst/opencode/github@latest
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         with:
-          # Uses custom profile from opencode.json in repo root
-          # Profile: openai/gpt-5-medium -> actual model: openai/gpt-5
-          # Options: reasoningEffort=medium, textVerbosity=low
           model: openrouter/openai/gpt-5-medium
-          agent: codevault-reviewer
           share: false
-          # OpenCode will:
-          # - Use codevault-reviewer agent (specialized, read-only)
-          # - Read AGENTS.md for comprehensive CodeVault guidelines
-          # - Perform deep analysis with 8-category checklist (50+ checks)
-          # - Auto-review PRs (feedback only, cannot make code changes)
-          # - For fixes, use manual commands: /opencode fix [issue]
+          # Note: OpenCode will read opencode.json and AGENTS.md from the repo
+          # To use the custom agent, mention it in your comment:
+          # Example: "/opencode @codevault-reviewer review this PR"
