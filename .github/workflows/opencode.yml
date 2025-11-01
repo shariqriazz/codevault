@@ -1,17 +1,14 @@
 name: opencode-pr-review
 
 on:
-  # Auto-review when PR is opened or updated
-  pull_request:
-    types: [opened, synchronize]
-  # Manual trigger with /oc or /opencode comments
+  # Trigger on comments in issues and PRs
   issue_comment:
     types: [created]
 
 jobs:
   opencode:
+    # Only run if comment contains /oc or /opencode
     if: |
-      github.event_name == 'pull_request' ||
       contains(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
