@@ -16,6 +16,8 @@ import { indexProject } from './core/indexer.js';
 import { resolveScopeWithPack } from './context/packs.js';
 import { synthesizeAnswer } from './synthesis/synthesizer.js';
 import { formatSynthesisResult, formatErrorMessage, formatNoResultsMessage } from './synthesis/markdown-formatter.js';
+import { MAX_CHUNK_SIZE } from './config/constants.js';
+import { resolveProjectRoot } from './utils/path-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,23 +31,23 @@ let sessionContextPack: any = null;
 const CACHE_CLEAR_INTERVAL_MS = Number.parseInt(process.env.CODEVAULT_CACHE_CLEAR_INTERVAL || '3600000', 10); // Default: 1 hour
 let cacheCleanupTimer: NodeJS.Timeout | null = null;
 
-function scheduleCacheCleanup() {
+async function scheduleCacheCleanup() {
   if (cacheCleanupTimer) {
     clearInterval(cacheCleanupTimer);
   }
   
-  cacheCleanupTimer = setInterval(() => {
+  cacheCleanupTimer = setInterval(async () => {
     try {
       // Clear search caches
-      const { clearSearchCaches } = require('./core/search.js');
-      if (typeof clearSearchCaches === 'function') {
-        clearSearchCaches();
+      const searchModule = await import('./core/search.js').catch(() => ({ clearSearchCaches: undefined }));
+      if (typeof searchModule.clearSearchCaches === 'function') {
+        searchModule.clearSearchCaches();
       }
       
       // Clear token counter cache
-      const { clearTokenCache } = require('./chunking/token-counter.js');
-      if (typeof clearTokenCache === 'function') {
-        clearTokenCache();
+      const tokenModule = await import('./chunking/token-counter.js').catch(() => ({ clearTokenCache: undefined }));
+      if (typeof tokenModule.clearTokenCache === 'function') {
+        tokenModule.clearTokenCache();
       }
       
       console.error(JSON.stringify({
@@ -205,8 +207,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'search_code': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
             path_glob: typedArgs.path_glob,
@@ -259,8 +260,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'search_code_with_chunks': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
             path_glob: typedArgs.path_glob,
@@ -289,7 +289,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const resultsWithCode = [];
-        const MAX_CHUNK_SIZE = 100000;
 
         for (const result of searchResults.results) {
           const chunkResult = await getChunk(result.sha, cleanPath);
@@ -326,8 +325,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_code_chunk': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const result = await getChunk(typedArgs.sha, cleanPath);
 
         if (!result.success) {
@@ -337,7 +335,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const MAX_CHUNK_SIZE = 100000;
         const codeText = result.code || '';
 
         if (codeText.length > MAX_CHUNK_SIZE) {
@@ -357,8 +354,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'index_project': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
 
         if (!fs.existsSync(cleanPath)) {
           throw new Error(`Directory ${cleanPath} does not exist`);
@@ -386,8 +382,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'update_project': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const result = await indexProject({ repoPath: cleanPath, provider: typedArgs.provider || 'auto' });
 
         if (!result.success) {
@@ -410,8 +405,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_project_stats': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const overviewResult = await getOverview(50, cleanPath);
 
         if (!overviewResult.success) {
@@ -444,8 +438,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'use_context_pack': {
-        // FIX: Standardize path handling - support project/directory aliases like CLI
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         const name = typedArgs.name;
 
         if (name === 'default' || name === 'none' || name === 'clear') {
@@ -477,7 +470,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'ask_codebase': {
-        const cleanPath = (typedArgs.path || typedArgs.project || typedArgs.directory || '.')?.trim?.() || '.';
+        const cleanPath = resolveProjectRoot(typedArgs);
         
         // Use resolveScopeWithPack like other search tools for consistency
         const { scope: scopeFilters } = resolveScopeWithPack(
@@ -561,7 +554,7 @@ async function main() {
   scheduleCacheCleanup();
   
   // FIX: Add cleanup handlers for graceful shutdown
-  const cleanup = () => {
+  const cleanup = async () => {
     // Stop cache cleanup timer
     if (cacheCleanupTimer) {
       clearInterval(cacheCleanupTimer);
@@ -573,9 +566,9 @@ async function main() {
     
     // Clear search caches to free memory
     try {
-      const { clearSearchCaches } = require('./core/search.js');
-      if (typeof clearSearchCaches === 'function') {
-        clearSearchCaches();
+      const searchModule = await import('./core/search.js').catch(() => ({ clearSearchCaches: undefined }));
+      if (typeof searchModule.clearSearchCaches === 'function') {
+        searchModule.clearSearchCaches();
       }
     } catch (error) {
       // Ignore if module doesn't export the function yet
@@ -583,27 +576,27 @@ async function main() {
     
     // Clear token counter cache
     try {
-      const { clearTokenCache } = require('./chunking/token-counter.js');
-      if (typeof clearTokenCache === 'function') {
-        clearTokenCache();
+      const tokenModule = await import('./chunking/token-counter.js').catch(() => ({ clearTokenCache: undefined }));
+      if (typeof tokenModule.clearTokenCache === 'function') {
+        tokenModule.clearTokenCache();
       }
     } catch (error) {
       // Ignore if module doesn't export the function yet
     }
   };
   
-  process.on('SIGINT', () => {
-    cleanup();
+  process.on('SIGINT', async () => {
+    await cleanup();
     process.exit(0);
   });
   
-  process.on('SIGTERM', () => {
-    cleanup();
+  process.on('SIGTERM', async () => {
+    await cleanup();
     process.exit(0);
   });
   
   process.on('exit', () => {
-    cleanup();
+    // Note: Cannot use async in exit handler, but cleanup is best-effort
   });
 }
 

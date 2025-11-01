@@ -1,6 +1,5 @@
 import type { Codemap } from '../types/codemap.js';
-
-const MAX_NEIGHBORS = 16;
+import { MAX_NEIGHBORS } from '../config/constants.js';
 
 interface SymbolCandidate {
   chunkId: string;

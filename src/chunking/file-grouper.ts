@@ -1,18 +1,11 @@
 import { analyzeCodeSize, batchAnalyzeCodeSize, type CodeSizeAnalysis } from './token-counter.js';
 import type { ModelProfile } from '../providers/base.js';
+import { getSizeLimits } from '../providers/base.js';
 import type { TreeSitterNode } from '../types/ast.js';
 
 interface LanguageRule {
   subdivisionTypes?: Record<string, string[]>;
   [key: string]: any;
-}
-
-interface SizeLimits {
-  optimal: number;
-  min: number;
-  max: number;
-  overlap: number;
-  unit: string;
 }
 
 interface NodeAnalysis {
@@ -33,25 +26,6 @@ export interface NodeGroup {
   nodes: TreeSitterNode[];
   totalSize: number;
   groupInfo: SemanticGroup[];
-}
-
-function getSizeLimits(profile: ModelProfile): SizeLimits {
-  if (profile.useTokens && profile.tokenCounter) {
-    return {
-      optimal: profile.optimalTokens,
-      min: profile.minChunkTokens,
-      max: profile.maxChunkTokens,
-      overlap: profile.overlapTokens,
-      unit: 'tokens'
-    };
-  }
-  return {
-    optimal: profile.optimalChars,
-    min: profile.minChunkChars,
-    max: profile.maxChunkChars,
-    overlap: profile.overlapChars,
-    unit: 'characters'
-  };
 }
 
 async function batchAnalyzeNodesInternal(nodes: TreeSitterNode[], source: string, profile: ModelProfile): Promise<NodeAnalysis[]> {
@@ -139,7 +113,7 @@ async function combineGroupsToOptimalSize(
   semanticGroups: SemanticGroup[],
   source: string,
   profile: ModelProfile,
-  limits: SizeLimits
+  limits: ReturnType<typeof getSizeLimits>
 ): Promise<NodeGroup[]> {
   const optimalGroups: NodeGroup[] = [];
   let currentCombinedGroup: NodeGroup = {
@@ -240,7 +214,7 @@ export interface CombinedChunk {
   };
 }
 
-export function createCombinedChunk(nodeGroup: NodeGroup, source: string, filerel: string): CombinedChunk | null {
+export function createCombinedChunk(nodeGroup: NodeGroup, source: string): CombinedChunk | null {
   if (!nodeGroup.nodes || nodeGroup.nodes.length === 0) {
     return null;
   }

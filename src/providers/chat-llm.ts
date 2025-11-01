@@ -32,7 +32,8 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     this.model = process.env.CODEVAULT_CHAT_MODEL
                  || process.env.CODEVAULT_OPENAI_CHAT_MODEL // Backward compatibility
                  || 'gpt-4o';
-    this.rateLimiter = createRateLimiter('OpenAI-Chat');
+    // Use 'OpenAI' to match rate limiter defaults (rpm: 50)
+    this.rateLimiter = createRateLimiter('OpenAI');
   }
 
   async init(): Promise<void> {
@@ -77,6 +78,9 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     
     const temperature = options.temperature ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
     const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
+    
+    // Apply rate limiting to streaming requests to prevent overwhelming the provider
+    await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
     
     const stream = await this.openai!.chat.completions.create({
       model: this.model,

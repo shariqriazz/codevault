@@ -38,6 +38,8 @@ import {
 import { Database, initDatabase } from '../database/db.js';
 import { BatchEmbeddingProcessor } from './batch-indexer.js';
 import type { IndexProjectOptions, IndexProjectResult, ChunkingStats } from './types.js';
+import { DEFAULT_SCAN_IGNORES } from '../utils/scan-patterns.js';
+import { SIZE_THRESHOLD, CHUNK_SIZE } from '../config/constants.js';
 
 import type { TreeSitterNode } from '../types/ast.js';
 
@@ -79,31 +81,7 @@ export async function indexProject({
       cwd: repo,
       absolute: false,
       followSymbolicLinks: false,
-      ignore: [
-        '**/vendor/**',
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/storage/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/tmp/**',
-        '**/temp/**',
-        '**/.npm/**',
-        '**/.yarn/**',
-        '**/Library/**',
-        '**/System/**',
-        '**/.Trash/**',
-        '**/.codevault/**',
-        '**/codevault.codemap.json',
-        '**/codevault.codemap.json.backup-*',
-        '**/package-lock.json',
-        '**/yarn.lock',
-        '**/pnpm-lock.yaml',
-        '**/*.json',
-        '**/*.sh',
-        '**/examples/**',
-        '**/assets/**'
-      ],
+      ignore: DEFAULT_SCAN_IGNORES,
       onlyFiles: true,
       dot: false
     });
@@ -367,9 +345,6 @@ export async function indexProject({
         continue;
       }
 
-      const SIZE_THRESHOLD = 30000;
-      const CHUNK_SIZE = 30000;
-      
       let tree;
       try {
         parser.setLanguage(rule.ts);
@@ -449,7 +424,7 @@ export async function indexProject({
           return;
         }
         
-        const combinedChunk = createCombinedChunk(nodeGroup, source, rel);
+        const combinedChunk = createCombinedChunk(nodeGroup, source);
         if (combinedChunk) {
           chunkingStats.totalNodes += nodeGroup.nodes.length;
           chunkingStats.fileGrouped = (chunkingStats.fileGrouped || 0) + 1;
