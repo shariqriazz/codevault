@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
-let currentWorkingPath = '.';
+// Note: working path is resolved per request via resolveProjectRoot()
 let sessionContextPack: any = null;
 
 // FIX: Add periodic cache clearing to prevent memory leaks in long-running MCP server
