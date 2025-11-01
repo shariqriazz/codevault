@@ -9,6 +9,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 - **🔍 Semantic Search**: Find code by meaning, not just keywords using vector embeddings
 - **🤖 MCP Integration**: Native support for Claude Desktop and other MCP clients
 - **💬 LLM-Synthesized Answers**: Ask questions in natural language, get markdown responses with code citations
+- **🗣️ Interactive Chat Mode**: Have multi-turn conversations about your codebase with conversation history
 - **🎯 Symbol-Aware Ranking**: Boost results based on function signatures, parameters, and relationships
 - **⚡ Hybrid Retrieval**: Combines vector embeddings with BM25 keyword matching via Reciprocal Rank Fusion
 - **🚀 Batch Processing**: Efficient API usage with configurable batching (50 chunks/batch by default)
@@ -155,6 +156,14 @@ codevault search-with-code "database connection" --limit 5
 codevault ask "How does authentication work in this codebase?"
 codevault ask "How do I add a new payment provider?" --multi-query --stream
 
+# Start interactive chat (NEW!)
+codevault chat
+# Features:
+# - Multi-turn conversations with history
+# - Maintains context across questions
+# - Commands: /help, /history, /clear, /stats, /exit
+# - Configurable history window (--max-history)
+
 # View project stats
 codevault info
 ```
@@ -219,6 +228,7 @@ codevault watch [path]                   # Watch for changes
 codevault search <query>                 # Search code (metadata only)
 codevault search-with-code <query>       # Search with full code chunks
 codevault ask <question>                 # Ask questions, get synthesized answers
+codevault chat                           # Interactive conversation mode (NEW!)
 
 # Context Packs
 codevault context list                   # List saved contexts
@@ -255,6 +265,13 @@ codevault mcp                            # Start MCP server
    - Builds context prompt with metadata
    - Generates natural language answer via chat LLM
    - Returns markdown with code citations
+
+4. **Interactive Chat Phase** (Chat Feature)
+   - Maintains conversation history (last N turns)
+   - Performs fresh semantic search for each question
+   - Combines conversation context + new code chunks
+   - Generates conversational responses with continuity
+   - Supports commands: /help, /history, /clear, /stats
 
 ### Supported Languages
 
@@ -365,6 +382,6 @@ Built with:
 
 ---
 
-**Version**: 1.5.0  
+**Version**: 1.6.0  
 **Built by**: Shariq Riaz  
-**Last Updated**: October 2025
+**Last Updated**: November 2025

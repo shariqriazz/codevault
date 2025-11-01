@@ -15,6 +15,7 @@ Commands:
   search         Semantic search (metadata only)
   search-with-code  Semantic search with full code
   ask            Ask questions, get LLM answers
+  chat           Interactive conversation mode
   context        Context pack management
   info           Project statistics
   mcp            Start MCP server
@@ -363,6 +364,71 @@ export CODEVAULT_CHAT_MODEL=qwen2.5-coder:7b
 codevault ask "How does routing work?"
 ```
 
+### `chat`
+
+Start interactive conversation mode with conversation history.
+
+```bash
+codevault chat [options]
+
+Options:
+  -p, --provider <name>        Embedding provider (auto|openai|ollama)
+  -c, --chat-provider <name>   Chat LLM provider (auto|openai|ollama)
+  --path <path>                Project path (default: current directory)
+  --project <path>             Alias for project path
+  --directory <path>           Alias for project directory
+  -k, --max-chunks <num>       Max code chunks per query (default: 10)
+  --path_glob <pattern...>     Filter by file pattern
+  --tags <tag...>              Filter by tags
+  --lang <language...>         Filter by language
+  --reranker <on|off>          Use API reranking (default: on)
+  --temperature <num>          LLM temperature 0-2 (default: 0.7)
+  --max-history <num>          Max conversation turns to remember (default: 5)
+```
+
+**In-Chat Commands:**
+- `/help` - Show available commands
+- `/exit`, `/quit`, `/q` - Exit chat mode
+- `/clear` - Clear conversation history
+- `/history` - View conversation history
+- `/stats` - Show conversation statistics
+
+**Examples:**
+```bash
+# Start interactive chat
+codevault chat
+
+# With filters
+codevault chat --tags auth --lang typescript
+
+# Custom settings
+codevault chat \
+  --max-chunks 15 \
+  --temperature 0.8 \
+  --max-history 10
+
+# Using context pack
+codevault context use feature-auth
+codevault chat
+
+# Example conversation:
+# You: How does authentication work?
+# Assistant: [explains auth with code citations]
+# You: What about session management?
+# Assistant: [builds on previous answer]
+# You: /stats
+# [Shows conversation statistics]
+# You: /exit
+```
+
+**Features:**
+- Multi-turn conversations with history
+- Maintains context across questions
+- Fresh semantic search for each query
+- Combines conversation history + new code chunks
+- Conversational responses that build on previous answers
+- Commands for managing conversation state
+
 ## 📦 Context Pack Commands
 
 ### `context list`
@@ -560,6 +626,9 @@ codevault search "function name"
 
 # Ask questions
 codevault ask "How does this feature work?" --stream
+
+# Interactive chat
+codevault chat
 ```
 
 ### Code Review
@@ -639,5 +708,5 @@ codevault ask "What languages are used?" --stream --no-metadata
 
 ---
 
-**Version:** 1.5.0  
-**Last Updated:** October 2025
+**Version:** 1.6.0  
+**Last Updated:** November 2025
