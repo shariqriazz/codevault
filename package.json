@@ -48,6 +48,7 @@
     "@modelcontextprotocol/sdk": "^1.20.2",
     "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
     "@tree-sitter-grammars/tree-sitter-markdown": "^0.3.2",
+    "better-sqlite3": "^11.10.0",
     "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
     "cli-progress": "^3.12.0",
@@ -57,7 +58,6 @@
     "micromatch": "^4.0.8",
     "openai": "^6.7.0",
     "ora": "^9.0.0",
-    "sqlite3": "^5.1.7",
     "tiktoken": "^1.0.22",
     "tree-sitter": "^0.25.0",
     "tree-sitter-bash": "^0.25.0",
@@ -86,6 +86,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/chokidar": "^1.7.5",
     "@types/cli-progress": "^3.11.6",
     "@types/micromatch": "^4.0.10",
