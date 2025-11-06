@@ -89,7 +89,7 @@
     "@types/chokidar": "^1.7.5",
     "@types/cli-progress": "^3.11.6",
     "@types/micromatch": "^4.0.10",
-    "@types/node": "^24.9.1",
+    "@types/node": "^24.10.0",
     "typescript": "^5.9.3"
   }
 }

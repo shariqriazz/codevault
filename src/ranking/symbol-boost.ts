@@ -1,7 +1,10 @@
 import type { Codemap } from '../types/codemap.js';
+import { SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
 
-const SIGNATURE_MATCH_BOOST = 0.3;
-const NEIGHBOR_MATCH_BOOST = 0.15;
+const SIGNATURE_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.SIGNATURE_MATCH_BOOST;
+const NEIGHBOR_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.NEIGHBOR_MATCH_BOOST;
+const MIN_TOKEN_LENGTH = SYMBOL_BOOST_CONSTANTS.MIN_TOKEN_LENGTH;
+const MAX_SYMBOL_BOOST = SYMBOL_BOOST_CONSTANTS.MAX_SYMBOL_BOOST;
 
 interface SearchResult {
   id: string;
@@ -12,17 +15,39 @@ interface SearchResult {
   symbolNeighborStrength?: number;
 }
 
+// Regex cache for performance
+const regexCache = new Map<string, RegExp>();
+const MAX_CACHE_SIZE = 1000;
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function buildQueryTokenRegex(token: string): RegExp | null {
-  if (!token || token.length < 3) {
+  if (!token || token.length < MIN_TOKEN_LENGTH) {
     return null;
   }
 
+  // Check cache first
+  const cached = regexCache.get(token);
+  if (cached) {
+    return cached;
+  }
+
   const escaped = escapeRegex(token.toLowerCase());
-  return new RegExp(`\\b${escaped}[a-z0-9_]*\\b`, 'i');
+  const regex = new RegExp(`\\b${escaped}[a-z0-9_]*\\b`, 'i');
+
+  // Add to cache with size limit
+  if (regexCache.size >= MAX_CACHE_SIZE) {
+    // Clear oldest entries (simple FIFO)
+    const firstKey = regexCache.keys().next().value;
+    if (firstKey !== undefined) {
+      regexCache.delete(firstKey);
+    }
+  }
+  regexCache.set(token, regex);
+
+  return regex;
 }
 
 function splitSymbolWords(symbol: string): string[] {
@@ -65,7 +90,7 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   const symbolTokens = splitSymbolWords(rawSymbol).map(token => token.toLowerCase());
   let symbolTokenMatches = 0;
   for (const token of symbolTokens) {
-    if (token.length < 3 || matchedTokens.has(token)) {
+    if (token.length < MIN_TOKEN_LENGTH || matchedTokens.has(token)) {
       continue;
     }
 
@@ -91,7 +116,7 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
         .toLowerCase()
         .split(/[^a-z0-9]+/)
         .map(part => part.trim())
-        .filter(part => part.length >= 3);
+        .filter(part => part.length >= MIN_TOKEN_LENGTH);
 
       for (const part of parts) {
         if (matchedTokens.has(part)) {
@@ -188,7 +213,7 @@ export function applySymbolBoost(results: SearchResult[], { query, codemap }: { 
     }
 
     if (boost > 0) {
-      const cappedBoost = Math.min(boost, 0.45);
+      const cappedBoost = Math.min(boost, MAX_SYMBOL_BOOST);
       const baseScore = typeof result.score === 'number' ? result.score : 0;
       result.score = baseScore + cappedBoost;
       result.symbolBoost = cappedBoost;

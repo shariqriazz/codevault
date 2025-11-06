@@ -234,11 +234,48 @@ export class Database {
 
   async getOverviewChunks(limit: number): Promise<Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }>> {
     return await this.all(`
-      SELECT id, file_path, symbol, sha, lang 
-      FROM code_chunks 
-      ORDER BY file_path, symbol 
+      SELECT id, file_path, symbol, sha, lang
+      FROM code_chunks
+      ORDER BY file_path, symbol
       LIMIT ?
     `, [limit]);
+  }
+
+  /**
+   * Begin a database transaction
+   */
+  async beginTransaction(): Promise<void> {
+    await this.run('BEGIN TRANSACTION');
+  }
+
+  /**
+   * Commit the current transaction
+   */
+  async commit(): Promise<void> {
+    await this.run('COMMIT');
+  }
+
+  /**
+   * Rollback the current transaction
+   */
+  async rollback(): Promise<void> {
+    await this.run('ROLLBACK');
+  }
+
+  /**
+   * Execute a function within a transaction
+   * Automatically commits on success and rolls back on error
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    await this.beginTransaction();
+    try {
+      const result = await fn();
+      await this.commit();
+      return result;
+    } catch (error) {
+      await this.rollback();
+      throw error;
+    }
   }
 
   close(): void {

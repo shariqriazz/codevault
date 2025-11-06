@@ -1,0 +1,23 @@
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# CodeVault data
+.codevault/
+
+# Lockfiles and configs that shouldn't be formatted
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# Documentation that may have specific formatting
+CHANGELOG.md
+LICENSE
