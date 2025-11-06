@@ -34,6 +34,22 @@ export function applyConfigToEnv(basePath = '.'): void {
       process.env.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.openai.dimensions);
       process.env.CODEVAULT_DIMENSIONS = String(config.providers.openai.dimensions); // Backward compatibility
     }
+
+    // Provider routing for embeddings
+    if (config.providers.openai.providerRouting) {
+      if (!process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER && config.providers.openai.providerRouting.order) {
+        process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER = config.providers.openai.providerRouting.order.join(',');
+      }
+      if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS === undefined && config.providers.openai.providerRouting.allowFallbacks !== undefined) {
+        process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS = String(config.providers.openai.providerRouting.allowFallbacks);
+      }
+      if (!process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY && config.providers.openai.providerRouting.only) {
+        process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY = config.providers.openai.providerRouting.only.join(',');
+      }
+      if (!process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE && config.providers.openai.providerRouting.ignore) {
+        process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE = config.providers.openai.providerRouting.ignore.join(',');
+      }
+    }
   }
   
 
@@ -100,8 +116,39 @@ export function applyConfigToEnv(basePath = '.'): void {
     if (!process.env.CODEVAULT_CHAT_TEMPERATURE && config.chatLLM.openai.temperature) {
       process.env.CODEVAULT_CHAT_TEMPERATURE = String(config.chatLLM.openai.temperature);
     }
+
+    // Provider routing for chat LLM
+    if (config.chatLLM.openai.providerRouting) {
+      if (!process.env.CODEVAULT_CHAT_PROVIDER_ORDER && config.chatLLM.openai.providerRouting.order) {
+        process.env.CODEVAULT_CHAT_PROVIDER_ORDER = config.chatLLM.openai.providerRouting.order.join(',');
+      }
+      if (process.env.CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS === undefined && config.chatLLM.openai.providerRouting.allowFallbacks !== undefined) {
+        process.env.CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS = String(config.chatLLM.openai.providerRouting.allowFallbacks);
+      }
+      if (!process.env.CODEVAULT_CHAT_PROVIDER_ONLY && config.chatLLM.openai.providerRouting.only) {
+        process.env.CODEVAULT_CHAT_PROVIDER_ONLY = config.chatLLM.openai.providerRouting.only.join(',');
+      }
+      if (!process.env.CODEVAULT_CHAT_PROVIDER_IGNORE && config.chatLLM.openai.providerRouting.ignore) {
+        process.env.CODEVAULT_CHAT_PROVIDER_IGNORE = config.chatLLM.openai.providerRouting.ignore.join(',');
+      }
+    }
   }
-  
+
+  // Reranker provider routing
+  if (config.reranker?.providerRouting) {
+    if (!process.env.CODEVAULT_RERANK_PROVIDER_ORDER && config.reranker.providerRouting.order) {
+      process.env.CODEVAULT_RERANK_PROVIDER_ORDER = config.reranker.providerRouting.order.join(',');
+    }
+    if (process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS === undefined && config.reranker.providerRouting.allowFallbacks !== undefined) {
+      process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS = String(config.reranker.providerRouting.allowFallbacks);
+    }
+    if (!process.env.CODEVAULT_RERANK_PROVIDER_ONLY && config.reranker.providerRouting.only) {
+      process.env.CODEVAULT_RERANK_PROVIDER_ONLY = config.reranker.providerRouting.only.join(',');
+    }
+    if (!process.env.CODEVAULT_RERANK_PROVIDER_IGNORE && config.reranker.providerRouting.ignore) {
+      process.env.CODEVAULT_RERANK_PROVIDER_IGNORE = config.reranker.providerRouting.ignore.join(',');
+    }
+  }
 
 }
 

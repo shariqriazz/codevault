@@ -1,8 +1,21 @@
+export interface ProviderRoutingConfig {
+  order?: string[];
+  allowFallbacks?: boolean;
+  requireParameters?: boolean;
+  dataCollection?: 'allow' | 'deny';
+  zdr?: boolean;
+  only?: string[];
+  ignore?: string[];
+  quantizations?: string[];
+  sort?: 'price' | 'throughput' | 'latency';
+}
+
 export interface ProviderConfig {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
   dimensions?: number;
+  providerRouting?: ProviderRoutingConfig;
 }
 
 export interface RateLimitConfig {
@@ -21,6 +34,7 @@ export interface ChatLLMConfig {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  providerRouting?: ProviderRoutingConfig;
 }
 
 export interface CodevaultConfig {
@@ -40,6 +54,7 @@ export interface CodevaultConfig {
     model?: string;
     maxCandidates?: number;
     maxTokens?: number;
+    providerRouting?: ProviderRoutingConfig;
   };
 }
 

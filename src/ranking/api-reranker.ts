@@ -34,6 +34,28 @@ function truncateText(text: string, maxTokens: number): string {
   return text.slice(0, maxChars);
 }
 
+function getProviderRouting(): any {
+  const routing: any = {};
+  
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ORDER) {
+    routing.order = process.env.CODEVAULT_RERANK_PROVIDER_ORDER.split(',').map(s => s.trim());
+  }
+  
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS !== undefined) {
+    routing.allow_fallbacks = process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS === 'true';
+  }
+  
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ONLY) {
+    routing.only = process.env.CODEVAULT_RERANK_PROVIDER_ONLY.split(',').map(s => s.trim());
+  }
+  
+  if (process.env.CODEVAULT_RERANK_PROVIDER_IGNORE) {
+    routing.ignore = process.env.CODEVAULT_RERANK_PROVIDER_IGNORE.split(',').map(s => s.trim());
+  }
+  
+  return routing;
+}
+
 export function isAPIRerankingConfigured(): boolean {
   const url = getAPIUrl();
   const key = getAPIKey();
@@ -66,13 +88,19 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error('CODEVAULT_RERANK_API_KEY is not configured');
   }
 
-  // Standard reranking API format (Novita, Cohere, Jina AI, Voyage AI)
-  const requestBody = {
+  // Standard reranking API format (Novita, Cohere, Jina AI, Voyage AI, OpenRouter)
+  const requestBody: any = {
     model: model,
     query: query,
     documents: documents,
     top_n: documents.length
   };
+
+  // Add provider routing if configured (for OpenRouter when they support reranking)
+  const providerRouting = getProviderRouting();
+  if (providerRouting && Object.keys(providerRouting).length > 0) {
+    requestBody.provider = providerRouting;
+  }
 
   const response = await fetch(apiUrl, {
     method: 'POST',

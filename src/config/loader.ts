@@ -78,6 +78,35 @@ export function readEnvConfig(): CodevaultConfig {
     }
   }
 
+  // Provider routing for embeddings
+  if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER) {
+    config.providers = config.providers || {};
+    config.providers.openai = config.providers.openai || {};
+    config.providers.openai.providerRouting = config.providers.openai.providerRouting || {};
+    config.providers.openai.providerRouting.order = process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER.split(',').map(s => s.trim());
+  }
+
+  if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS !== undefined) {
+    config.providers = config.providers || {};
+    config.providers.openai = config.providers.openai || {};
+    config.providers.openai.providerRouting = config.providers.openai.providerRouting || {};
+    config.providers.openai.providerRouting.allowFallbacks = process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS === 'true';
+  }
+
+  if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY) {
+    config.providers = config.providers || {};
+    config.providers.openai = config.providers.openai || {};
+    config.providers.openai.providerRouting = config.providers.openai.providerRouting || {};
+    config.providers.openai.providerRouting.only = process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY.split(',').map(s => s.trim());
+  }
+
+  if (process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE) {
+    config.providers = config.providers || {};
+    config.providers.openai = config.providers.openai || {};
+    config.providers.openai.providerRouting = config.providers.openai.providerRouting || {};
+    config.providers.openai.providerRouting.ignore = process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE.split(',').map(s => s.trim());
+  }
+
   // Max tokens - New variable with backward compatibility
   if (process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS) {
     const tokens = parseInt(process.env.CODEVAULT_EMBEDDING_MAX_TOKENS || process.env.CODEVAULT_MAX_TOKENS || '0', 10);
@@ -163,7 +192,59 @@ export function readEnvConfig(): CodevaultConfig {
     }
   }
 
+  // Provider routing for chat LLM
+  if (process.env.CODEVAULT_CHAT_PROVIDER_ORDER) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.providerRouting = config.chatLLM.openai.providerRouting || {};
+    config.chatLLM.openai.providerRouting.order = process.env.CODEVAULT_CHAT_PROVIDER_ORDER.split(',').map(s => s.trim());
+  }
 
+  if (process.env.CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS !== undefined) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.providerRouting = config.chatLLM.openai.providerRouting || {};
+    config.chatLLM.openai.providerRouting.allowFallbacks = process.env.CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS === 'true';
+  }
+
+  if (process.env.CODEVAULT_CHAT_PROVIDER_ONLY) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.providerRouting = config.chatLLM.openai.providerRouting || {};
+    config.chatLLM.openai.providerRouting.only = process.env.CODEVAULT_CHAT_PROVIDER_ONLY.split(',').map(s => s.trim());
+  }
+
+  if (process.env.CODEVAULT_CHAT_PROVIDER_IGNORE) {
+    config.chatLLM = config.chatLLM || {};
+    config.chatLLM.openai = config.chatLLM.openai || {};
+    config.chatLLM.openai.providerRouting = config.chatLLM.openai.providerRouting || {};
+    config.chatLLM.openai.providerRouting.ignore = process.env.CODEVAULT_CHAT_PROVIDER_IGNORE.split(',').map(s => s.trim());
+  }
+
+  // Provider routing for reranker
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ORDER) {
+    config.reranker = config.reranker || {};
+    config.reranker.providerRouting = config.reranker.providerRouting || {};
+    config.reranker.providerRouting.order = process.env.CODEVAULT_RERANK_PROVIDER_ORDER.split(',').map(s => s.trim());
+  }
+
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS !== undefined) {
+    config.reranker = config.reranker || {};
+    config.reranker.providerRouting = config.reranker.providerRouting || {};
+    config.reranker.providerRouting.allowFallbacks = process.env.CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS === 'true';
+  }
+
+  if (process.env.CODEVAULT_RERANK_PROVIDER_ONLY) {
+    config.reranker = config.reranker || {};
+    config.reranker.providerRouting = config.reranker.providerRouting || {};
+    config.reranker.providerRouting.only = process.env.CODEVAULT_RERANK_PROVIDER_ONLY.split(',').map(s => s.trim());
+  }
+
+  if (process.env.CODEVAULT_RERANK_PROVIDER_IGNORE) {
+    config.reranker = config.reranker || {};
+    config.reranker.providerRouting = config.reranker.providerRouting || {};
+    config.reranker.providerRouting.ignore = process.env.CODEVAULT_RERANK_PROVIDER_IGNORE.split(',').map(s => s.trim());
+  }
 
   return config;
 }
@@ -194,6 +275,13 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
           ...result.providers.openai,
           ...config.providers.openai
         };
+        // Deep merge provider routing
+        if (config.providers.openai.providerRouting) {
+          result.providers.openai.providerRouting = {
+            ...result.providers.openai.providerRouting,
+            ...config.providers.openai.providerRouting
+          };
+        }
       }
 
 
@@ -228,6 +316,13 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
           ...result.chatLLM.openai,
           ...config.chatLLM.openai
         };
+        // Deep merge provider routing
+        if (config.chatLLM.openai.providerRouting) {
+          result.chatLLM.openai.providerRouting = {
+            ...result.chatLLM.openai.providerRouting,
+            ...config.chatLLM.openai.providerRouting
+          };
+        }
       }
 
 

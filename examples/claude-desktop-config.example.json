@@ -1,22 +1,26 @@
 {
-  "comment": "CodeVault MCP configuration for Claude Desktop - Recommended Setup",
+  "comment": "CodeVault MCP configuration for Claude Desktop - OpenRouter with Provider Routing",
   "mcpServers": {
     "codevault": {
       "command": "npx",
       "args": ["-y", "codevault", "mcp"],
       "env": {
-        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-api-token-here",
-        "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
-        "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
+        "CODEVAULT_EMBEDDING_API_KEY": "your-openrouter-api-key-here",
+        "CODEVAULT_EMBEDDING_BASE_URL": "https://openrouter.ai/api/v1",
+        "CODEVAULT_EMBEDDING_MODEL": "qwen/qwen3-embedding-8b",
         "CODEVAULT_EMBEDDING_DIMENSIONS": "4096",
         "CODEVAULT_EMBEDDING_MAX_TOKENS": "32000",
         "CODEVAULT_EMBEDDING_RATE_LIMIT_RPM": "10000",
         "CODEVAULT_EMBEDDING_RATE_LIMIT_TPM": "600000",
+        "CODEVAULT_EMBEDDING_PROVIDER_ORDER": "nebius,deepinfra",
+        "CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS": "true",
         "CODEVAULT_CHAT_API_KEY": "your-openrouter-api-key-here",
         "CODEVAULT_CHAT_BASE_URL": "https://openrouter.ai/api/v1",
         "CODEVAULT_CHAT_MODEL": "anthropic/claude-sonnet-4.5",
         "CODEVAULT_CHAT_MAX_TOKENS": "32000",
         "CODEVAULT_CHAT_TEMPERATURE": "0.1",
+        "CODEVAULT_CHAT_PROVIDER_ORDER": "anthropic",
+        "CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS": "true",
         "CODEVAULT_RERANK_API_URL": "https://api.novita.ai/openai/v1/rerank",
         "CODEVAULT_RERANK_API_KEY": "your-novita-api-key-here",
         "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b"

@@ -47,10 +47,18 @@ export class OpenAIProvider extends EmbeddingProvider {
     const maxChars = profile.maxChunkChars || 8000;
     
     return await this.rateLimiter.execute(async () => {
-      const { data } = await this.openai!.embeddings.create({
+      const requestBody: any = {
         model: this.model,
         input: text.slice(0, maxChars)
-      });
+      };
+
+      // Add provider routing if configured (for OpenRouter)
+      const providerRouting = this.getProviderRouting();
+      if (providerRouting && Object.keys(providerRouting).length > 0) {
+        requestBody.provider = providerRouting;
+      }
+
+      const { data } = await this.openai!.embeddings.create(requestBody);
       return data[0].embedding;
     });
   }
@@ -72,6 +80,28 @@ export class OpenAIProvider extends EmbeddingProvider {
   
   getModelName(): string {
     return this.model;
+  }
+
+  private getProviderRouting(): any {
+    const routing: any = {};
+    
+    if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER) {
+      routing.order = process.env.CODEVAULT_EMBEDDING_PROVIDER_ORDER.split(',').map(s => s.trim());
+    }
+    
+    if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS !== undefined) {
+      routing.allow_fallbacks = process.env.CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS === 'true';
+    }
+    
+    if (process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY) {
+      routing.only = process.env.CODEVAULT_EMBEDDING_PROVIDER_ONLY.split(',').map(s => s.trim());
+    }
+    
+    if (process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE) {
+      routing.ignore = process.env.CODEVAULT_EMBEDDING_PROVIDER_IGNORE.split(',').map(s => s.trim());
+    }
+    
+    return routing;
   }
 
   // Batch processing implementation for OpenAI
@@ -130,10 +160,18 @@ export class OpenAIProvider extends EmbeddingProvider {
         }
         
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
-          const { data } = await this.openai!.embeddings.create({
+          const requestBody: any = {
             model: this.model,
             input: currentBatch
-          });
+          };
+
+          // Add provider routing if configured (for OpenRouter)
+          const providerRouting = this.getProviderRouting();
+          if (providerRouting && Object.keys(providerRouting).length > 0) {
+            requestBody.provider = providerRouting;
+          }
+
+          const { data } = await this.openai!.embeddings.create(requestBody);
           return data.map(item => item.embedding);
         });
         

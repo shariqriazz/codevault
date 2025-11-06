@@ -1,12 +1,17 @@
 {
-  "comment": "Recommended setup: Nebius (embeddings) + OpenRouter (chat) + Novita (reranking)",
+  "comment": "Recommended setup: OpenRouter with Nebius (embeddings) + Claude (chat) + Novita (reranking)",
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "your-nebius-api-token-here",
-      "baseUrl": "https://api.studio.nebius.com/v1",
-      "model": "Qwen/Qwen3-Embedding-8B",
-      "dimensions": 4096
+      "apiKey": "your-openrouter-api-key-here",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen3-embedding-8b",
+      "dimensions": 4096,
+      "providerRouting": {
+        "order": ["nebius", "deepinfra"],
+        "allowFallbacks": true,
+        "comment": "Primary: Nebius, Fallback: DeepInfra. Can also use siliconflow/fp8 for FP8 quantization"
+      }
     }
   },
   "chatLLM": {
@@ -15,7 +20,11 @@
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
-      "temperature": 0.1
+      "temperature": 0.1,
+      "providerRouting": {
+        "order": ["anthropic"],
+        "allowFallbacks": true
+      }
     }
   },
   "maxTokens": 32000,

@@ -6,26 +6,30 @@ Complete guide to configuring CodeVault for both CLI and MCP usage.
 
 ### For CLI Users (Recommended)
 
-**One-time setup with Nebius + OpenRouter:**
+**One-time setup with OpenRouter (locks in Nebius for embeddings, Anthropic for chat):**
 
 ```bash
 # Initialize global configuration
 codevault config init
 
-# Embedding provider (Nebius + Qwen)
-codevault config set providers.openai.apiKey your-nebius-api-key
-codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
-codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
+# Embedding via OpenRouter (locked to Nebius, fallback to DeepInfra)
+codevault config set providers.openai.apiKey your-openrouter-api-key
+codevault config set providers.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set providers.openai.model qwen/qwen3-embedding-8b
 codevault config set providers.openai.dimensions 4096
+codevault config set providers.openai.providerRouting.order "nebius,deepinfra"
+codevault config set providers.openai.providerRouting.allowFallbacks true
 codevault config set maxTokens 32000
 
-# Chat LLM (OpenRouter + Claude)
+# Chat via OpenRouter (locked to Anthropic)
 codevault config set chatLLM.openai.apiKey your-openrouter-api-key
 codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
 codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
 codevault config set chatLLM.openai.maxTokens 32000
+codevault config set chatLLM.openai.providerRouting.order anthropic
+codevault config set chatLLM.openai.providerRouting.allowFallbacks true
 
-# Reranking (Novita + Qwen)
+# Reranking (Novita directly)
 codevault config set reranker.apiUrl https://api.novita.ai/openai/v1/rerank
 codevault config set reranker.apiKey your-novita-api-key
 codevault config set reranker.model qwen/qwen3-reranker-8b
@@ -33,6 +37,21 @@ codevault config set reranker.model qwen/qwen3-reranker-8b
 # Now use CodeVault in any project
 cd ~/projects/any-project
 codevault index
+```
+
+**Alternative: Direct Nebius (simpler, no provider routing needed):**
+
+```bash
+# Embedding directly from Nebius (no OpenRouter)
+codevault config set providers.openai.apiKey your-nebius-api-key
+codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
+codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
+codevault config set providers.openai.dimensions 4096
+
+# Chat via OpenRouter
+codevault config set chatLLM.openai.apiKey your-openrouter-api-key
+codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
 ```
 
 ### For MCP Users
@@ -98,17 +117,21 @@ This ensures:
 
 ## 📝 Configuration File Format
 
-### Complete Example
+### Complete Example (OpenRouter with Provider Routing)
 
 ```json
 {
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "your-nebius-api-key",
-      "baseUrl": "https://api.studio.nebius.com/v1",
-      "model": "Qwen/Qwen3-Embedding-8B",
-      "dimensions": 4096
+      "apiKey": "your-openrouter-api-key",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen3-embedding-8b",
+      "dimensions": 4096,
+      "providerRouting": {
+        "order": ["nebius", "deepinfra"],
+        "allowFallbacks": true
+      }
     }
   },
   "chatLLM": {
@@ -117,7 +140,11 @@ This ensures:
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
-      "temperature": 0.1
+      "temperature": 0.1,
+      "providerRouting": {
+        "order": ["anthropic"],
+        "allowFallbacks": true
+      }
     }
   },
   "maxTokens": 32000,
@@ -133,6 +160,27 @@ This ensures:
     "apiUrl": "https://api.novita.ai/openai/v1/rerank",
     "apiKey": "your-novita-api-key",
     "model": "qwen/qwen3-reranker-8b"
+  }
+}
+```
+
+### Simple Example (Direct Provider - No Routing)
+
+```json
+{
+  "providers": {
+    "openai": {
+      "apiKey": "your-nebius-api-key",
+      "baseUrl": "https://api.studio.nebius.com/v1",
+      "model": "Qwen/Qwen3-Embedding-8B",
+      "dimensions": 4096
+    }
+  },
+  "chatLLM": {
+    "openai": {
+      "apiKey": "your-openai-api-key",
+      "model": "gpt-4o"
+    }
   }
 }
 ```
@@ -254,6 +302,48 @@ export CODEVAULT_RERANK_API_KEY=your-novita-api-key
 export CODEVAULT_RERANK_MODEL=qwen/qwen3-reranker-8b
 ```
 
+### Provider Routing (Optional - OpenRouter Only)
+
+**⚠️ Only needed when using OpenRouter or similar routing services**
+
+Provider routing allows you to lock in specific providers when using OpenRouter's multi-provider API.
+
+```bash
+# Embedding via OpenRouter (lock to Nebius, fallback to DeepInfra)
+export CODEVAULT_EMBEDDING_API_KEY=your-openrouter-api-key
+export CODEVAULT_EMBEDDING_BASE_URL=https://openrouter.ai/api/v1
+export CODEVAULT_EMBEDDING_MODEL=qwen/qwen3-embedding-8b
+export CODEVAULT_EMBEDDING_PROVIDER_ORDER=nebius,deepinfra
+export CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS=true
+
+# Alternative: Use FP8 quantization for cost savings
+export CODEVAULT_EMBEDDING_PROVIDER_ORDER=siliconflow/fp8
+export CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS=false
+
+# Chat via OpenRouter (lock to Anthropic, allow fallbacks)
+export CODEVAULT_CHAT_API_KEY=your-openrouter-api-key
+export CODEVAULT_CHAT_BASE_URL=https://openrouter.ai/api/v1
+export CODEVAULT_CHAT_MODEL=anthropic/claude-sonnet-4.5
+export CODEVAULT_CHAT_PROVIDER_ORDER=anthropic
+export CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS=true
+
+# Reranking via OpenRouter (future support)
+export CODEVAULT_RERANK_PROVIDER_ORDER=novita
+export CODEVAULT_RERANK_PROVIDER_ALLOW_FALLBACKS=false
+```
+
+**Available routing options:**
+- `CODEVAULT_*_PROVIDER_ORDER` - Comma-separated list of providers (e.g., "nebius,together")
+- `CODEVAULT_*_PROVIDER_ALLOW_FALLBACKS` - Allow fallback to other providers (true/false)
+- `CODEVAULT_*_PROVIDER_ONLY` - Only use these providers (e.g., "nebius,anthropic")
+- `CODEVAULT_*_PROVIDER_IGNORE` - Ignore these providers (e.g., "openai,azure")
+
+**When NOT to use provider routing:**
+- ❌ Direct Nebius (you're already on a single provider)
+- ❌ Direct OpenAI (no routing layer)
+- ❌ Ollama local (single provider)
+- ✅ OpenRouter (to lock specific providers like Nebius, Anthropic, etc.)
+
 ### Encryption (Optional)
 
 ```bash
@@ -271,22 +361,49 @@ Old variable names are still supported:
 
 ## 🎭 Common Setups
 
-### Setup 1: Nebius + OpenRouter (Cloud, Best Quality)
+### Setup 1: OpenRouter (Cloud, Provider Routing)
+
+**Use OpenRouter for everything, lock in specific providers**
 
 ```bash
-# Embeddings: Nebius + Qwen3-Embedding-8B
+# Embeddings: OpenRouter locked to Nebius (with fallback)
+codevault config set providers.openai.apiKey your-openrouter-api-key
+codevault config set providers.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set providers.openai.model qwen/qwen3-embedding-8b
+codevault config set providers.openai.dimensions 4096
+codevault config set providers.openai.providerRouting.order "nebius,deepinfra"
+codevault config set providers.openai.providerRouting.allowFallbacks true
+
+# Chat: OpenRouter locked to Anthropic
+codevault config set chatLLM.openai.apiKey your-openrouter-api-key
+codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
+codevault config set chatLLM.openai.providerRouting.order anthropic
+codevault config set chatLLM.openai.providerRouting.allowFallbacks true
+
+# Reranking: Novita (direct)
+codevault config set reranker.apiUrl https://api.novita.ai/openai/v1/rerank
+codevault config set reranker.apiKey your-novita-api-key
+codevault config set reranker.model qwen/qwen3-reranker-8b
+```
+
+### Setup 1b: Direct Providers (No Routing Needed)
+
+**Simpler setup when using providers directly**
+
+```bash
+# Embeddings: Nebius directly
 codevault config set providers.openai.apiKey your-nebius-api-key
 codevault config set providers.openai.baseUrl https://api.studio.nebius.com/v1
 codevault config set providers.openai.model Qwen/Qwen3-Embedding-8B
 codevault config set providers.openai.dimensions 4096
-codevault config set maxTokens 32000
 
-# Chat: OpenRouter + Claude Sonnet 4.5
+# Chat: OpenRouter (default load balancing)
 codevault config set chatLLM.openai.apiKey your-openrouter-api-key
 codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
 codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
 
-# Reranking: Novita + Qwen3-Reranker
+# Reranking: Novita directly
 codevault config set reranker.apiUrl https://api.novita.ai/openai/v1/rerank
 codevault config set reranker.apiKey your-novita-api-key
 codevault config set reranker.model qwen/qwen3-reranker-8b
@@ -350,6 +467,147 @@ codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
 - MCP manages environment isolation automatically
 - Config files are stored in system-specific locations
 
+## 🔀 Provider Routing (OpenRouter)
+
+### What is Provider Routing?
+
+Provider routing is an **optional feature** that allows you to control which backend provider OpenRouter uses for your requests. This is **only relevant when using OpenRouter** as your base URL.
+
+### When to Use Provider Routing
+
+✅ **Use provider routing when:**
+- Using OpenRouter's API (`https://openrouter.ai/api/v1`)
+- You want to lock in a specific provider (e.g., Nebius, Anthropic, Together AI)
+- You want to control fallback behavior
+- You need data privacy controls (ZDR, data collection policies)
+
+❌ **Do NOT use provider routing when:**
+- Using Nebius directly (`https://api.studio.nebius.com/v1`)
+- Using OpenAI directly (`https://api.openai.com/v1`)
+- Using Ollama locally (`http://localhost:11434/v1`)
+- Using any other single provider directly
+
+### Configuration Options
+
+Add `providerRouting` to your provider config (embedding, chat, or reranking):
+
+```json
+{
+  "providers": {
+    "openai": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "providerRouting": {
+        "order": ["nebius"],           // Try these providers in order
+        "allowFallbacks": false,        // Don't fallback to other providers
+        "requireParameters": false,     // Only use providers supporting all params
+        "dataCollection": "deny",       // Only use providers that don't collect data
+        "zdr": false,                   // Require Zero Data Retention
+        "only": ["nebius", "together"], // Whitelist specific providers
+        "ignore": ["openai", "azure"]   // Blacklist specific providers
+      }
+    }
+  }
+}
+```
+
+### Common Patterns
+
+**Lock to single provider (no fallbacks):**
+```json
+"providerRouting": {
+  "order": ["nebius"],
+  "allowFallbacks": false
+}
+```
+
+**Prefer provider but allow fallbacks:**
+```json
+"providerRouting": {
+  "order": ["anthropic", "openai"],
+  "allowFallbacks": true
+}
+```
+
+**Privacy-focused (no data collection):**
+```json
+"providerRouting": {
+  "dataCollection": "deny",
+  "zdr": true
+}
+```
+
+### Environment Variables
+
+Use environment variables for provider routing in MCP configs:
+
+```bash
+# Embedding provider routing
+export CODEVAULT_EMBEDDING_PROVIDER_ORDER=nebius
+export CODEVAULT_EMBEDDING_PROVIDER_ALLOW_FALLBACKS=false
+
+# Chat provider routing  
+export CODEVAULT_CHAT_PROVIDER_ORDER=anthropic,openai
+export CODEVAULT_CHAT_PROVIDER_ALLOW_FALLBACKS=true
+
+# Reranking provider routing (future)
+export CODEVAULT_RERANK_PROVIDER_ORDER=novita
+```
+
+### Provider Names
+
+Common OpenRouter provider names:
+- `nebius` - Nebius AI
+- `anthropic` - Anthropic (Claude)
+- `openai` - OpenAI
+- `together` - Together AI
+- `deepinfra` - DeepInfra
+- `siliconflow` - Silicon Flow
+- `azure` - Azure OpenAI
+- `novita` - Novita AI (reranking)
+
+See [OpenRouter docs](https://openrouter.ai/docs/provider-routing) for complete list.
+
+### Qwen3 Embedding Model on OpenRouter
+
+When using `qwen/qwen3-embedding-8b` model via OpenRouter, you can choose from multiple providers:
+
+**Model**: `qwen/qwen3-embedding-8b`
+**Available Providers**:
+- `nebius` - Nebius AI (recommended, high performance)
+- `siliconflow/fp8` - Silicon Flow with FP8 quantization (faster, lower cost)
+- `deepinfra` - DeepInfra (good balance)
+
+**Example configurations:**
+
+```json
+{
+  "providers": {
+    "openai": {
+      "apiKey": "your-openrouter-api-key",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen3-embedding-8b",
+      "dimensions": 4096,
+      "providerRouting": {
+        "order": ["nebius", "deepinfra"],
+        "allowFallbacks": true
+      }
+    }
+  }
+}
+```
+
+**Use FP8 quantization for cost savings:**
+```json
+{
+  "providerRouting": {
+    "order": ["siliconflow/fp8"],
+    "allowFallbacks": false
+  }
+}
+```
+
+**Note**: When specifying quantization variants like `siliconflow/fp8`, use the exact provider slug including the quantization suffix.
+
 ## 🔍 Troubleshooting
 
 ### "Which config is being used?"
@@ -362,6 +620,14 @@ codevault config list --sources
 ### "MCP not using my global config"
 
 **This is correct!** MCP uses environment variables by design. Global config is only for CLI convenience.
+
+### "Provider routing not working"
+
+Check these:
+1. Are you using OpenRouter as your base URL?
+2. Is `providerRouting` configured correctly?
+3. Does the provider support your model?
+4. Run `codevault config list --sources` to verify settings
 
 ### "Config not taking effect"
 

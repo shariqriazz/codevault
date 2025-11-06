@@ -1,12 +1,20 @@
 {
-  "comment": "Complete CodeVault configuration with all available options",
+  "comment": "Complete CodeVault configuration with all available options including OpenRouter provider routing",
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "your-nebius-api-token-here",
-      "baseUrl": "https://api.studio.nebius.com/v1",
-      "model": "Qwen/Qwen3-Embedding-8B",
-      "dimensions": 4096
+      "apiKey": "your-openrouter-api-key-here",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen3-embedding-8b",
+      "dimensions": 4096,
+      "providerRouting": {
+        "order": ["nebius", "deepinfra"],
+        "allowFallbacks": true,
+        "requireParameters": false,
+        "dataCollection": "deny",
+        "zdr": false,
+        "comment": "Providers for qwen3-embedding-8b: nebius, siliconflow/fp8, deepinfra"
+      }
     }
   },
   "chatLLM": {
@@ -15,7 +23,13 @@
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
-      "temperature": 0.1
+      "temperature": 0.1,
+      "providerRouting": {
+        "order": ["anthropic"],
+        "allowFallbacks": true,
+        "requireParameters": false,
+        "dataCollection": "deny"
+      }
     }
   },
   "maxTokens": 32000,
@@ -30,6 +44,11 @@
   "reranker": {
     "apiUrl": "https://api.novita.ai/openai/v1/rerank",
     "apiKey": "your-novita-api-key-here",
-    "model": "qwen/qwen3-reranker-8b"
+    "model": "qwen/qwen3-reranker-8b",
+    "providerRouting": {
+      "comment": "Provider routing for when OpenRouter supports reranking models",
+      "order": ["novita"],
+      "allowFallbacks": false
+    }
   }
 }
