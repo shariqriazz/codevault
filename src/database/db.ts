@@ -1,7 +1,7 @@
-import sqlite3 from 'sqlite3';
-import { promisify } from 'util';
+import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import { log } from '../utils/logger.js';
 
 export interface DatabaseChunk {
   id: string;
@@ -23,21 +23,44 @@ export interface DatabaseChunk {
   updated_at?: string;
 }
 
-export class Database {
-  private db: sqlite3.Database;
-  private run: (sql: string, params?: any[]) => Promise<void>;
-  private get: <T = any>(sql: string, params?: any[]) => Promise<T | undefined>;
-  private all: <T = any>(sql: string, params?: any[]) => Promise<T[]>;
+export class CodeVaultDatabase {
+  private db: Database.Database;
+  private insertChunkStmt: Database.Statement;
+  private getChunksStmt: Database.Statement;
+  private deleteChunksStmt: Database.Statement | null = null;
 
   constructor(dbPath: string) {
-    this.db = new sqlite3.Database(dbPath);
-    this.run = promisify(this.db.run.bind(this.db));
-    this.get = promisify(this.db.get.bind(this.db));
-    this.all = promisify(this.db.all.bind(this.db));
+    this.db = new Database(dbPath);
+
+    // Enable WAL mode for better concurrency
+    this.db.pragma('journal_mode = WAL');
+
+    // Optimize for performance
+    this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('cache_size = -64000'); // 64MB cache
+    this.db.pragma('temp_store = MEMORY');
+    this.db.pragma('mmap_size = 30000000000'); // 30GB mmap
+
+    // Prepare statements for better performance
+    this.insertChunkStmt = this.db.prepare(`
+      INSERT OR REPLACE INTO code_chunks
+      (id, file_path, symbol, sha, lang, chunk_type, embedding, embedding_provider, embedding_dimensions,
+       codevault_tags, codevault_intent, codevault_description, doc_comments, variables_used, context_info, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    this.getChunksStmt = this.db.prepare(`
+      SELECT id, file_path, symbol, sha, lang, chunk_type, embedding,
+             codevault_tags, codevault_intent, codevault_description,
+             embedding_provider, embedding_dimensions
+      FROM code_chunks
+      WHERE embedding_provider = ? AND embedding_dimensions = ?
+      ORDER BY created_at DESC
+    `);
   }
 
   async initialize(dimensions: number): Promise<void> {
-    await this.run(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS code_chunks (
         id TEXT PRIMARY KEY,
         file_path TEXT NOT NULL,
@@ -59,7 +82,7 @@ export class Database {
       )
     `);
 
-    await this.run(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS intention_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         query_normalized TEXT NOT NULL,
@@ -72,7 +95,7 @@ export class Database {
       )
     `);
 
-    await this.run(`
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS query_patterns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         pattern TEXT NOT NULL UNIQUE,
@@ -99,7 +122,7 @@ export class Database {
     ];
 
     for (const sql of indexes) {
-      await this.run(sql);
+      this.db.exec(sql);
     }
   }
 
@@ -120,28 +143,28 @@ export class Database {
     variables_used: any[];
     context_info: any;
   }): Promise<void> {
-    await this.run(`
-      INSERT OR REPLACE INTO code_chunks
-      (id, file_path, symbol, sha, lang, chunk_type, embedding, embedding_provider, embedding_dimensions,
-       codevault_tags, codevault_intent, codevault_description, doc_comments, variables_used, context_info, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `, [
-      params.id,
-      params.file_path,
-      params.symbol,
-      params.sha,
-      params.lang,
-      params.chunk_type,
-      Buffer.from(JSON.stringify(params.embedding)),
-      params.embedding_provider,
-      params.embedding_dimensions,
-      JSON.stringify(params.codevault_tags),
-      params.codevault_intent,
-      params.codevault_description,
-      params.doc_comments,
-      JSON.stringify(params.variables_used),
-      JSON.stringify(params.context_info)
-    ]);
+    try {
+      this.insertChunkStmt.run(
+        params.id,
+        params.file_path,
+        params.symbol,
+        params.sha,
+        params.lang,
+        params.chunk_type,
+        Buffer.from(JSON.stringify(params.embedding)),
+        params.embedding_provider,
+        params.embedding_dimensions,
+        JSON.stringify(params.codevault_tags),
+        params.codevault_intent,
+        params.codevault_description,
+        params.doc_comments,
+        JSON.stringify(params.variables_used),
+        JSON.stringify(params.context_info)
+      );
+    } catch (error) {
+      log.error('Failed to insert chunk', error, { chunkId: params.id });
+      throw error;
+    }
   }
 
   async deleteChunks(chunkIds: string[]): Promise<void> {
@@ -149,100 +172,198 @@ export class Database {
       return;
     }
 
-    const placeholders = chunkIds.map(() => '?').join(', ');
-    await this.run(`DELETE FROM code_chunks WHERE id IN (${placeholders})`, chunkIds);
+    try {
+      const placeholders = chunkIds.map(() => '?').join(', ');
+      if (!this.deleteChunksStmt) {
+        this.deleteChunksStmt = this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
+      }
+      this.deleteChunksStmt.run(...chunkIds);
+    } catch (error) {
+      log.error('Failed to delete chunks', error, { count: chunkIds.length });
+      throw error;
+    }
   }
 
   async getChunks(providerName: string, dimensions: number): Promise<DatabaseChunk[]> {
-    return await this.all<DatabaseChunk>(`
-      SELECT id, file_path, symbol, sha, lang, chunk_type, embedding,
-             codevault_tags, codevault_intent, codevault_description,
-             embedding_provider, embedding_dimensions
-      FROM code_chunks
-      WHERE embedding_provider = ? AND embedding_dimensions = ?
-      ORDER BY created_at DESC
-    `, [providerName, dimensions]);
+    try {
+      return this.getChunksStmt.all(providerName, dimensions) as DatabaseChunk[];
+    } catch (error) {
+      log.error('Failed to get chunks', error, { provider: providerName, dimensions });
+      throw error;
+    }
   }
 
   async getExistingDimensions(): Promise<Array<{ embedding_provider: string; embedding_dimensions: number }>> {
-    return await this.all(`
-      SELECT DISTINCT embedding_provider, embedding_dimensions
-      FROM code_chunks
-      LIMIT 10
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        SELECT DISTINCT embedding_provider, embedding_dimensions
+        FROM code_chunks
+        LIMIT 10
+      `);
+      return stmt.all() as Array<{ embedding_provider: string; embedding_dimensions: number }>;
+    } catch (error) {
+      log.error('Failed to get existing dimensions', error);
+      throw error;
+    }
   }
 
   async recordIntention(normalizedQuery: string, originalQuery: string, targetSha: string, confidence: number): Promise<void> {
-    const existing = await this.get<{ id: number; usage_count: number }>(`
-      SELECT id, usage_count FROM intention_cache 
-      WHERE query_normalized = ? AND target_sha = ?
-    `, [normalizedQuery, targetSha]);
+    try {
+      const existing = this.db.prepare(`
+        SELECT id, usage_count FROM intention_cache
+        WHERE query_normalized = ? AND target_sha = ?
+      `).get(normalizedQuery, targetSha) as { id: number; usage_count: number } | undefined;
 
-    if (existing) {
-      await this.run(`
-        UPDATE intention_cache 
-        SET usage_count = usage_count + 1, 
-            confidence = ?, 
-            last_used = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `, [confidence, existing.id]);
-    } else {
-      await this.run(`
-        INSERT INTO intention_cache 
-        (query_normalized, original_query, target_sha, confidence)
-        VALUES (?, ?, ?, ?)
-      `, [normalizedQuery, originalQuery, targetSha, confidence]);
+      if (existing) {
+        this.db.prepare(`
+          UPDATE intention_cache
+          SET usage_count = usage_count + 1,
+              confidence = ?,
+              last_used = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(confidence, existing.id);
+      } else {
+        this.db.prepare(`
+          INSERT INTO intention_cache
+          (query_normalized, original_query, target_sha, confidence)
+          VALUES (?, ?, ?, ?)
+        `).run(normalizedQuery, originalQuery, targetSha, confidence);
+      }
+    } catch (error) {
+      log.error('Failed to record intention', error, { query: normalizedQuery });
+      throw error;
     }
   }
 
   async searchByIntention(normalizedQuery: string): Promise<any> {
-    return await this.get(`
-      SELECT 
-        i.target_sha, 
-        i.confidence, 
-        i.usage_count, 
-        i.original_query,
-        c.file_path,
-        c.symbol,
-        c.lang,
-        c.chunk_type
-      FROM intention_cache i
-      LEFT JOIN code_chunks c ON i.target_sha = c.sha
-      WHERE i.query_normalized = ?
-      ORDER BY i.confidence DESC, i.usage_count DESC
-      LIMIT 1
-    `, [normalizedQuery]);
+    try {
+      return this.db.prepare(`
+        SELECT
+          i.target_sha,
+          i.confidence,
+          i.usage_count,
+          i.original_query,
+          c.file_path,
+          c.symbol,
+          c.lang,
+          c.chunk_type
+        FROM intention_cache i
+        LEFT JOIN code_chunks c ON i.target_sha = c.sha
+        WHERE i.query_normalized = ?
+        ORDER BY i.confidence DESC, i.usage_count DESC
+        LIMIT 1
+      `).get(normalizedQuery);
+    } catch (error) {
+      log.error('Failed to search by intention', error, { query: normalizedQuery });
+      return null;
+    }
   }
 
   async recordQueryPattern(pattern: string): Promise<void> {
-    const existing = await this.get<{ id: number; frequency: number }>(`
-      SELECT id, frequency FROM query_patterns WHERE pattern = ?
-    `, [pattern]);
+    try {
+      const existing = this.db.prepare(`
+        SELECT id, frequency FROM query_patterns WHERE pattern = ?
+      `).get(pattern) as { id: number; frequency: number } | undefined;
 
-    if (existing) {
-      await this.run(`
-        UPDATE query_patterns 
-        SET frequency = frequency + 1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `, [existing.id]);
-    } else {
-      await this.run(`
-        INSERT INTO query_patterns (pattern) VALUES (?)
-      `, [pattern]);
+      if (existing) {
+        this.db.prepare(`
+          UPDATE query_patterns
+          SET frequency = frequency + 1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(existing.id);
+      } else {
+        this.db.prepare(`
+          INSERT INTO query_patterns (pattern) VALUES (?)
+        `).run(pattern);
+      }
+    } catch (error) {
+      log.error('Failed to record query pattern', error, { pattern });
+      throw error;
     }
   }
 
   async getOverviewChunks(limit: number): Promise<Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }>> {
-    return await this.all(`
-      SELECT id, file_path, symbol, sha, lang 
-      FROM code_chunks 
-      ORDER BY file_path, symbol 
-      LIMIT ?
-    `, [limit]);
+    try {
+      return this.db.prepare(`
+        SELECT id, file_path, symbol, sha, lang
+        FROM code_chunks
+        ORDER BY file_path, symbol
+        LIMIT ?
+      `).all(limit) as Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }>;
+    } catch (error) {
+      log.error('Failed to get overview chunks', error, { limit });
+      throw error;
+    }
   }
 
+  /**
+   * Begin a database transaction
+   */
+  async beginTransaction(): Promise<void> {
+    this.db.prepare('BEGIN TRANSACTION').run();
+  }
+
+  /**
+   * Commit the current transaction
+   */
+  async commit(): Promise<void> {
+    this.db.prepare('COMMIT').run();
+  }
+
+  /**
+   * Rollback the current transaction
+   */
+  async rollback(): Promise<void> {
+    this.db.prepare('ROLLBACK').run();
+  }
+
+  /**
+   * Execute a function within a transaction
+   * Automatically commits on success and rolls back on error
+   *
+   * Note: better-sqlite3 transactions are MUCH faster than individual commits
+   */
+  async transaction<T>(fn: () => Promise<T> | T): Promise<T> {
+    const transactionFn = this.db.transaction((callback: () => T) => {
+      return callback();
+    });
+
+    try {
+      return transactionFn(fn as () => T);
+    } catch (error) {
+      log.error('Transaction failed and was rolled back', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Close the database connection
+   * IMPORTANT: Always call this when done to avoid resource leaks
+   */
   close(): void {
-    this.db.close();
+    try {
+      this.db.close();
+      log.debug('Database connection closed');
+    } catch (error) {
+      log.error('Failed to close database', error);
+    }
+  }
+
+  /**
+   * Get database statistics for monitoring
+   */
+  getStats(): {
+    isOpen: boolean;
+    inTransaction: boolean;
+    readonly: boolean;
+    memory: boolean;
+  } {
+    return {
+      isOpen: this.db.open,
+      inTransaction: this.db.inTransaction,
+      readonly: this.db.readonly,
+      memory: this.db.memory,
+    };
   }
 }
 
@@ -254,7 +375,10 @@ export async function initDatabase(dimensions: number, basePath = '.'): Promise<
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  const db = new Database(dbPath);
+  const db = new CodeVaultDatabase(dbPath);
   await db.initialize(dimensions);
   db.close();
 }
+
+// Export as Database for backward compatibility
+export { CodeVaultDatabase as Database };

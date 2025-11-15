@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { CodevaultConfig, ConfigSource } from './types.js';
+import { log } from '../utils/logger.js';
 
 const GLOBAL_CONFIG_DIR = path.join(os.homedir(), '.codevault');
 const GLOBAL_CONFIG_FILE = path.join(GLOBAL_CONFIG_DIR, 'config.json');
@@ -19,7 +20,7 @@ export function readGlobalConfig(): CodevaultConfig | null {
     const content = fs.readFileSync(GLOBAL_CONFIG_FILE, 'utf8');
     return JSON.parse(content);
   } catch (error) {
-    console.warn(`Warning: Failed to read global config: ${(error as Error).message}`);
+    log.warn('Failed to read global config', { error, path: GLOBAL_CONFIG_FILE });
     return null;
   }
 }
@@ -37,7 +38,8 @@ export function readProjectConfig(basePath = '.'): CodevaultConfig | null {
     const content = fs.readFileSync(configPath, 'utf8');
     return JSON.parse(content);
   } catch (error) {
-    console.warn(`Warning: Failed to read project config: ${(error as Error).message}`);
+    const configPath = path.join(path.resolve(basePath), PROJECT_CONFIG_FILE);
+    log.warn('Failed to read project config', { error, path: configPath, basePath });
     return null;
   }
 }

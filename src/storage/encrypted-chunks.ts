@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import { log } from '../utils/logger.js';
 
 const KEY_ENV_VAR = 'CODEVAULT_ENCRYPTION_KEY';
 const MAGIC_HEADER = Buffer.from('CVAULTE1', 'utf8');
@@ -30,7 +31,7 @@ function decodeKey(raw: string): Buffer | null {
       return base64;
     }
   } catch (error) {
-    // Ignore decoding errors
+    log.debug('Failed to decode key as base64, will try hex', { error });
   }
 
   try {
@@ -39,7 +40,7 @@ function decodeKey(raw: string): Buffer | null {
       return hex;
     }
   } catch (error) {
-    // Ignore decoding errors
+    log.debug('Failed to decode key as hex', { error });
   }
 
   return null;

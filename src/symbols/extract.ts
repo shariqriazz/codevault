@@ -1,9 +1,14 @@
 import type { TreeSitterNode } from '../types/ast.js';
+import { CHUNKING_CONSTANTS, SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
 
 const KEYWORD_BLACKLIST = new Set([
   'if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'class',
   'new', 'await', 'yield', 'isset', 'empty', 'echo', 'print', 'require', 'include'
 ]);
+
+// Regex cache for performance
+const regexCache = new Map<string, RegExp>();
+const MAX_CACHE_SIZE = 1000;
 
 export interface SymbolMetadata {
   signature: string;
@@ -19,7 +24,7 @@ function escapeRegex(value: string): string {
 
 function sliceSignatureSnippet(source: string, node: TreeSitterNode): string {
   const start = node.startIndex;
-  const end = Math.min(node.endIndex, start + 400);
+  const end = Math.min(node.endIndex, start + CHUNKING_CONSTANTS.MAX_SIGNATURE_SNIPPET);
   return source.slice(start, end);
 }
 
@@ -37,6 +42,27 @@ function findClosingParen(text: string, startIndex: number): number {
     }
   }
   return -1;
+}
+
+function buildMemoizedRegex(word: string): RegExp {
+  const cacheKey = `\\b${word}[a-z0-9_]*\\b`;
+  const cached = regexCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const regex = new RegExp(cacheKey, 'i');
+
+  // Add to cache with size limit
+  if (regexCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = regexCache.keys().next().value;
+    if (firstKey !== undefined) {
+      regexCache.delete(firstKey);
+    }
+  }
+  regexCache.set(cacheKey, regex);
+
+  return regex;
 }
 
 function extractParameterSection(snippet: string): { paramsText: string; closeIndex: number } {
@@ -74,7 +100,7 @@ function extractParameters(snippet: string): { parameters: string[]; closeIndex:
   const parameters = rawParams
     .map(param => normalizeParameter(param))
     .filter(param => param.length > 0)
-    .slice(0, 12);
+    .slice(0, SYMBOL_BOOST_CONSTANTS.MAX_PARAMETERS);
 
   return { parameters, closeIndex };
 }
@@ -84,7 +110,7 @@ function extractReturnType(snippet: string, closeIndex: number): string | null {
     return null;
   }
 
-  const after = snippet.slice(closeIndex + 1, closeIndex + 80);
+  const after = snippet.slice(closeIndex + 1, closeIndex + CHUNKING_CONSTANTS.MAX_RETURN_TYPE_SNIPPET);
   const colonMatch = after.match(/:\s*([A-Za-z0-9_\\\[\]<>|?]+)/);
   if (colonMatch) {
     return colonMatch[1];
@@ -148,7 +174,7 @@ function collectCalls(node: TreeSitterNode, source: string, calls: Set<string>):
   const isCallNode = nodeType.includes('call') || nodeType.includes('invocation');
 
   if (isCallNode) {
-    const snippet = source.slice(node.startIndex, Math.min(node.endIndex, node.startIndex + 120));
+    const snippet = source.slice(node.startIndex, Math.min(node.endIndex, node.startIndex + CHUNKING_CONSTANTS.MAX_CALL_SNIPPET));
     const name = extractCallNameFromSnippet(snippet);
     if (name) {
       calls.add(name);
@@ -230,10 +256,10 @@ export function queryMatchesSignature(query: string, metadata: any): boolean {
 
   if (Array.isArray(metadata.keywords) && metadata.keywords.length > 0) {
     for (const word of metadata.keywords) {
-      if (!word || word.length < 3) {
+      if (!word || word.length < SYMBOL_BOOST_CONSTANTS.MIN_TOKEN_LENGTH) {
         continue;
       }
-      const pattern = new RegExp(`\\b${escapeRegex(word)}[a-z0-9_]*\\b`, 'i');
+      const pattern = buildMemoizedRegex(escapeRegex(word));
       if (pattern.test(query)) {
         return true;
       }

@@ -8,6 +8,7 @@ import { BM25Index } from '../search/bm25.js';
 import { reciprocalRankFusion } from '../search/hybrid.js';
 import { rerankWithAPI } from '../ranking/api-reranker.js';
 import { applySymbolBoost } from '../ranking/symbol-boost.js';
+import { log } from '../utils/logger.js';
 import { hasScopeFilters } from '../types/search.js';
 import { readChunkFromDisk } from '../storage/encrypted-chunks.js';
 import { RRF_K, DOC_BOOST } from '../config/constants.js';
@@ -306,7 +307,7 @@ export async function searchCode(
             }
           });
         } catch (error) {
-          // Ignore tag parsing errors
+          log.warn('Failed to parse codevault_tags for chunk', { chunkId: chunk.id, error });
         }
       }
 
