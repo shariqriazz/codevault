@@ -136,4 +136,5 @@ export const log = {
   error: (message: string, error?: Error | any, meta?: LogMetadata) =>
     logger.error(message, error, meta),
   isQuiet: () => logger.isQuiet(),
+  setQuiet: (quiet: boolean) => logger.setQuiet(quiet),
 };

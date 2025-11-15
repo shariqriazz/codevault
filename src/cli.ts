@@ -18,6 +18,7 @@ import { searchCode } from './core/search.js';
 import { startWatch } from './indexer/watch.js';
 import { IndexerUI } from './utils/cli-ui.js';
 import { indexProjectWithProgress } from './utils/indexer-with-progress.js';
+import { log } from './utils/logger.js';
 import { applyConfigToEnv } from './config/apply-env.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from './providers/index.js';
 
@@ -54,7 +55,10 @@ program
         process.env.CODEVAULT_QUIET = 'true';
         // Cache model profile to prevent repeated console.logs
         process.env.CODEVAULT_MODEL_PROFILE_CACHED = 'true';
-        
+
+        // Suppress structured logging to avoid interfering with progress bar
+        log.setQuiet(true);
+
         ui.showHeader();
         
         // Get provider info once for configuration display

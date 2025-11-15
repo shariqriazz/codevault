@@ -35,12 +35,20 @@ export async function indexProjectWithProgress(
   
   // Phase 2: Index with progress tracking
   let processedCount = 0;
+  const processedFiles = new Set<string>();
   const result = await indexProject({
     ...indexOptions,
     onProgress: (event) => {
       if (event.type === 'chunk_processed' && event.file && callbacks?.onFileProgress) {
-        processedCount++;
-        callbacks.onFileProgress(processedCount, files.length, event.file);
+        // Only count each file once (not per chunk)
+        if (!processedFiles.has(event.file)) {
+          processedFiles.add(event.file);
+          processedCount++;
+          callbacks.onFileProgress(processedCount, files.length, event.file);
+        }
+      }
+      if (event.type === 'finalizing' && callbacks?.onFinalizing) {
+        callbacks.onFinalizing();
       }
     }
   });

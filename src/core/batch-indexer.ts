@@ -151,12 +151,12 @@ export class BatchEmbeddingProcessor {
     log.info(`Batch complete (${texts.length} embeddings generated)`);
 
     // Store all embeddings in database within a transaction
-    await this.db.transaction(async () => {
+    await this.db.transaction(() => {
       for (let i = 0; i < batch.length; i++) {
         const chunk = batch[i];
         const embedding = embeddings[i];
 
-        await this.db.insertChunk({
+        this.db.insertChunk({
           id: chunk.chunkId,
           file_path: chunk.params.rel,
           symbol: chunk.params.symbol,
@@ -188,7 +188,7 @@ export class BatchEmbeddingProcessor {
       try {
         const embedding = await this.embeddingProvider.generateEmbedding(chunk.enhancedEmbeddingText);
 
-        await this.db.insertChunk({
+        this.db.insertChunk({
           id: chunk.chunkId,
           file_path: chunk.params.rel,
           symbol: chunk.params.symbol,

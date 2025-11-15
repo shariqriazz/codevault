@@ -25,9 +25,10 @@ export interface DatabaseChunk {
 
 export class CodeVaultDatabase {
   private db: Database.Database;
-  private insertChunkStmt: Database.Statement;
-  private getChunksStmt: Database.Statement;
+  private insertChunkStmt!: Database.Statement;
+  private getChunksStmt!: Database.Statement;
   private deleteChunksStmt: Database.Statement | null = null;
+  private initialized = false;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -41,7 +42,38 @@ export class CodeVaultDatabase {
     this.db.pragma('temp_store = MEMORY');
     this.db.pragma('mmap_size = 30000000000'); // 30GB mmap
 
-    // Prepare statements for better performance
+    // Check if tables exist and create if needed
+    this.ensureTablesExist();
+  }
+
+  /**
+   * Ensure database tables exist and prepare statements
+   */
+  private ensureTablesExist(): void {
+    // Create tables if they don't exist
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS code_chunks (
+        id TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        sha TEXT NOT NULL,
+        lang TEXT NOT NULL,
+        chunk_type TEXT DEFAULT 'function',
+        embedding BLOB,
+        embedding_provider TEXT,
+        embedding_dimensions INTEGER,
+        codevault_tags TEXT,
+        codevault_intent TEXT,
+        codevault_description TEXT,
+        doc_comments TEXT,
+        variables_used TEXT,
+        context_info TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Prepare statements after tables exist
     this.insertChunkStmt = this.db.prepare(`
       INSERT OR REPLACE INTO code_chunks
       (id, file_path, symbol, sha, lang, chunk_type, embedding, embedding_provider, embedding_dimensions,
@@ -124,9 +156,30 @@ export class CodeVaultDatabase {
     for (const sql of indexes) {
       this.db.exec(sql);
     }
+
+    // Prepare statements after tables are created
+    if (!this.initialized) {
+      this.insertChunkStmt = this.db.prepare(`
+        INSERT OR REPLACE INTO code_chunks
+        (id, file_path, symbol, sha, lang, chunk_type, embedding, embedding_provider, embedding_dimensions,
+         codevault_tags, codevault_intent, codevault_description, doc_comments, variables_used, context_info, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `);
+
+      this.getChunksStmt = this.db.prepare(`
+        SELECT id, file_path, symbol, sha, lang, chunk_type, embedding,
+               codevault_tags, codevault_intent, codevault_description,
+               embedding_provider, embedding_dimensions
+        FROM code_chunks
+        WHERE embedding_provider = ? AND embedding_dimensions = ?
+        ORDER BY created_at DESC
+      `);
+
+      this.initialized = true;
+    }
   }
 
-  async insertChunk(params: {
+  insertChunk(params: {
     id: string;
     file_path: string;
     symbol: string;
@@ -142,7 +195,7 @@ export class CodeVaultDatabase {
     doc_comments: string | null;
     variables_used: any[];
     context_info: any;
-  }): Promise<void> {
+  }): void {
     try {
       this.insertChunkStmt.run(
         params.id,
@@ -321,16 +374,29 @@ export class CodeVaultDatabase {
    * Execute a function within a transaction
    * Automatically commits on success and rolls back on error
    *
-   * Note: better-sqlite3 transactions are MUCH faster than individual commits
+   * Note: better-sqlite3 transactions MUST be synchronous
+   * If you need async operations, use beginTransaction/commit/rollback manually
    */
   async transaction<T>(fn: () => Promise<T> | T): Promise<T> {
-    const transactionFn = this.db.transaction((callback: () => T) => {
-      return callback();
-    });
-
     try {
-      return transactionFn(fn as () => T);
+      // Start transaction
+      this.db.prepare('BEGIN TRANSACTION').run();
+
+      // Execute function (can be async)
+      const result = await fn();
+
+      // Commit if successful
+      this.db.prepare('COMMIT').run();
+
+      return result;
     } catch (error) {
+      // Rollback on error
+      try {
+        this.db.prepare('ROLLBACK').run();
+      } catch (rollbackError) {
+        log.error('Failed to rollback transaction', rollbackError);
+      }
+
       log.error('Transaction failed and was rolled back', error);
       throw error;
     }
