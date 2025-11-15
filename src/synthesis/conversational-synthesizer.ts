@@ -1,4 +1,5 @@
 import { searchCode, getChunk } from '../core/search.js';
+import { PROMPT_TRUNCATE_LENGTH, CONVERSATION_MAX_CONTEXT_CHUNKS } from '../config/constants.js';
 import { createChatLLMProvider, type ChatMessage } from '../providers/chat-llm.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchResult } from '../core/types.js';
@@ -24,6 +25,7 @@ export interface ConversationalSynthesisOptions {
   useReranking?: boolean;
   temperature?: number;
   maxHistoryTurns?: number;
+  onChunksSelected?: (chunks: SearchResult[]) => void;
 }
 
 export interface ConversationalSynthesisResult {
@@ -100,6 +102,8 @@ export async function synthesizeConversationalAnswer(
             result,
             code: chunkResult.code
           });
+          // Enforce LRU cap on cached chunks
+          evictOldChunksIfNeeded(conversationContext);
         }
       }
     }
@@ -112,8 +116,13 @@ export async function synthesizeConversationalAnswer(
       maxHistoryTurns
     );
 
-    // Generate answer
-    const answer = await chatLLM.generateCompletion(messages, { 
+    // Expose selected chunks to caller for tracking
+    if (options.onChunksSelected) {
+      options.onChunksSelected(newChunks);
+    }
+
+    // Generate answer (non-streaming)
+    const answer = await chatLLM.generateCompletion(messages, {
       temperature,
       maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10)
     });
@@ -191,6 +200,8 @@ export async function* synthesizeConversationalAnswerStreaming(
           result,
           code: chunkResult.code
         });
+        // Enforce LRU cap on cached chunks
+        evictOldChunksIfNeeded(conversationContext);
       }
     }
   }
@@ -202,6 +213,11 @@ export async function* synthesizeConversationalAnswerStreaming(
     newChunks,
     maxHistoryTurns
   );
+
+  // Expose selected chunks to caller for tracking
+  if (options.onChunksSelected) {
+    options.onChunksSelected(newChunks);
+  }
 
   // Stream the response
   for await (const chunk of chatLLM.generateStreamingCompletion(messages, { temperature })) {
@@ -303,8 +319,9 @@ function buildConversationalUserPrompt(
       }
 
       if (chunkData && chunkData.code) {
-        const truncatedCode = chunkData.code.length > 2000
-          ? chunkData.code.substring(0, 2000) + '\n... [truncated]'
+        const limit = PROMPT_TRUNCATE_LENGTH;
+        const truncatedCode = chunkData.code.length > limit
+          ? chunkData.code.substring(0, limit) + '\n... [truncated]'
           : chunkData.code;
 
         prompt += `\n**Code:**\n\n\`\`\`${result.lang}\n${truncatedCode}\n\`\`\`\n\n`;
@@ -377,6 +394,17 @@ export function addConversationTurn(
 export function clearConversationHistory(context: ConversationContext): void {
   context.turns = [];
   context.allChunks.clear();
+}
+
+function evictOldChunksIfNeeded(context: ConversationContext): void {
+  const max = CONVERSATION_MAX_CONTEXT_CHUNKS || 200;
+  if (context.allChunks.size <= max) return;
+  const excess = context.allChunks.size - max;
+  // Remove first N inserted entries (Map preserves insertion order)
+  const keys = Array.from(context.allChunks.keys());
+  for (let i = 0; i < excess; i++) {
+    context.allChunks.delete(keys[i]);
+  }
 }
 
 /**

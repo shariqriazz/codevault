@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { indexProject } from '../core/indexer.js';
 import { getSupportedLanguageExtensions } from '../languages/rules.js';
+import { DEFAULT_SCAN_IGNORES } from './scan-patterns.js';
 import type { IndexProjectOptions, IndexProjectResult } from '../core/types.js';
 
 export interface IndexWithProgressCallbacks {
@@ -23,31 +24,7 @@ export async function indexProjectWithProgress(
     cwd: repo,
     absolute: false,
     followSymbolicLinks: false,
-    ignore: [
-      '**/vendor/**',
-      '**/node_modules/**',
-      '**/.git/**',
-      '**/storage/**',
-      '**/dist/**',
-      '**/build/**',
-      '**/tmp/**',
-      '**/temp/**',
-      '**/.npm/**',
-      '**/.yarn/**',
-      '**/Library/**',
-      '**/System/**',
-      '**/.Trash/**',
-      '**/.codevault/**',
-      '**/codevault.codemap.json',
-      '**/codevault.codemap.json.backup-*',
-      '**/package-lock.json',
-      '**/yarn.lock',
-      '**/pnpm-lock.yaml',
-      '**/*.json',
-      '**/*.sh',
-      '**/examples/**',
-      '**/assets/**'
-    ],
+    ignore: DEFAULT_SCAN_IGNORES,
     onlyFiles: true,
     dot: false
   });

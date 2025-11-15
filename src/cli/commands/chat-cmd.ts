@@ -111,6 +111,7 @@ export function registerChatCommand(program: Command): void {
             let firstChunk = true;
 
             try {
+              let selectedChunks: ConversationTurn['chunks'] = [];
               for await (const chunk of synthesizeConversationalAnswerStreaming(
                 trimmedQuestion,
                 conversationContext,
@@ -122,7 +123,8 @@ export function registerChatCommand(program: Command): void {
                   maxChunks,
                   useReranking,
                   temperature,
-                  maxHistoryTurns: maxHistory
+                  maxHistoryTurns: maxHistory,
+                  onChunksSelected: (chunks) => { selectedChunks = chunks; }
                 }
               )) {
                 if (firstChunk) {
@@ -139,7 +141,7 @@ export function registerChatCommand(program: Command): void {
               const turn: ConversationTurn = {
                 question: trimmedQuestion,
                 answer: fullAnswer,
-                chunks: [], // Chunks are already stored in conversationContext.allChunks
+                chunks: selectedChunks,
                 timestamp: new Date()
               };
               addConversationTurn(conversationContext, turn);

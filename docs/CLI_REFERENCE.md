@@ -215,7 +215,7 @@ Arguments:
 
 Options:
   -p, --provider <name>     Embedding provider (auto|openai|ollama)
-  --debounce <ms>          Debounce delay in milliseconds (default: 1000)
+  --debounce <ms>          Debounce delay in milliseconds (default: 500)
 ```
 
 **Examples:**
@@ -289,7 +289,7 @@ Arguments:
 
 Options:
   (Same as search command, plus:)
-  --max-code-size <bytes>      Max code size per chunk (default: 50000)
+  --max-code-size <bytes>      Max code size per chunk (default: 100000)
 ```
 
 **Examples:**

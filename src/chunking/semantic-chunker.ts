@@ -1,18 +1,11 @@
 import { analyzeCodeSize, batchAnalyzeCodeSize, type CodeSizeAnalysis } from './token-counter.js';
 import type { ModelProfile } from '../providers/base.js';
+import { getSizeLimits } from '../providers/base.js';
 import type { TreeSitterNode } from '../types/ast.js';
 
 interface LanguageRule {
   subdivisionTypes?: Record<string, string[]>;
   [key: string]: any;
-}
-
-interface SizeLimits {
-  optimal: number;
-  min: number;
-  max: number;
-  overlap: number;
-  unit: string;
 }
 
 export function findSemanticSubdivisions(node: TreeSitterNode, rule: LanguageRule): TreeSitterNode[] {
@@ -89,25 +82,6 @@ export function extractParentContext(node: TreeSitterNode, source: string): {
 export function getLineNumber(byteOffset: number, source: string): number {
   const before = source.substring(0, byteOffset);
   return before.split('\n').length;
-}
-
-function getSizeLimits(profile: ModelProfile): SizeLimits {
-  if (profile.useTokens && profile.tokenCounter) {
-    return {
-      optimal: profile.optimalTokens,
-      min: profile.minChunkTokens,
-      max: profile.maxChunkTokens,
-      overlap: profile.overlapTokens,
-      unit: 'tokens'
-    };
-  }
-  return {
-    optimal: profile.optimalChars,
-    min: profile.minChunkChars,
-    max: profile.maxChunkChars,
-    overlap: profile.overlapChars,
-    unit: 'characters'
-  };
 }
 
 export interface NodeAnalysis {
@@ -226,7 +200,9 @@ export async function yieldStatementChunks(
         unit: profile.useTokens ? 'tokens' : 'characters'
       });
       
-      const overlapLines = Math.floor(currentChunk.length * 0.2);
+      // Use the provided overlapSize parameter instead of hardcoded 20%
+      const overlapRatio = Math.min(1, Math.max(0, overlapSize / maxSize));
+      const overlapLines = Math.max(1, Math.floor(currentChunk.length * overlapRatio));
       currentChunk = currentChunk.slice(-overlapLines);
       currentSize = profile.useTokens && profile.tokenCounter
         ? await profile.tokenCounter(currentChunk.join('\n'))
