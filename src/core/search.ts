@@ -11,7 +11,7 @@ import { applySymbolBoost } from '../ranking/symbol-boost.js';
 import { log } from '../utils/logger.js';
 import { hasScopeFilters } from '../types/search.js';
 import { readChunkFromDisk } from '../storage/encrypted-chunks.js';
-import { RRF_K, DOC_BOOST } from '../config/constants.js';
+import { RRF_K, DOC_BOOST, CACHE_CONSTANTS, SEARCH_CONSTANTS } from '../config/constants.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchCodeResult, SearchResult, GetChunkResult } from './types.js';
 import type { DatabaseChunk } from '../database/db.js';
@@ -37,16 +37,17 @@ interface SearchCandidate {
   symbolBoostSources?: string[];
   rerankerScore?: number;
   rerankerRank?: number;
-  [key: string]: any; // Allow additional properties from reranker/symbol boost
+  scoreRaw?: number;
 }
 
 // FIX: Add cache size limits to prevent memory leaks in long-running processes
-const MAX_BM25_CACHE_SIZE = Number.parseInt(process.env.CODEVAULT_MAX_BM25_CACHE || '10', 10);
-const MAX_CHUNK_TEXT_CACHE_SIZE = Number.parseInt(process.env.CODEVAULT_MAX_CHUNK_CACHE || '1000', 10);
+const MAX_BM25_CACHE_SIZE = CACHE_CONSTANTS.MAX_BM25_CACHE_SIZE;
+const MAX_CHUNK_TEXT_CACHE_SIZE = CACHE_CONSTANTS.MAX_CHUNK_TEXT_CACHE_SIZE;
 
 const bm25IndexCache = new Map<string, { index: BM25Index; added: Set<string>; lastAccess: number }>();
 const chunkTextCache = new Map<string, { text: string | null; lastAccess: number }>();
-const RERANKER_MAX_CANDIDATES = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX || '50', 10);
+const RERANKER_MAX_CANDIDATES = SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES;
+const HYBRID_SELECTION_MULTIPLIER = SEARCH_CONSTANTS.SELECTION_BUDGET_MULTIPLIER;
 
 // Cache eviction helper for BM25 index cache (LRU)
 function evictOldestBm25Index(): void {
@@ -357,7 +358,7 @@ export async function searchCode(
     let bm25CandidateCount = 0;
 
     if (remainingSlots > 0) {
-      const selectionBudget = Math.max(remainingSlots, RRF_K);
+      const selectionBudget = Math.max(remainingSlots, HYBRID_SELECTION_MULTIPLIER);
       const vectorPool = sortedResults.slice(0, selectionBudget);
 
       if (hybridEnabled && bm25Enabled) {
@@ -576,7 +577,7 @@ export async function searchCode(
     };
 
   } catch (error) {
-    console.error('Error in searchCode:', error);
+    log.error('Error in searchCode', error);
     return {
       success: false,
       error: 'search_error',

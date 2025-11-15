@@ -44,3 +44,5 @@ coverage/
 .history
 
 .npmignore
+
+package-lock.json

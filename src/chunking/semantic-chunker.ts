@@ -1,6 +1,7 @@
 import { analyzeCodeSize, batchAnalyzeCodeSize, type CodeSizeAnalysis } from './token-counter.js';
 import type { ModelProfile } from '../providers/base.js';
 import { getSizeLimits } from '../providers/base.js';
+import { CHUNKING_CONSTANTS } from '../config/constants.js';
 import type { TreeSitterNode } from '../types/ast.js';
 
 interface LanguageRule {
@@ -200,8 +201,9 @@ export async function yieldStatementChunks(
         unit: profile.useTokens ? 'tokens' : 'characters'
       });
       
-      // Use the provided overlapSize parameter instead of hardcoded 20%
-      const overlapRatio = Math.min(1, Math.max(0, overlapSize / maxSize));
+      const ratioFromConfig = Math.min(1, Math.max(0, CHUNKING_CONSTANTS.LINE_OVERLAP_PERCENTAGE));
+      const ratioFromParam = maxSize > 0 ? Math.min(1, Math.max(0, overlapSize / maxSize)) : 0;
+      const overlapRatio = ratioFromConfig > 0 ? ratioFromConfig : ratioFromParam;
       const overlapLines = Math.max(1, Math.floor(currentChunk.length * overlapRatio));
       currentChunk = currentChunk.slice(-overlapLines);
       currentSize = profile.useTokens && profile.tokenCounter

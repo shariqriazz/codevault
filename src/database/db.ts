@@ -27,7 +27,6 @@ export class CodeVaultDatabase {
   private db: Database.Database;
   private insertChunkStmt!: Database.Statement;
   private getChunksStmt!: Database.Statement;
-  private deleteChunksStmt: Database.Statement | null = null;
   private initialized = false;
 
   constructor(dbPath: string) {
@@ -227,10 +226,8 @@ export class CodeVaultDatabase {
 
     try {
       const placeholders = chunkIds.map(() => '?').join(', ');
-      if (!this.deleteChunksStmt) {
-        this.deleteChunksStmt = this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
-      }
-      this.deleteChunksStmt.run(...chunkIds);
+      const deleteStmt = this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
+      deleteStmt.run(...chunkIds);
     } catch (error) {
       log.error('Failed to delete chunks', error, { count: chunkIds.length });
       throw error;
