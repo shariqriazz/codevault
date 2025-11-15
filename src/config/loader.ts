@@ -152,7 +152,8 @@ export function readEnvConfig(): CodevaultConfig {
     if (!isNaN(maxTokens) && maxTokens > 0) {
       config.chatLLM = config.chatLLM || {};
       config.chatLLM.openai = config.chatLLM.openai || {};
-      config.chatLLM.openai.maxTokens = maxTokens;
+      // Cap at 32K to prevent unreasonable values
+      config.chatLLM.openai.maxTokens = Math.min(maxTokens, 64000);
     }
   }
 
@@ -230,6 +231,12 @@ function deepMerge(...configs: (CodevaultConfig | null)[]): CodevaultConfig {
           ...result.chatLLM.openai,
           ...config.chatLLM.openai
         };
+
+        // Validate and cap maxTokens at 32K to prevent unreasonable values
+        if (result.chatLLM.openai.maxTokens && result.chatLLM.openai.maxTokens > 64000) {
+          console.warn(`⚠️  Warning: chatLLM.openai.maxTokens (${result.chatLLM.openai.maxTokens}) exceeds recommended maximum. Capping at 32,000 tokens.`);
+          result.chatLLM.openai.maxTokens = 64000;
+        }
       }
 
 
