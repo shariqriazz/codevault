@@ -1,15 +1,13 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import Parser from 'tree-sitter';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider } from '../providers/index.js';
 import { BATCH_SIZE } from '../providers/base.js';
-import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../chunking/semantic-chunker.js';
-import { groupNodesForChunking, createCombinedChunk } from '../chunking/file-grouper.js';
 import { getTokenCountStats } from '../chunking/token-counter.js';
 import { readCodemap, writeCodemap } from '../codemap/io.js';
 import { normalizeChunkMetadata, type Codemap } from '../types/codemap.js';
 import { LANG_RULES } from '../languages/rules.js';
+import { groupNodesForChunking } from '../chunking/file-grouper.js';
 import {
   cloneMerkle,
   computeFastHash,
@@ -19,30 +17,20 @@ import {
   saveMerkle,
   type MerkleTree
 } from '../indexer/merkle.js';
-import { extractSymbolMetadata } from '../symbols/extract.js';
 import { attachSymbolGraphToCodemap } from '../symbols/graph.js';
 import {
   resolveEncryptionPreference,
   writeChunkToDisk,
   removeChunkArtifacts
 } from '../storage/encrypted-chunks.js';
-import { extractSymbolName } from './symbol-extractor.js';
-import {
-  extractCodevaultMetadata,
-  extractSemanticTags,
-  extractImportantVariables,
-  extractDocComments,
-  generateEnhancedEmbeddingText
-} from './metadata.js';
 import { Database, initDatabase } from '../database/db.js';
 import { BatchEmbeddingProcessor } from './batch-indexer.js';
 import type { IndexProjectOptions, IndexProjectResult, ChunkingStats } from './types.js';
-import { SIZE_THRESHOLD, CHUNK_SIZE } from '../config/constants.js';
 import { logger } from '../utils/logger.js';
 import { FileScanner } from './indexing/file-scanner.js';
 import { resolveProviderContext } from '../config/resolver.js';
+import { ChunkPipeline } from './indexing/chunk-pipeline.js';
 
-import type { TreeSitterNode } from '../types/ast.js';
 
 export class IndexerEngine {
   private db: Database | null = null;
@@ -65,7 +53,6 @@ export class IndexerEngine {
   private embeddingProvider: EmbeddingProvider | null = null;
   private batchProcessor: BatchEmbeddingProcessor | null = null;
   private chunkDir: string = '';
-  private processedNodes = new Set<number>();
 
   constructor(private options: IndexProjectOptions = {}) {}
 
@@ -148,12 +135,11 @@ export class IndexerEngine {
       this.merkle = loadMerkle(repo);
       this.updatedMerkle = cloneMerkle(this.merkle);
 
-      const parser = new Parser();
-      
       this.db = new Database(dbPath);
       
       // Create batch processor for efficient embedding generation
       this.batchProcessor = new BatchEmbeddingProcessor(this.embeddingProvider, this.db, BATCH_SIZE);
+      const chunkPipeline = new ChunkPipeline();
 
       for (const rel of files) {
         deletedSet.delete(rel);
@@ -181,103 +167,35 @@ export class IndexerEngine {
             continue;
           }
 
-          let tree;
-          try {
-            parser.setLanguage(rule.ts);
-            
-            if (source.length > SIZE_THRESHOLD) {
-              tree = parser.parse((index: number) => {
-                if (index < source.length) {
-                  return source.slice(index, Math.min(index + CHUNK_SIZE, source.length));
-                }
-                return null;
-              });
-            } else {
-              tree = parser.parse(source);
-            }
-            
-            if (!tree || !tree.rootNode) {
-              throw new Error('Failed to create syntax tree');
-            }
-          } catch (parseError) {
-            throw parseError;
-          }
+          const collectedNodes = await chunkPipeline.collectNodesForFile(source, rule);
 
-          const collectedNodes: TreeSitterNode[] = [];
-          const collectNodes = (node: TreeSitterNode) => {
-             if (node.type === 'export_statement') {
-              let hasDeclaration = false;
-              for (let i = 0; i < node.childCount; i++) {
-                const child = node.child(i);
-                if (child && ['function_declaration', 'class_declaration', 'method_definition'].includes(child.type)) {
-                  hasDeclaration = true;
-                  break;
-                }
-              }
-              
-              if (!hasDeclaration && rule.nodeTypes.includes(node.type)) {
-                collectedNodes.push(node);
-                return;
-              }
-              
-              if (hasDeclaration) {
-                for (let i = 0; i < node.childCount; i++) {
-                  const child = node.child(i);
-                  if (child) {
-                    collectNodes(child);
-                  }
-                }
-                return;
-              }
-            }
-            
-            if (rule.nodeTypes.includes(node.type)) {
-              collectedNodes.push(node);
-            }
-            for (let i = 0; i < node.childCount; i++) {
-              const child = node.child(i);
-              if (child) {
-                collectNodes(child);
-              }
-            }
-          };
-          
-          collectNodes(tree.rootNode);
-          
           const nodeGroups = await groupNodesForChunking(
             collectedNodes,
             source,
             modelProfile,
             rule
           );
-          
-          this.processedNodes = new Set<number>();
 
-          for (const nodeGroup of nodeGroups) {
-             if (nodeGroup.nodes.length === 1) {
-              await this.yieldChunk(nodeGroup.nodes[0], source, rule, limits, modelProfile, rel, staleChunkIds, chunkMerkleHashes, onProgress);
-            } else {
-              const combinedChunk = createCombinedChunk(nodeGroup, source);
-              if (combinedChunk) {
-                this.chunkingStats.totalNodes += nodeGroup.nodes.length;
-                this.chunkingStats.fileGrouped = (this.chunkingStats.fileGrouped || 0) + 1;
-                this.chunkingStats.functionsGrouped = (this.chunkingStats.functionsGrouped || 0) + nodeGroup.nodes.length;
-                
-                await this.processChunk(
-                  combinedChunk.node,
-                  combinedChunk.code,
-                  `group_${nodeGroup.nodes.length}funcs`,
-                  null,
-                  source,
-                  rel,
-                  rule,
-                  staleChunkIds,
-                  chunkMerkleHashes,
-                  onProgress
-                );
-              }
-            }
-          }
+          const existingChunks = new Map(
+            Object.entries(this.codemap)
+              .filter(([, metadata]) => metadata && metadata.file === rel) as [string, any][]
+          );
+          const staleChunkIds = new Set(existingChunks.keys());
+          const chunkMerkleHashes: string[] = [];
+
+          await chunkPipeline.processGroups(
+            nodeGroups,
+            source,
+            rule,
+            limits,
+            modelProfile,
+            rel,
+            { staleChunkIds, existingChunks },
+            chunkMerkleHashes,
+            onProgress,
+            (params) => this.embedAndStore(params),
+            this.chunkingStats
+          );
 
           if (staleChunkIds.size > 0) {
             await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
@@ -423,189 +341,6 @@ export class IndexerEngine {
       } catch (error) {
         this.errors.push({ type: 'db_close_error', error: (error as Error).message });
       }
-    }
-  }
-
-  private async yieldChunk(
-      node: TreeSitterNode, 
-      source: string, 
-      rule: any, 
-      limits: any, 
-      modelProfile: any, 
-      rel: string,
-      staleChunkIds: Set<string>,
-      chunkMerkleHashes: string[],
-      onProgress: any,
-      parentNode: TreeSitterNode | null = null
-  ): Promise<void> {
-    this.chunkingStats.totalNodes++;
-    
-    const analysis = await analyzeNodeForChunking(node, source, rule, modelProfile);
-    
-    if (analysis.size < limits.min && parentNode !== null) {
-      this.chunkingStats.skippedSmall++;
-      return;
-    }
-    
-    if (analysis.needsSubdivision && analysis.subdivisionCandidates.length > 0) {
-      this.chunkingStats.subdivided++;
-      
-      const subAnalyses = await batchAnalyzeNodes(
-        analysis.subdivisionCandidates,
-        source,
-        rule,
-        modelProfile,
-        true
-      );
-      
-      const smallChunks: any[] = [];
-      
-      for (let i = 0; i < subAnalyses.length; i++) {
-        const subAnalysis = subAnalyses[i];
-        const subNode = subAnalysis.node;
-        
-        if (subAnalysis.size < limits.min) {
-          const subCode = source.slice(subNode.startIndex, subNode.endIndex);
-          smallChunks.push({
-            node: subNode,
-            code: subCode,
-            size: subAnalysis.size
-          });
-          if (subNode.id !== undefined) {
-            this.processedNodes.add(subNode.id);
-          }
-        } else {
-          if (subNode.id !== undefined) {
-            this.processedNodes.add(subNode.id);
-          }
-          await this.yieldChunk(subNode, source, rule, limits, modelProfile, rel, staleChunkIds, chunkMerkleHashes, onProgress, node);
-        }
-      }
-      
-      if (smallChunks.length > 0) {
-        const totalSmallSize = smallChunks.reduce((sum: number, c: any) => sum + c.size, 0);
-        
-        if (totalSmallSize >= limits.min || smallChunks.length >= 3) {
-          const mergedCode = smallChunks.map((c: any) => c.code).join('\n\n');
-          const mergedNode: TreeSitterNode = {
-            ...node,
-            type: `${node.type}_merged`,
-            startIndex: smallChunks[0].node.startIndex,
-            endIndex: smallChunks[smallChunks.length - 1].node.endIndex
-          };
-          const suffix = `small_methods_${smallChunks.length}`;
-          
-          this.chunkingStats.mergedSmall++;
-          await this.processChunk(mergedNode, mergedCode, suffix, parentNode, source, rel, rule, staleChunkIds, chunkMerkleHashes, onProgress);
-        } else {
-          this.chunkingStats.skippedSmall += smallChunks.length;
-        }
-      }
-      
-      return;
-    } else if (analysis.size > limits.max) {
-      this.chunkingStats.statementFallback++;
-      const statementChunks = await yieldStatementChunks(
-        node, 
-        source, 
-        limits.max, 
-        limits.overlap, 
-        modelProfile
-      );
-      
-      for (let i = 0; i < statementChunks.length; i++) {
-        const stmtChunk = statementChunks[i];
-        await this.processChunk(node, stmtChunk.code, `${i + 1}`, parentNode, source, rel, rule, staleChunkIds, chunkMerkleHashes, onProgress);
-      }
-      return;
-    }
-    
-    this.chunkingStats.normalChunks++;
-    const code = source.slice(node.startIndex, node.endIndex);
-    await this.processChunk(node, code, null, parentNode, source, rel, rule, staleChunkIds, chunkMerkleHashes, onProgress);
-  }
-
-  private async processChunk(
-      node: TreeSitterNode, 
-      code: string, 
-      suffix: string | null, 
-      parentNode: TreeSitterNode | null,
-      source: string,
-      rel: string,
-      rule: any,
-      staleChunkIds: Set<string>,
-      chunkMerkleHashes: string[],
-      onProgress: any
-  ): Promise<void> {
-    let symbol = extractSymbolName(node, source);
-    if (!symbol) return;
-    
-    if (suffix) {
-      symbol = `${symbol}_part${suffix}`;
-    }
-
-    const docComments = extractDocComments(source, node, rule);
-    const codevaultMetadata = extractCodevaultMetadata(docComments);
-    const automaticTags = extractSemanticTags(rel, symbol, code);
-    const allTags = [...new Set([...codevaultMetadata.tags, ...automaticTags])];
-    codevaultMetadata.tags = allTags;
-
-    const importantVariables = extractImportantVariables(node, source, rule);
-    const symbolData = extractSymbolMetadata({ node, source, symbol });
-
-    const enhancedEmbeddingText = generateEnhancedEmbeddingText(
-      code,
-      codevaultMetadata,
-      importantVariables,
-      docComments
-    );
-
-    const chunkType = node.type.includes('class') ? 'class' :
-      node.type.includes('method') ? 'method' : 'function';
-
-    const contextInfo = {
-      nodeType: node.type,
-      startLine: source.slice(0, node.startIndex).split('\n').length,
-      endLine: source.slice(0, node.endIndex).split('\n').length,
-      codeLength: code.length,
-      hasDocumentation: !!docComments,
-      variableCount: importantVariables.length,
-      isSubdivision: !!suffix,
-      hasParentContext: !!parentNode
-    };
-
-    const sha = crypto.createHash('sha1').update(code).digest('hex');
-    const chunkId = `${rel}:${symbol}:${sha.substring(0, 8)}`;
-    const chunkMerkleHash = await computeFastHash(code);
-
-    if (this.codemap[chunkId]?.sha === sha) {
-      staleChunkIds.delete(chunkId);
-      chunkMerkleHashes.push(chunkMerkleHash);
-      return;
-    }
-
-    await this.embedAndStore({
-      code,
-      enhancedEmbeddingText,
-      chunkId,
-      sha,
-      lang: rule.lang,
-      rel,
-      symbol,
-      chunkType,
-      codevaultMetadata,
-      importantVariables,
-      docComments,
-      contextInfo,
-      symbolData
-    });
-    
-    staleChunkIds.delete(chunkId);
-    chunkMerkleHashes.push(chunkMerkleHash);
-    this.processedChunks++;
-
-    if (onProgress) {
-      onProgress({ type: 'chunk_processed', file: rel, symbol, chunkId });
     }
   }
 
