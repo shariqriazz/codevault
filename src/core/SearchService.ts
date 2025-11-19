@@ -102,220 +102,55 @@ export class SearchService {
 
       const codemapData = await readCodemapAsync(codemapPath);
       const scopedChunks = applyScope(chunks, normalizedScope) as DatabaseChunk[];
-      const chunkInfoById = new Map<string, SearchCandidate>();
-      const results: SearchCandidate[] = [];
-
-      let queryEmbedding: number[] | null = null;
-      if (scopedChunks.length > 0) {
-        if (embeddingProvider.init) {
-          await embeddingProvider.init();
-        }
-        queryEmbedding = await embeddingProvider.generateEmbedding(normalizedQuery);
-      }
-
-      for (const chunk of scopedChunks) {
-        const embedding = JSON.parse(chunk.embedding.toString());
-        const vectorSimilarity = queryEmbedding ? this.cosineSimilarity(queryEmbedding, embedding) : 0;
-
-        let boostScore = 0;
-
-        if (chunk.codevault_intent && query.toLowerCase().includes(chunk.codevault_intent.toLowerCase())) {
-          boostScore += DOC_BOOST_CONSTANTS.INTENT_MATCH_BOOST;
-        }
-
-        if (chunk.codevault_tags) {
-          try {
-            const tags = JSON.parse(chunk.codevault_tags || '[]');
-            const queryLower = query.toLowerCase();
-            tags.forEach((tag: string) => {
-              if (typeof tag === 'string' && queryLower.includes(tag.toLowerCase())) {
-                boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
-              }
-            });
-          } catch (error) {
-            logger.warn('Failed to parse codevault_tags for chunk', { chunkId: chunk.id, error });
-          }
-        }
-
-        let docBoost = 0;
-        const filePath = chunk.file_path.toLowerCase();
-        if (filePath.includes('readme') ||
-            filePath.includes('/docs/') ||
-            filePath.startsWith('docs/') ||
-            filePath.includes('changelog') ||
-            filePath.includes('contributing') ||
-            filePath.endsWith('.md')) {
-          docBoost = DOC_BOOST;
-        }
-        
-        const finalScore = Math.min(1, Math.max(0, vectorSimilarity + boostScore + docBoost));
-
-        const info = {
-          id: chunk.id,
-          file_path: chunk.file_path,
-          symbol: chunk.symbol,
-          sha: chunk.sha,
-          lang: chunk.lang,
-          chunk_type: chunk.chunk_type,
-          codevault_intent: chunk.codevault_intent,
-          codevault_description: chunk.codevault_description,
-          score: finalScore,
-          vectorScore: vectorSimilarity,
-          boostScore: boostScore
-        };
-
-        chunkInfoById.set(chunk.id, info);
-        results.push(info);
-      }
+      const { chunkInfoById, vectorPool } = await this.buildVectorPool(
+        scopedChunks,
+        embeddingProvider,
+        normalizedQuery
+      );
 
       if (symbolBoostEnabled) {
         try {
-          applySymbolBoost(results, { query: normalizedQuery, codemap: codemapData });
+          applySymbolBoost(vectorPool, { query: normalizedQuery, codemap: codemapData });
         } catch (error) {
-            // Silent fail
+          // Silent fail
         }
       }
 
-      const sortedResults = results.sort((a, b) => b.score - a.score);
-      const remainingSlots = limit;
-      let vectorResults: SearchCandidate[] = [];
-      let bm25Fused = false;
-      let bm25CandidateCount = 0;
-
-      if (remainingSlots > 0) {
-        const selectionBudget = Math.max(remainingSlots, RRF_K);
-        const vectorPool = sortedResults.slice(0, selectionBudget);
-
-        if (hybridEnabled && bm25Enabled) {
-          const bm25Index = this.ensureBm25IndexForChunks(
-            basePath,
-            chunkDir,
-            embeddingProvider.getName(),
-            embeddingProvider.getDimensions(),
-            scopedChunks
-          );
-
-          if (bm25Index) {
-            const allowedIds = new Set(scopedChunks.map((chunk) => chunk.id));
-            const bm25RawResults = bm25Index.search(normalizedQuery, selectionBudget);
-            const bm25Results = bm25RawResults.filter(result => allowedIds.has(result.id));
-            bm25CandidateCount = bm25Results.length;
-
-            if (bm25Results.length > 0) {
-              const fused = reciprocalRankFusion({
-                vectorResults: vectorPool.map((item) => ({ id: item.id, score: item.score })),
-                bm25Results: bm25Results.map(item => ({ id: item.id, score: item.score })),
-                limit: selectionBudget,
-                k: RRF_K
-              });
-
-              if (fused.length > 0) {
-                bm25Fused = true;
-                vectorResults = fused
-                  .map(entry => {
-                    const info = chunkInfoById.get(entry.id);
-                    if (!info) return null;
-                    info.hybridScore = entry.score;
-                    info.bm25Score = entry.bm25Score;
-                    info.bm25Rank = entry.bm25Rank;
-                    info.vectorRank = entry.vectorRank;
-                    return info;
-                  })
-                  .filter((item): item is SearchCandidate => item !== null);
-              }
-            }
-          }
-        }
-
-        if (vectorResults.length === 0) {
-          vectorResults = vectorPool;
-        }
-
-        const hasSymbolBoost = symbolBoostEnabled && vectorResults.some(
-            (candidate) => typeof candidate.symbolBoost === 'number' && candidate.symbolBoost > 0
-        );
-
-        if (hasSymbolBoost && vectorResults.length > 1) {
-            vectorResults.sort((a, b) => {
-              const scoreA = typeof a.score === 'number' ? a.score : 0;
-              const scoreB = typeof b.score === 'number' ? b.score : 0;
-              if (scoreB !== scoreA) return scoreB - scoreA;
-
-              const boostA = typeof a.symbolBoost === 'number' ? a.symbolBoost : 0;
-              const boostB = typeof b.symbolBoost === 'number' ? b.symbolBoost : 0;
-              if (boostB !== boostA) return boostB - boostA;
-
-              const hybridA = typeof a.hybridScore === 'number' ? a.hybridScore : Number.NEGATIVE_INFINITY;
-              const hybridB = typeof b.hybridScore === 'number' ? b.hybridScore : Number.NEGATIVE_INFINITY;
-              return hybridB - hybridA;
-            });
-        }
-
-        vectorResults = vectorResults.slice(0, remainingSlots);
-
-        if (vectorResults.length > 1 && normalizedScope.reranker === 'api') {
-            try {
-              const reranked = await rerankWithAPI(normalizedQuery, vectorResults, {
-                max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, vectorResults.length),
-                getText: (candidate) => {
-                  const codeText = this.readChunkTextCached(candidate.sha, chunkDir, basePath) || '';
-                  return this.buildBm25Document(candidate, codeText);
-                },
-                apiUrl: providerContext.reranker.apiUrl,
-                apiKey: providerContext.reranker.apiKey,
-                model: providerContext.reranker.model,
-                maxTokens: providerContext.reranker.maxTokens
-              });
-
-              if (Array.isArray(reranked) && reranked.length === vectorResults.length) {
-                vectorResults = reranked as SearchCandidate[];
-              }
-            } catch (error) {
-              // Silent fallback
-            }
-        }
-
-        // Enforce score bounds after boosts/reranking
-        vectorResults = vectorResults.map(candidate => ({
-          ...candidate,
-          score: Math.min(1, Math.max(candidate.score ?? 0, 0))
-        }));
-      }
-
-      const vectorSearchType = bm25Fused ? 'hybrid' : 'vector';
-      const combinedResults: SearchResult[] = vectorResults.map((result) => {
-          // ... mapping logic same as before ...
-          const meta: any = {
-            id: result.id,
-            symbol: result.symbol,
-            score: Math.min(1, Math.max(result.score || 0, 0)),
-            intent: result.codevault_intent,
-            description: result.codevault_description,
-            searchType: vectorSearchType,
-            vectorScore: result.vectorScore
-          };
-          
-          if (typeof result.hybridScore === 'number') meta.hybridScore = result.hybridScore;
-          if (typeof result.bm25Score === 'number') meta.bm25Score = result.bm25Score;
-          if (typeof result.bm25Rank === 'number') meta.bm25Rank = result.bm25Rank;
-          if (typeof result.vectorRank === 'number') meta.vectorRank = result.vectorRank;
-          if (typeof result.rerankerScore === 'number') meta.rerankerScore = result.rerankerScore;
-          if (typeof result.rerankerRank === 'number') meta.rerankerRank = result.rerankerRank;
-          if (typeof result.symbolBoost === 'number' && result.symbolBoost > 0) {
-            meta.symbolBoost = result.symbolBoost;
-            if (Array.isArray(result.symbolBoostSources)) meta.symbolBoostSources = result.symbolBoostSources;
-          }
-          if (typeof result.score === 'number' && result.score > 1) meta.scoreRaw = result.score;
-
-          return {
-            type: 'code',
-            lang: result.lang,
-            path: result.file_path,
-            sha: result.sha,
-            data: null,
-            meta
-          };
+      const selectionBudget = Math.max(limit, RRF_K);
+      const { fusedResults, bm25Fused, bm25CandidateCount } = this.tryHybridFusion({
+        hybridEnabled,
+        bm25Enabled,
+        selectionBudget,
+        normalizedQuery,
+        embeddingProvider,
+        chunkDir,
+        basePath,
+        scopedChunks,
+        chunkInfoById,
+        vectorPool
       });
+
+      let vectorResults = fusedResults.length > 0 ? fusedResults : vectorPool.slice(0, selectionBudget);
+      vectorResults = this.sortWithSymbolBoost(vectorResults, symbolBoostEnabled);
+      vectorResults = vectorResults.slice(0, limit);
+
+      if (vectorResults.length > 1 && normalizedScope.reranker === 'api') {
+        vectorResults = await this.applyReranker(
+          normalizedQuery,
+          vectorResults,
+          chunkDir,
+          basePath,
+          providerContext
+        );
+      }
+
+      // Enforce score bounds after boosts/reranking
+      vectorResults = vectorResults.map(candidate => ({
+        ...candidate,
+        score: Math.min(1, Math.max(candidate.score ?? 0, 0))
+      }));
+
+      const combinedResults = this.mapResults(vectorResults, bm25Fused ? 'hybrid' : 'vector');
 
       combinedResults.sort((a, b) => {
           if (typeof a.meta?.rerankerScore === 'number' && typeof b.meta?.rerankerScore === 'number') {
@@ -436,6 +271,243 @@ export class SearchService {
 
   private normalizeQuery(query: string): string {
     return query.toLowerCase().trim().replace(/[¿?]/g, '').replace(/\s+/g, ' ');
+  }
+
+  private async buildVectorPool(
+    scopedChunks: DatabaseChunk[],
+    embeddingProvider: any,
+    normalizedQuery: string
+  ): Promise<{ chunkInfoById: Map<string, SearchCandidate>; vectorPool: SearchCandidate[] }> {
+    const chunkInfoById = new Map<string, SearchCandidate>();
+    const results: SearchCandidate[] = [];
+
+    let queryEmbedding: number[] | null = null;
+    if (scopedChunks.length > 0) {
+      if (embeddingProvider.init) {
+        await embeddingProvider.init();
+      }
+      queryEmbedding = await embeddingProvider.generateEmbedding(normalizedQuery);
+    }
+
+    for (const chunk of scopedChunks) {
+      const embedding = JSON.parse(chunk.embedding.toString());
+      const vectorSimilarity = queryEmbedding ? this.cosineSimilarity(queryEmbedding, embedding) : 0;
+
+      let boostScore = 0;
+
+      if (chunk.codevault_intent && normalizedQuery.includes(chunk.codevault_intent.toLowerCase())) {
+        boostScore += DOC_BOOST_CONSTANTS.INTENT_MATCH_BOOST;
+      }
+
+      if (chunk.codevault_tags) {
+        try {
+          const tags = JSON.parse(chunk.codevault_tags || '[]');
+          tags.forEach((tag: string) => {
+            if (typeof tag === 'string' && normalizedQuery.includes(tag.toLowerCase())) {
+              boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
+            }
+          });
+        } catch (error) {
+          logger.warn('Failed to parse codevault_tags for chunk', { chunkId: chunk.id, error });
+        }
+      }
+
+      let docBoost = 0;
+      const filePath = chunk.file_path.toLowerCase();
+      if (filePath.includes('readme') ||
+          filePath.includes('/docs/') ||
+          filePath.startsWith('docs/') ||
+          filePath.includes('changelog') ||
+          filePath.includes('contributing') ||
+          filePath.endsWith('.md')) {
+        docBoost = DOC_BOOST;
+      }
+      
+      const finalScore = Math.min(1, Math.max(0, vectorSimilarity + boostScore + docBoost));
+
+      const info = {
+        id: chunk.id,
+        file_path: chunk.file_path,
+        symbol: chunk.symbol,
+        sha: chunk.sha,
+        lang: chunk.lang,
+        chunk_type: chunk.chunk_type,
+        codevault_intent: chunk.codevault_intent,
+        codevault_description: chunk.codevault_description,
+        score: finalScore,
+        vectorScore: vectorSimilarity,
+        boostScore: boostScore
+      };
+
+      chunkInfoById.set(chunk.id, info);
+      results.push(info);
+    }
+
+    // Highest vector scores first
+    results.sort((a, b) => b.score - a.score);
+
+    return { chunkInfoById, vectorPool: results };
+  }
+
+  private tryHybridFusion(params: {
+    hybridEnabled: boolean;
+    bm25Enabled: boolean;
+    selectionBudget: number;
+    normalizedQuery: string;
+    embeddingProvider: any;
+    chunkDir: string;
+    basePath: string;
+    scopedChunks: DatabaseChunk[];
+    chunkInfoById: Map<string, SearchCandidate>;
+    vectorPool: SearchCandidate[];
+  }): { fusedResults: SearchCandidate[]; bm25Fused: boolean; bm25CandidateCount: number } {
+    const {
+      hybridEnabled,
+      bm25Enabled,
+      selectionBudget,
+      normalizedQuery,
+      embeddingProvider,
+      chunkDir,
+      basePath,
+      scopedChunks,
+      chunkInfoById,
+      vectorPool
+    } = params;
+
+    let vectorResults: SearchCandidate[] = [];
+    let bm25Fused = false;
+    let bm25CandidateCount = 0;
+
+    if (hybridEnabled && bm25Enabled) {
+      const bm25Index = this.ensureBm25IndexForChunks(
+        basePath,
+        chunkDir,
+        embeddingProvider.getName(),
+        embeddingProvider.getDimensions(),
+        scopedChunks
+      );
+
+      if (bm25Index) {
+        const allowedIds = new Set(scopedChunks.map((chunk) => chunk.id));
+        const bm25RawResults = bm25Index.search(normalizedQuery, selectionBudget);
+        const bm25Results = bm25RawResults.filter(result => allowedIds.has(result.id));
+        bm25CandidateCount = bm25Results.length;
+
+        if (bm25Results.length > 0) {
+          const fused = reciprocalRankFusion({
+            vectorResults: vectorPool.slice(0, selectionBudget).map((item) => ({ id: item.id, score: item.score })),
+            bm25Results: bm25Results.map(item => ({ id: item.id, score: item.score })),
+            limit: selectionBudget,
+            k: RRF_K
+          });
+
+          if (fused.length > 0) {
+            bm25Fused = true;
+            vectorResults = fused
+              .map(entry => {
+                const info = chunkInfoById.get(entry.id);
+                if (!info) return null;
+                info.hybridScore = entry.score;
+                info.bm25Score = entry.bm25Score;
+                info.bm25Rank = entry.bm25Rank;
+                info.vectorRank = entry.vectorRank;
+                return info;
+              })
+              .filter((item): item is SearchCandidate => item !== null);
+          }
+        }
+      }
+    }
+
+    return { fusedResults: vectorResults, bm25Fused, bm25CandidateCount };
+  }
+
+  private sortWithSymbolBoost(results: SearchCandidate[], symbolBoostEnabled: boolean): SearchCandidate[] {
+    const hasSymbolBoost = symbolBoostEnabled && results.some(
+      (candidate) => typeof candidate.symbolBoost === 'number' && candidate.symbolBoost > 0
+    );
+
+    if (hasSymbolBoost && results.length > 1) {
+      return [...results].sort((a, b) => {
+        const scoreA = typeof a.score === 'number' ? a.score : 0;
+        const scoreB = typeof b.score === 'number' ? b.score : 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+
+        const boostA = typeof a.symbolBoost === 'number' ? a.symbolBoost : 0;
+        const boostB = typeof b.symbolBoost === 'number' ? b.symbolBoost : 0;
+        if (boostB !== boostA) return boostB - boostA;
+
+        const hybridA = typeof a.hybridScore === 'number' ? a.hybridScore : Number.NEGATIVE_INFINITY;
+        const hybridB = typeof b.hybridScore === 'number' ? b.hybridScore : Number.NEGATIVE_INFINITY;
+        return hybridB - hybridA;
+      });
+    }
+
+    return results;
+  }
+
+  private async applyReranker(
+    normalizedQuery: string,
+    vectorResults: SearchCandidate[],
+    chunkDir: string,
+    basePath: string,
+    providerContext: ReturnType<typeof resolveProviderContext>
+  ): Promise<SearchCandidate[]> {
+    try {
+      const reranked = await rerankWithAPI(normalizedQuery, vectorResults, {
+        max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, vectorResults.length),
+        getText: (candidate) => {
+          const codeText = this.readChunkTextCached(candidate.sha, chunkDir, basePath) || '';
+          return this.buildBm25Document(candidate, codeText);
+        },
+        apiUrl: providerContext.reranker.apiUrl,
+        apiKey: providerContext.reranker.apiKey,
+        model: providerContext.reranker.model,
+        maxTokens: providerContext.reranker.maxTokens
+      });
+
+      if (Array.isArray(reranked) && reranked.length === vectorResults.length) {
+        return reranked as SearchCandidate[];
+      }
+    } catch (error) {
+      // Silent fallback
+    }
+    return vectorResults;
+  }
+
+  private mapResults(vectorResults: SearchCandidate[], searchType: string): SearchResult[] {
+    return vectorResults.map((result) => {
+        const meta: any = {
+          id: result.id,
+          symbol: result.symbol,
+          score: Math.min(1, Math.max(result.score || 0, 0)),
+          intent: result.codevault_intent,
+          description: result.codevault_description,
+          searchType: searchType,
+          vectorScore: result.vectorScore
+        };
+        
+        if (typeof result.hybridScore === 'number') meta.hybridScore = result.hybridScore;
+        if (typeof result.bm25Score === 'number') meta.bm25Score = result.bm25Score;
+        if (typeof result.bm25Rank === 'number') meta.bm25Rank = result.bm25Rank;
+        if (typeof result.vectorRank === 'number') meta.vectorRank = result.vectorRank;
+        if (typeof result.rerankerScore === 'number') meta.rerankerScore = result.rerankerScore;
+        if (typeof result.rerankerRank === 'number') meta.rerankerRank = result.rerankerRank;
+        if (typeof result.symbolBoost === 'number' && result.symbolBoost > 0) {
+          meta.symbolBoost = result.symbolBoost;
+          if (Array.isArray(result.symbolBoostSources)) meta.symbolBoostSources = result.symbolBoostSources;
+        }
+        if (typeof result.score === 'number' && result.score > 1) meta.scoreRaw = result.score;
+
+        return {
+          type: 'code',
+          lang: result.lang,
+          path: result.file_path,
+          sha: result.sha,
+          data: null,
+          meta
+        };
+    });
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
