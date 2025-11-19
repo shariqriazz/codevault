@@ -88,6 +88,7 @@ function evictOldestChunkText(): void {
 
 // Public function to clear caches (useful for long-running processes)
 export function clearSearchCaches(): void {
+  log.debug('Clearing search caches explicitly.');
   bm25IndexCache.clear();
   chunkTextCache.clear();
 }

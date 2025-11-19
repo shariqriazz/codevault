@@ -28,7 +28,6 @@ export class CodeVaultDatabase {
   private insertChunkStmt!: Database.Statement;
   private getChunksStmt!: Database.Statement;
   private deleteChunksStmt: Database.Statement | null = null;
-  private initialized = false;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -93,28 +92,6 @@ export class CodeVaultDatabase {
 
   async initialize(dimensions: number): Promise<void> {
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS code_chunks (
-        id TEXT PRIMARY KEY,
-        file_path TEXT NOT NULL,
-        symbol TEXT NOT NULL,
-        sha TEXT NOT NULL,
-        lang TEXT NOT NULL,
-        chunk_type TEXT DEFAULT 'function',
-        embedding BLOB,
-        embedding_provider TEXT,
-        embedding_dimensions INTEGER,
-        codevault_tags TEXT,
-        codevault_intent TEXT,
-        codevault_description TEXT,
-        doc_comments TEXT,
-        variables_used TEXT,
-        context_info TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    this.db.exec(`
       CREATE TABLE IF NOT EXISTS intention_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         query_normalized TEXT NOT NULL,
@@ -156,27 +133,6 @@ export class CodeVaultDatabase {
     for (const sql of indexes) {
       this.db.exec(sql);
     }
-
-    // Prepare statements after tables are created
-    if (!this.initialized) {
-      this.insertChunkStmt = this.db.prepare(`
-        INSERT OR REPLACE INTO code_chunks
-        (id, file_path, symbol, sha, lang, chunk_type, embedding, embedding_provider, embedding_dimensions,
-         codevault_tags, codevault_intent, codevault_description, doc_comments, variables_used, context_info, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
-
-      this.getChunksStmt = this.db.prepare(`
-        SELECT id, file_path, symbol, sha, lang, chunk_type, embedding,
-               codevault_tags, codevault_intent, codevault_description,
-               embedding_provider, embedding_dimensions
-        FROM code_chunks
-        WHERE embedding_provider = ? AND embedding_dimensions = ?
-        ORDER BY created_at DESC
-      `);
-
-      this.initialized = true;
-    }
   }
 
   insertChunk(params: {
@@ -193,8 +149,8 @@ export class CodeVaultDatabase {
     codevault_intent: string | null;
     codevault_description: string | null;
     doc_comments: string | null;
-    variables_used: any[];
-    context_info: any;
+    variables_used: string[];
+    context_info: Record<string, unknown>;
   }): void {
     try {
       this.insertChunkStmt.run(

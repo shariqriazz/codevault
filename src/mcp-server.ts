@@ -11,13 +11,17 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { searchCode, getChunk, getOverview } from './core/search.js';
-import { indexProject } from './core/indexer.js';
-import { resolveScopeWithPack } from './context/packs.js';
-import { synthesizeAnswer } from './synthesis/synthesizer.js';
-import { formatSynthesisResult, formatErrorMessage, formatNoResultsMessage } from './synthesis/markdown-formatter.js';
-import { MAX_CHUNK_SIZE } from './config/constants.js';
-import { resolveProjectRoot } from './utils/path-helpers.js';
+import * as handlers from './mcp/handlers/index.js';
+import {
+  SearchCodeArgsSchema,
+  SearchCodeWithChunksArgsSchema,
+  GetCodeChunkArgsSchema,
+  IndexProjectArgsSchema,
+  UpdateProjectArgsSchema,
+  GetProjectStatsArgsSchema,
+  UseContextPackArgsSchema,
+  AskCodebaseArgsSchema
+} from './mcp/schemas.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -202,338 +206,65 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  const typedArgs = args as any; // MCP SDK doesn't provide strict typing for arguments
+  const rawArgs = args || {};
 
   try {
     switch (name) {
       case 'search_code': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const { scope: scopeFilters } = resolveScopeWithPack(
-          {
-            path_glob: typedArgs.path_glob,
-            tags: typedArgs.tags,
-            lang: typedArgs.lang,
-            reranker: typedArgs.reranker,
-            hybrid: typedArgs.hybrid,
-            bm25: typedArgs.bm25,
-            symbol_boost: typedArgs.symbol_boost,
-          },
-          { basePath: cleanPath, sessionPack: sessionContextPack }
-        );
-
-        const results = await searchCode(
-          typedArgs.query,
-          typedArgs.limit || 50,
-          typedArgs.provider || 'auto',
-          cleanPath,
-          scopeFilters
-        );
-
-        if (!results.success) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: results.error === 'database_not_found'
-                  ? `📋 Project not indexed!\n\n🔍 Database not found: ${cleanPath}/.codevault/codevault.db\n\n💡 Use index_project tool`
-                  : `No results: ${results.message}\n${results.suggestion || ''}`,
-              },
-            ],
-          };
-        }
-
-        const resultText = results.results
-          .map(
-            (result, index) =>
-              `${index + 1}. ${result.path}\n   Symbol: ${result.meta.symbol} (${result.lang})\n   Similarity: ${result.meta.score}\n   SHA: ${result.sha}`
-          )
-          .join('\n\n');
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Found ${results.results.length} results for: "${typedArgs.query}"\nProvider: ${results.provider}\n\n${resultText}`,
-            },
-          ],
-        };
+        const validArgs = SearchCodeArgsSchema.parse(rawArgs);
+        return await handlers.handleSearchCode(validArgs, sessionContextPack);
       }
 
       case 'search_code_with_chunks': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const { scope: scopeFilters } = resolveScopeWithPack(
-          {
-            path_glob: typedArgs.path_glob,
-            tags: typedArgs.tags,
-            lang: typedArgs.lang,
-            reranker: typedArgs.reranker,
-            hybrid: typedArgs.hybrid,
-            bm25: typedArgs.bm25,
-            symbol_boost: typedArgs.symbol_boost,
-          },
-          { basePath: cleanPath, sessionPack: sessionContextPack }
-        );
-
-        const searchResults = await searchCode(
-          typedArgs.query,
-          typedArgs.limit || 10,
-          typedArgs.provider || 'auto',
-          cleanPath,
-          scopeFilters
-        );
-
-        if (!searchResults.success) {
-          return {
-            content: [{ type: 'text', text: searchResults.message || 'Search failed' }],
-          };
-        }
-
-        const resultsWithCode = [];
-
-        for (const result of searchResults.results) {
-          const chunkResult = await getChunk(result.sha, cleanPath);
-          let code = '';
-          let truncated = false;
-
-          if (chunkResult.success && chunkResult.code) {
-            code = chunkResult.code;
-            if (code.length > MAX_CHUNK_SIZE) {
-              code = code.substring(0, MAX_CHUNK_SIZE);
-              truncated = true;
-            }
-          } else {
-            code = `[Error retrieving code: ${chunkResult.error}]`;
-          }
-
-          resultsWithCode.push({ ...result, code, truncated });
-        }
-
-        const resultText = resultsWithCode
-          .map(
-            (result, index) =>
-              `${index + 1}. ${result.path}\n   Symbol: ${result.meta.symbol} (${result.lang})\n   Similarity: ${result.meta.score}\n   SHA: ${result.sha}${
-                result.truncated ? '\n   ⚠️  Code truncated' : ''
-              }\n\n${'─'.repeat(80)}\n${result.code}\n${'─'.repeat(80)}`
-          )
-          .join('\n\n');
-
-        return {
-          content: [
-            { type: 'text', text: `Found ${resultsWithCode.length} results with code\n\n${resultText}` },
-          ],
-        };
+        const validArgs = SearchCodeWithChunksArgsSchema.parse(rawArgs);
+        return await handlers.handleSearchCodeWithChunks(validArgs, sessionContextPack);
       }
 
       case 'get_code_chunk': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const result = await getChunk(typedArgs.sha, cleanPath);
-
-        if (!result.success) {
-          return {
-            content: [{ type: 'text', text: `Error: ${result.error}` }],
-            isError: true,
-          };
-        }
-
-        const codeText = result.code || '';
-
-        if (codeText.length > MAX_CHUNK_SIZE) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `⚠️ CODE CHUNK TOO LARGE - TRUNCATED\n\nSHA: ${typedArgs.sha}\nFull size: ${codeText.length} characters\n\n${codeText.substring(0, MAX_CHUNK_SIZE)}\n\n[TRUNCATED]`,
-              },
-            ],
-          };
-        }
-
-        return {
-          content: [{ type: 'text', text: codeText }],
-        };
+        const validArgs = GetCodeChunkArgsSchema.parse(rawArgs);
+        return await handlers.handleGetCodeChunk(validArgs);
       }
 
       case 'index_project': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-
-        if (!fs.existsSync(cleanPath)) {
-          throw new Error(`Directory ${cleanPath} does not exist`);
-        }
-
-        const result = await indexProject({ repoPath: cleanPath, provider: typedArgs.provider || 'auto' });
-
-        if (!result.success) {
-          return {
-            content: [
-              { type: 'text', text: `Indexing failed: ${result.errors[0]?.error || 'Unknown error'}` },
-            ],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `✅ Project indexed successfully!\n\n📊 Statistics:\n- Processed chunks: ${result.processedChunks}\n- Total chunks: ${result.totalChunks}\n- Provider: ${result.provider}\n\n🔍 Ready to search!\n- Quick search: search_code with path="${cleanPath}"\n- With code: search_code_with_chunks with path="${cleanPath}"`,
-            },
-          ],
-        };
+        const validArgs = IndexProjectArgsSchema.parse(rawArgs);
+        return await handlers.handleIndexProject(validArgs);
       }
 
       case 'update_project': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const result = await indexProject({ repoPath: cleanPath, provider: typedArgs.provider || 'auto' });
-
-        if (!result.success) {
-          return {
-            content: [
-              { type: 'text', text: `Update failed: ${result.errors[0]?.error || 'Unknown error'}` },
-            ],
-            isError: true,
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `🔄 Project updated!\n📊 Processed: ${result.processedChunks} chunks\n📁 Total: ${result.totalChunks} chunks`,
-            },
-          ],
-        };
+        const validArgs = UpdateProjectArgsSchema.parse(rawArgs);
+        return await handlers.handleUpdateProject(validArgs);
       }
 
       case 'get_project_stats': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const overviewResult = await getOverview(50, cleanPath);
-
-        if (!overviewResult.success) {
-          return {
-            content: [
-              { type: 'text', text: `Error: ${overviewResult.message || 'Failed to get stats'}` },
-            ],
-            isError: true,
-          };
-        }
-
-        if (overviewResult.results.length === 0) {
-          return {
-            content: [{ type: 'text', text: '📋 Project not indexed or empty' }],
-          };
-        }
-
-        const overview = overviewResult.results
-          .map((result) => `- ${result.path} :: ${result.meta.symbol} (${result.lang})`)
-          .join('\n');
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `📊 Project overview (${overviewResult.results.length} main functions):\n\n${overview}`,
-            },
-          ],
-        };
+        const validArgs = GetProjectStatsArgsSchema.parse(rawArgs);
+        return await handlers.handleGetProjectStats(validArgs);
       }
 
       case 'use_context_pack': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        const name = typedArgs.name;
-
-        if (name === 'default' || name === 'none' || name === 'clear') {
-          sessionContextPack = null;
-          return {
-            content: [{ type: 'text', text: 'Cleared active context pack for this session' }],
-          };
-        }
-
-        try {
-          const { loadContextPack } = await import('./context/packs.js');
-          const pack = loadContextPack(name, cleanPath);
-          sessionContextPack = { ...pack, basePath: cleanPath };
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Context pack "${pack.key}" activated for session\n\nScope: ${JSON.stringify(pack.scope, null, 2)}`,
-              },
-            ],
-          };
-        } catch (error) {
-          return {
-            content: [{ type: 'text', text: `Error: ${(error as Error).message}` }],
-            isError: true,
-          };
-        }
+        const validArgs = UseContextPackArgsSchema.parse(rawArgs);
+        return await handlers.handleUseContextPack(validArgs, (pack) => {
+          sessionContextPack = pack;
+        });
       }
 
       case 'ask_codebase': {
-        const cleanPath = resolveProjectRoot(typedArgs);
-        
-        // Use resolveScopeWithPack like other search tools for consistency
-        const { scope: scopeFilters } = resolveScopeWithPack(
-          {
-            path_glob: typedArgs.path_glob,
-            tags: typedArgs.tags,
-            lang: typedArgs.lang,
-            reranker: typedArgs.reranker,
-          },
-          { basePath: cleanPath, sessionPack: sessionContextPack }
-        );
-
-        try {
-          const result = await synthesizeAnswer(typedArgs.question, {
-            provider: typedArgs.provider || 'auto',
-            chatProvider: typedArgs.chat_provider || 'auto',
-            workingPath: cleanPath,
-            scope: scopeFilters,
-            maxChunks: typedArgs.max_chunks || 10,
-            useReranking: typedArgs.reranker !== 'off',
-            useMultiQuery: typedArgs.multi_query || false,
-            temperature: typedArgs.temperature || 0.7
-          });
-
-          if (!result.success) {
-            let errorText: string;
-            if (result.error === 'no_results') {
-              errorText = formatNoResultsMessage(result.query, result.queriesUsed);
-            } else {
-              errorText = formatErrorMessage(result.error || 'Unknown error', result.query);
-            }
-            
-            return {
-              content: [{ type: 'text', text: errorText }],
-            };
-          }
-
-          const formattedResult = formatSynthesisResult(result, {
-            includeMetadata: true,
-            includeStats: true
-          });
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: formattedResult
-              }
-            ],
-          };
-        } catch (error) {
-          const errorText = formatErrorMessage((error as Error).message, typedArgs.question);
-          return {
-            content: [{ type: 'text', text: errorText }],
-            isError: true,
-          };
-        }
+        const validArgs = AskCodebaseArgsSchema.parse(rawArgs);
+        return await handlers.handleAskCodebase(validArgs, sessionContextPack);
       }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    // Handle Zod validation errors specifically
+    if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as any).issues)) {
+      const validationError = `Validation Error: ${(error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+      return {
+        content: [{ type: 'text', text: validationError }],
+        isError: true,
+      };
+    }
+
     return {
       content: [{ type: 'text', text: `ERROR: ${(error as Error).message}` }],
       isError: true,
