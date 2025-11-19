@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createEmbeddingProvider } from '../providers/index.js';
 import { Database, type DatabaseChunk } from '../database/db.js';
-import { readCodemap } from '../codemap/io.js';
+import { readCodemap, readCodemapAsync } from '../codemap/io.js';
 import { normalizeScopeFilters, applyScope } from '../search/scope.js';
 import { BM25Index } from '../search/bm25.js';
 import { reciprocalRankFusion } from '../search/hybrid.js';
@@ -98,7 +98,7 @@ export class SearchService {
         return this.createErrorResult('no_chunks_found', `No indexed chunks found`, embeddingProvider.getName(), normalizedScope, hybridEnabled, bm25Enabled, symbolBoostEnabled);
       }
 
-      const codemapData = readCodemap(codemapPath);
+      const codemapData = await readCodemapAsync(codemapPath);
       const scopedChunks = applyScope(chunks, normalizedScope) as DatabaseChunk[];
       const chunkInfoById = new Map<string, SearchCandidate>();
       const results: SearchCandidate[] = [];

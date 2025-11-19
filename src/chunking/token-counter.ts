@@ -1,39 +1,4 @@
-class LRUCache<K, V> {
-  private maxSize: number;
-  private cache = new Map<K, V>();
-
-  constructor(maxSize = 1000) {
-    this.maxSize = maxSize;
-  }
-
-  get(key: K): V | undefined {
-    if (!this.cache.has(key)) return undefined;
-    
-    const value = this.cache.get(key)!;
-    this.cache.delete(key);
-    this.cache.set(key, value);
-    return value;
-  }
-
-  set(key: K, value: V): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    
-    this.cache.set(key, value);
-    
-    if (this.cache.size > this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey !== undefined) {
-        this.cache.delete(firstKey);
-      }
-    }
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-}
+import { SimpleLRU } from '../utils/simple-lru.js';
 
 interface TokenCountStats {
   totalRequests: number;
@@ -46,7 +11,7 @@ interface TokenCountStats {
   tokenizationRate: string;
 }
 
-const tokenCountCache = new LRUCache<string, number>(1000);
+const tokenCountCache = new SimpleLRU<string, number>(1000);
 const stats = {
   totalRequests: 0,
   cacheHits: 0,
