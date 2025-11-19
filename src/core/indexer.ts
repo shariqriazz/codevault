@@ -73,44 +73,12 @@ export async function indexProject({
   ));
 
   const deletedSet = new Set(normalizedDeleted);
-  const languagePatterns = getSupportedLanguageExtensions().map(ext => `**/*${ext}`);
-  let files: string[] = [];
-
-  if (normalizedChanged === null) {
-    files = await fg(languagePatterns, {
-      cwd: repo,
-      absolute: false,
-      followSymbolicLinks: false,
-      ignore: DEFAULT_SCAN_IGNORES,
-      onlyFiles: true,
-      dot: false
-    });
-  } else {
-    files = normalizedChanged.filter(rel => {
-      const ext = path.extname(rel).toLowerCase();
-      return !!LANG_RULES[ext];
-    });
+  
+  const { files, toDelete } = await gatherFiles(repo, normalizedChanged);
+  
+  for (const file of toDelete) {
+    deletedSet.add(file);
   }
-
-  const uniqueFiles: string[] = [];
-  const seenFiles = new Set<string>();
-
-  for (const rel of files) {
-    if (!rel || seenFiles.has(rel)) {
-      continue;
-    }
-
-    const absPath = path.join(repo, rel);
-    if (!fs.existsSync(absPath)) {
-      deletedSet.add(rel);
-      continue;
-    }
-
-    seenFiles.add(rel);
-    uniqueFiles.push(rel);
-  }
-
-  files = uniqueFiles;
   const isPartialUpdate = normalizedChanged !== null;
 
   const embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider);
@@ -157,40 +125,7 @@ export async function indexProject({
   const chunkDir = path.join(repo, '.codevault/chunks');
   const dbPath = path.join(repo, '.codevault/codevault.db');
   
-  if (fs.existsSync(dbPath)) {
-    const db = new Database(dbPath);
-    try {
-      const existingDimensions = await db.getExistingDimensions();
-      
-      if (existingDimensions.length > 0) {
-        const currentProvider = embeddingProvider.getName();
-        const currentDimensions = embeddingProvider.getDimensions();
-        
-        const hasMismatch = existingDimensions.some(
-          row => row.embedding_provider !== currentProvider || 
-                 row.embedding_dimensions !== currentDimensions
-        );
-        
-        if (hasMismatch) {
-          console.log('\n⚠️  WARNING: Dimension/Provider Mismatch Detected!');
-          console.log('='.repeat(60));
-          console.log('Existing index:');
-          existingDimensions.forEach(row => {
-            console.log(`  ${row.embedding_provider} (${row.embedding_dimensions}D)`);
-          });
-          console.log(`Current config: ${currentProvider} (${currentDimensions}D)`);
-          console.log('\nRecommendation: Full re-index for consistent results');
-          console.log('='.repeat(60) + '\n');
-          
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-    } catch (error) {
-      // Ignore migration check errors
-    } finally {
-      db.close();
-    }
-  }
+  await checkDimensionMismatch(dbPath, embeddingProvider);
 
   const encryptionPreference = resolveEncryptionPreference({ mode: encryptMode, logger: console });
   let codemap = readCodemap(codemapPath);
@@ -769,4 +704,87 @@ export async function indexProject({
     chunkingStats,
     tokenStats: modelProfile.useTokens ? tokenStats : undefined
   };
+}
+
+// -----------------------------------------------------------------------------
+// HELPER FUNCTIONS
+// -----------------------------------------------------------------------------
+
+async function gatherFiles(repo: string, normalizedChanged: string[] | null): Promise<{ files: string[], toDelete: string[] }> {
+  const languagePatterns = getSupportedLanguageExtensions().map(ext => `**/*${ext}`);
+  let files: string[] = [];
+
+  if (normalizedChanged === null) {
+    files = await fg(languagePatterns, {
+      cwd: repo,
+      absolute: false,
+      followSymbolicLinks: false,
+      ignore: DEFAULT_SCAN_IGNORES,
+      onlyFiles: true,
+      dot: false
+    });
+  } else {
+    files = normalizedChanged.filter(rel => {
+      const ext = path.extname(rel).toLowerCase();
+      return !!LANG_RULES[ext];
+    });
+  }
+
+  const uniqueFiles: string[] = [];
+  const toDelete: string[] = [];
+  const seenFiles = new Set<string>();
+
+  for (const rel of files) {
+    if (!rel || seenFiles.has(rel)) {
+      continue;
+    }
+
+    const absPath = path.join(repo, rel);
+    if (!fs.existsSync(absPath)) {
+      toDelete.push(rel);
+      continue;
+    }
+
+    seenFiles.add(rel);
+    uniqueFiles.push(rel);
+  }
+
+  return { files: uniqueFiles, toDelete };
+}
+
+async function checkDimensionMismatch(dbPath: string, embeddingProvider: any): Promise<void> {
+  if (!fs.existsSync(dbPath)) return;
+  
+  const db = new Database(dbPath);
+  try {
+    const existingDimensions = await db.getExistingDimensions();
+    
+    if (existingDimensions.length > 0) {
+      const currentProvider = embeddingProvider.getName();
+      const currentDimensions = embeddingProvider.getDimensions();
+      
+      const hasMismatch = existingDimensions.some(
+        row => row.embedding_provider !== currentProvider ||
+               row.embedding_dimensions !== currentDimensions
+      );
+      
+      if (hasMismatch) {
+        console.log('\n⚠️  WARNING: Dimension/Provider Mismatch Detected!');
+        console.log('='.repeat(60));
+        console.log('Existing index:');
+        existingDimensions.forEach(row => {
+          console.log(`  ${row.embedding_provider} (${row.embedding_dimensions}D)`);
+        });
+        console.log(`Current config: ${currentProvider} (${currentDimensions}D)`);
+        console.log('\nRecommendation: Full re-index for consistent results');
+        console.log('='.repeat(60) + '\n');
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  } catch (error) {
+    // Ignore migration check errors
+  } finally {
+    db.close();
+  }
 }

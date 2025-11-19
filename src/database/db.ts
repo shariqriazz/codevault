@@ -193,8 +193,8 @@ export class CodeVaultDatabase {
     codevault_intent: string | null;
     codevault_description: string | null;
     doc_comments: string | null;
-    variables_used: any[];
-    context_info: any;
+    variables_used: string[];
+    context_info: Record<string, unknown>;
   }): void {
     try {
       this.insertChunkStmt.run(
