@@ -142,13 +142,16 @@ export class BatchEmbeddingProcessor {
     // Extract texts for embedding
     const texts = batch.map(chunk => chunk.enhancedEmbeddingText);
 
-    // Log batching activity
-    log.info(`Processing batch of ${texts.length} chunks`);
+    // Log batching activity at debug to reduce noise in normal runs
+    log.debug(`Processing batch of ${texts.length} chunks`);
 
     // Generate embeddings in batch (single API call for all)
-    const embeddings = await this.embeddingProvider.generateEmbeddings(texts);
+    const generate = async () => this.embeddingProvider.generateEmbeddings(texts);
+    const embeddings = this.embeddingProvider.rateLimiter
+      ? await this.embeddingProvider.rateLimiter.execute(generate)
+      : await generate();
 
-    log.info(`Batch complete (${texts.length} embeddings generated)`);
+    log.debug(`Batch complete (${texts.length} embeddings generated)`);
 
     // Store all embeddings in database within a transaction
     await this.db.transaction(() => {

@@ -19,23 +19,37 @@ import type { TreeSitterNode } from '../../types/ast.js';
 import type { LanguageRule } from '../../languages/rules.js';
 import type { ModelProfile } from '../../providers/base.js';
 
-interface ChunkProcessParams {
-  source: string;
-  rel: string;
-  rule: LanguageRule;
-  limits: any;
-  modelProfile: ModelProfile;
-  onProgress?: ((event: any) => void) | null;
-}
+type SizeLimits = {
+  optimal: number;
+  min: number;
+  max: number;
+  overlap: number;
+  unit: string;
+};
 
 interface ExistingChunks {
   staleChunkIds: Set<string>;
   existingChunks: Map<string, any>;
 }
 
+interface EmbedStoreParams {
+  code: string;
+  enhancedEmbeddingText: string;
+  chunkId: string;
+  sha: string;
+  lang: string;
+  rel: string;
+  symbol: string;
+  chunkType: string;
+  codevaultMetadata: any;
+  importantVariables: any[];
+  docComments: string | null;
+  contextInfo: any;
+  symbolData: any;
+}
+
 export class ChunkPipeline {
   private parser: Parser;
-  private processedNodes = new Set<number>();
 
   constructor() {
     this.parser = new Parser();
@@ -106,13 +120,13 @@ export class ChunkPipeline {
     nodeGroups: any[],
     source: string,
     rule: LanguageRule,
-    limits: any,
+    limits: SizeLimits,
     modelProfile: ModelProfile,
     rel: string,
     existing: ExistingChunks,
     chunkMerkleHashes: string[],
     onProgress: any,
-    embedAndStore: (params: any) => Promise<void>,
+    embedAndStore: (params: EmbedStoreParams) => Promise<void>,
     chunkingStats: any
   ): Promise<void> {
     this.processedNodes = new Set<number>();
@@ -150,13 +164,13 @@ export class ChunkPipeline {
       node: TreeSitterNode, 
       source: string, 
       rule: LanguageRule, 
-      limits: any, 
+      limits: SizeLimits, 
       modelProfile: ModelProfile, 
       rel: string,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
       onProgress: any,
-      embedAndStore: (params: any) => Promise<void>,
+      embedAndStore: (params: EmbedStoreParams) => Promise<void>,
       chunkingStats: any,
       parentNode: TreeSitterNode | null = null
   ): Promise<void> {
@@ -258,7 +272,7 @@ export class ChunkPipeline {
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
       onProgress: any,
-      embedAndStore: (params: any) => Promise<void>,
+      embedAndStore: (params: EmbedStoreParams) => Promise<void>,
       chunkingStats: any
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
