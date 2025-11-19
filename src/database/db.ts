@@ -176,17 +176,20 @@ export class CodeVaultDatabase {
     }
   }
 
+  private buildDeleteStatement(count: number): Database.Statement {
+    const placeholders = Array.from({ length: count }, () => '?').join(', ');
+    return this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
+  }
+
   async deleteChunks(chunkIds: string[]): Promise<void> {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       return;
     }
 
     try {
-      const placeholders = chunkIds.map(() => '?').join(', ');
-      if (!this.deleteChunksStmt) {
-        this.deleteChunksStmt = this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
-      }
-      this.deleteChunksStmt.run(...chunkIds);
+      // Build a fresh statement per invocation to avoid parameter count mismatches
+      const stmt = this.buildDeleteStatement(chunkIds.length);
+      stmt.run(...chunkIds);
     } catch (error) {
       log.error('Failed to delete chunks', error, { count: chunkIds.length });
       throw error;
