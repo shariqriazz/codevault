@@ -3,14 +3,14 @@
   "provider": {
     "openrouter": {
       "models": {
-        "openai/gpt-5-medium": {
-          "id": "openai/gpt-5",
-          "name": "GPT-5 (Medium Effort)",
+        "openai/gpt-5.1-codex": {
+          "id": "openai/gpt-5.1-codex",
+          "name": "GPT-5.1 Codex (High Effort)",
           "reasoning": true,
           "options": {
-            "reasoningEffort": "medium",
-            "textVerbosity": "low",
-            "reasoningSummary": "auto"
+            "reasoningEffort": "high",
+            "textVerbosity": "high",
+            "reasoningSummary": "detailed"
           }
         }
       }
@@ -21,7 +21,7 @@
     "codevault-reviewer": {
       "description": "Specialized code reviewer for CodeVault with deep knowledge of semantic search, indexing, and TypeScript best practices",
       "mode": "subagent",
-      "model": "openrouter/openai/gpt-5-medium",
+      "model": "openrouter/openai/gpt-5.1-codex",
       "temperature": 0.1,
       "tools": {
         "write": false,
