@@ -3,6 +3,7 @@ import { PROMPT_TRUNCATE_LENGTH, CONVERSATION_MAX_CONTEXT_CHUNKS } from '../conf
 import { createChatLLMProvider, type ChatMessage } from '../providers/chat-llm.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchResult } from '../core/types.js';
+import { resolveProviderContext } from '../config/resolver.js';
 
 export interface ConversationTurn {
   question: string;
@@ -59,7 +60,8 @@ export async function synthesizeConversationalAnswer(
   } = options;
 
   try {
-    const chatLLM = createChatLLMProvider(chatProvider);
+    const providerContext = resolveProviderContext(workingPath);
+    const chatLLM = createChatLLMProvider(chatProvider, providerContext.chat);
     if (chatLLM.init) {
       await chatLLM.init();
     }
@@ -168,7 +170,8 @@ export async function* synthesizeConversationalAnswerStreaming(
     maxHistoryTurns = 5
   } = options;
 
-  const chatLLM = createChatLLMProvider(chatProvider);
+  const providerContext = resolveProviderContext(workingPath);
+  const chatLLM = createChatLLMProvider(chatProvider, providerContext.chat);
   if (chatLLM.init) {
     await chatLLM.init();
   }

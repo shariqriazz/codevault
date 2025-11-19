@@ -4,6 +4,7 @@ import { updateIndex } from './update.js';
 import { toPosixPath } from './merkle.js';
 import { getSupportedLanguageExtensions } from '../languages/rules.js';
 import { createEmbeddingProvider, type EmbeddingProvider } from '../providers/index.js';
+import { resolveProviderContext } from '../config/resolver.js';
 
 const DEFAULT_DEBOUNCE_MS = 500;
 const IGNORED_GLOBS = [
@@ -76,6 +77,7 @@ export function startWatch({
   let embeddingProviderInstance: EmbeddingProvider | null = null;
   let embeddingProviderInitPromise: Promise<EmbeddingProvider> | null = null;
   let providerInitErrorLogged = false;
+  const providerContext = resolveProviderContext(root);
 
   async function getEmbeddingProviderInstance(): Promise<EmbeddingProvider> {
     if (embeddingProviderInstance) {
@@ -84,7 +86,7 @@ export function startWatch({
 
     if (!embeddingProviderInitPromise) {
       embeddingProviderInitPromise = (async () => {
-        const instance = createEmbeddingProvider(provider);
+        const instance = createEmbeddingProvider(provider, providerContext.embedding);
         if (instance.init) {
           await instance.init();
         }

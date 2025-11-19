@@ -40,6 +40,7 @@ import type { IndexProjectOptions, IndexProjectResult, ChunkingStats } from './t
 import { SIZE_THRESHOLD, CHUNK_SIZE } from '../config/constants.js';
 import { logger } from '../utils/logger.js';
 import { FileScanner } from './indexing/file-scanner.js';
+import { resolveProviderContext } from '../config/resolver.js';
 
 import type { TreeSitterNode } from '../types/ast.js';
 
@@ -95,6 +96,7 @@ export class IndexerEngine {
               .filter(Boolean) as string[]
           ))
         : null;
+      const providerContext = resolveProviderContext(repo);
 
       const normalizedDeleted = Array.from(new Set(
         (Array.isArray(deletedFiles) ? deletedFiles : [])
@@ -112,7 +114,7 @@ export class IndexerEngine {
       }
       const isPartialUpdate = normalizedChanged !== null;
 
-      this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider);
+      this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider, providerContext.embedding);
 
       if (!embeddingProviderOverride && this.embeddingProvider.init) {
         await this.embeddingProvider.init();

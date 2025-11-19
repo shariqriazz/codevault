@@ -9,6 +9,7 @@ import {
 } from './prompt-builder.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchResult } from '../core/types.js';
+import { resolveProviderContext } from '../config/resolver.js';
 
 export interface SynthesisOptions {
   provider?: string;
@@ -54,7 +55,8 @@ export async function synthesizeAnswer(
   } = options;
 
   try {
-    const chatLLM = createChatLLMProvider(chatProvider);
+    const providerContext = resolveProviderContext(workingPath);
+    const chatLLM = createChatLLMProvider(chatProvider, providerContext.chat);
     if (chatLLM.init) {
       await chatLLM.init();
     }
@@ -233,7 +235,8 @@ export async function* synthesizeAnswerStreaming(
     temperature = 0.7
   } = options;
 
-  const chatLLM = createChatLLMProvider(chatProvider);
+  const providerContext = resolveProviderContext(workingPath);
+  const chatLLM = createChatLLMProvider(chatProvider, providerContext.chat);
   if (chatLLM.init) {
     await chatLLM.init();
   }

@@ -19,17 +19,13 @@ import { startWatch } from './indexer/watch.js';
 import { IndexerUI } from './utils/cli-ui.js';
 import { indexProjectWithProgress } from './utils/indexer-with-progress.js';
 import { log } from './utils/logger.js';
-import { applyConfigToEnv } from './config/apply-env.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from './providers/index.js';
+import { resolveProviderContext } from './config/resolver.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-
-// Apply config to environment variables (CLI only - MCP uses env vars directly)
-// This allows CLI users to use global config while MCP continues using env vars
-applyConfigToEnv();
 
 const program = new Command();
 program
@@ -62,7 +58,8 @@ program
         ui.showHeader();
         
         // Get provider info once for configuration display
-        const embeddingProvider = createEmbeddingProvider(options.provider);
+        const providerContext = resolveProviderContext(resolvedPath);
+        const embeddingProvider = createEmbeddingProvider(options.provider, providerContext.embedding);
         if (embeddingProvider.init) {
           await embeddingProvider.init();
         }

@@ -8,18 +8,26 @@ import {
   MAX_ITEM_TOKENS,
   estimateTokens
 } from './base.js';
+import type { EmbeddingOptions } from '../config/resolver.js';
 
 export class OpenAIProvider extends EmbeddingProvider {
   private openai: OpenAI | null = null;
   private model: string;
+  private apiKey?: string;
+  private baseUrl?: string;
+  private dimensionsOverride?: number;
   rateLimiter: any;
 
-  constructor() {
+  constructor(options: EmbeddingOptions = {}) {
     super();
-    this.model = process.env.CODEVAULT_EMBEDDING_MODEL
+    this.model = options.model
+                 || process.env.CODEVAULT_EMBEDDING_MODEL
                  || process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL // Backward compatibility
                  || process.env.OPENAI_MODEL // Backward compatibility
                  || 'text-embedding-3-large';
+    this.apiKey = options.apiKey || process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
+    this.baseUrl = options.baseUrl || process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
+    this.dimensionsOverride = options.dimensions;
     this.rateLimiter = createRateLimiter('OpenAI');
   }
 
@@ -27,12 +35,12 @@ export class OpenAIProvider extends EmbeddingProvider {
     if (!this.openai) {
       const config: any = {};
       
-      if (process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY) {
-        config.apiKey = process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
+      if (this.apiKey) {
+        config.apiKey = this.apiKey;
       }
       
-      if (process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL) {
-        config.baseURL = process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
+      if (this.baseUrl) {
+        config.baseURL = this.baseUrl;
       }
       
       this.openai = new OpenAI(config);
@@ -56,6 +64,10 @@ export class OpenAIProvider extends EmbeddingProvider {
   }
 
   getDimensions(): number {
+    if (this.dimensionsOverride !== undefined) {
+      return this.dimensionsOverride;
+    }
+
     if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
       const dims = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
       if (!isNaN(dims) && dims > 0) return dims;
