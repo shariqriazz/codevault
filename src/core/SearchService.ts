@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createEmbeddingProvider } from '../providers/index.js';
 import { Database, type DatabaseChunk } from '../database/db.js';
-import { readCodemap } from '../codemap/io.js';
+import { readCodemap, readCodemapAsync } from '../codemap/io.js';
 import { normalizeScopeFilters, applyScope } from '../search/scope.js';
 import { BM25Index } from '../search/bm25.js';
 import { reciprocalRankFusion } from '../search/hybrid.js';
@@ -18,6 +18,7 @@ import {
     DOC_BOOST_CONSTANTS, 
     SEARCH_CONSTANTS 
 } from '../config/constants.js';
+import { resolveProviderContext } from '../config/resolver.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchCodeResult, SearchResult, GetChunkResult } from './types.js';
 
@@ -72,6 +73,7 @@ export class SearchService {
     const chunkDir = path.join(basePath, '.codevault/chunks');
     const codemapPath = path.join(basePath, 'codevault.codemap.json');
     const normalizedQuery = this.normalizeQuery(query);
+    const providerContext = resolveProviderContext(basePath);
 
     if (!normalizedQuery) {
       return this.getOverview(limit, workingPath);
@@ -83,7 +85,7 @@ export class SearchService {
     const bm25Enabled = normalizedScope.bm25 !== false;
     const symbolBoostEnabled = normalizedScope.symbol_boost !== false;
 
-    const embeddingProvider = createEmbeddingProvider(effectiveProvider);
+    const embeddingProvider = createEmbeddingProvider(effectiveProvider, providerContext.embedding);
     let db: Database | null = null;
 
     try {
@@ -98,7 +100,7 @@ export class SearchService {
         return this.createErrorResult('no_chunks_found', `No indexed chunks found`, embeddingProvider.getName(), normalizedScope, hybridEnabled, bm25Enabled, symbolBoostEnabled);
       }
 
-      const codemapData = readCodemap(codemapPath);
+      const codemapData = await readCodemapAsync(codemapPath);
       const scopedChunks = applyScope(chunks, normalizedScope) as DatabaseChunk[];
       const chunkInfoById = new Map<string, SearchCandidate>();
       const results: SearchCandidate[] = [];
@@ -258,7 +260,11 @@ export class SearchService {
                 getText: (candidate) => {
                   const codeText = this.readChunkTextCached(candidate.sha, chunkDir, basePath) || '';
                   return this.buildBm25Document(candidate, codeText);
-                }
+                },
+                apiUrl: providerContext.reranker.apiUrl,
+                apiKey: providerContext.reranker.apiKey,
+                model: providerContext.reranker.model,
+                maxTokens: providerContext.reranker.maxTokens
               });
 
               if (Array.isArray(reranked) && reranked.length === vectorResults.length) {

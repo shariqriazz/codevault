@@ -33,3 +33,21 @@ export function writeCodemap(filePath: string | undefined, codemap: Codemap): Co
   fs.writeFileSync(resolvedPath, JSON.stringify(normalized, null, 2));
   return normalized;
 }
+
+export async function readCodemapAsync(filePath?: string): Promise<Codemap> {
+  const resolvedPath = filePath ? path.resolve(filePath) : resolveCodemapPath('.');
+
+  try {
+    const exists = await fs.promises.access(resolvedPath).then(() => true).catch(() => false);
+    if (!exists) {
+      return {};
+    }
+
+    const raw = await fs.promises.readFile(resolvedPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return normalizeCodemapRecord(parsed);
+  } catch (error) {
+    console.warn(`Failed to read codemap at ${resolvedPath}:`, (error as Error).message);
+    return {};
+  }
+}

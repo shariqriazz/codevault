@@ -142,7 +142,10 @@ export async function rerankWithAPI(query: string, candidates: Candidate[], opti
   }
 
   const topCandidates = candidates.slice(0, maxCandidates);
-  const maxTokens = options.maxTokens || getMaxTokensFromEnv();
+  const configuredMaxTokens = typeof options.maxTokens === 'number' && Number.isFinite(options.maxTokens)
+    ? options.maxTokens
+    : getMaxTokensFromEnv();
+  const maxTokens = Math.max(1, configuredMaxTokens);
 
   try {
     const texts = await Promise.all(

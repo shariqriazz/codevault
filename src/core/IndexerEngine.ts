@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import fg from 'fast-glob';
 import fs from 'fs';
 import path from 'path';
 import Parser from 'tree-sitter';
@@ -10,7 +9,7 @@ import { groupNodesForChunking, createCombinedChunk } from '../chunking/file-gro
 import { getTokenCountStats } from '../chunking/token-counter.js';
 import { readCodemap, writeCodemap } from '../codemap/io.js';
 import { normalizeChunkMetadata, type Codemap } from '../types/codemap.js';
-import { LANG_RULES, getSupportedLanguageExtensions } from '../languages/rules.js';
+import { LANG_RULES } from '../languages/rules.js';
 import {
   cloneMerkle,
   computeFastHash,
@@ -38,9 +37,10 @@ import {
 import { Database, initDatabase } from '../database/db.js';
 import { BatchEmbeddingProcessor } from './batch-indexer.js';
 import type { IndexProjectOptions, IndexProjectResult, ChunkingStats } from './types.js';
-import { DEFAULT_SCAN_IGNORES } from '../utils/scan-patterns.js';
 import { SIZE_THRESHOLD, CHUNK_SIZE } from '../config/constants.js';
 import { logger } from '../utils/logger.js';
+import { FileScanner } from './indexing/file-scanner.js';
+import { resolveProviderContext } from '../config/resolver.js';
 
 import type { TreeSitterNode } from '../types/ast.js';
 
@@ -96,6 +96,7 @@ export class IndexerEngine {
               .filter(Boolean) as string[]
           ))
         : null;
+      const providerContext = resolveProviderContext(repo);
 
       const normalizedDeleted = Array.from(new Set(
         (Array.isArray(deletedFiles) ? deletedFiles : [])
@@ -105,14 +106,15 @@ export class IndexerEngine {
 
       const deletedSet = new Set(normalizedDeleted);
       
-      const { files, toDelete } = await this.gatherFiles(repo, normalizedChanged);
+      const scanner = new FileScanner();
+      const { files, toDelete } = await scanner.scan(repo, normalizedChanged);
       
       for (const file of toDelete) {
         deletedSet.add(file);
       }
       const isPartialUpdate = normalizedChanged !== null;
 
-      this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider);
+      this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider, providerContext.embedding);
 
       if (!embeddingProviderOverride && this.embeddingProvider.init) {
         await this.embeddingProvider.init();
@@ -709,48 +711,6 @@ export class IndexerEngine {
     if (removeMerkleEntry(this.updatedMerkle, fileRel)) {
       this.merkleDirty = true;
     }
-  }
-
-  private async gatherFiles(repo: string, normalizedChanged: string[] | null): Promise<{ files: string[], toDelete: string[] }> {
-    const languagePatterns = getSupportedLanguageExtensions().map(ext => `**/*${ext}`);
-    let files: string[] = [];
-
-    if (normalizedChanged === null) {
-      files = await fg(languagePatterns, {
-        cwd: repo,
-        absolute: false,
-        followSymbolicLinks: false,
-        ignore: DEFAULT_SCAN_IGNORES,
-        onlyFiles: true,
-        dot: false
-      });
-    } else {
-      files = normalizedChanged.filter(rel => {
-        const ext = path.extname(rel).toLowerCase();
-        return !!LANG_RULES[ext];
-      });
-    }
-
-    const uniqueFiles: string[] = [];
-    const toDelete: string[] = [];
-    const seenFiles = new Set<string>();
-
-    for (const rel of files) {
-      if (!rel || seenFiles.has(rel)) {
-        continue;
-      }
-
-      const absPath = path.join(repo, rel);
-      try {
-          await fs.promises.access(absPath);
-          seenFiles.add(rel);
-          uniqueFiles.push(rel);
-      } catch {
-          toDelete.push(rel);
-      }
-    }
-
-    return { files: uniqueFiles, toDelete };
   }
 
   private async checkDimensionMismatch(dbPath: string, embeddingProvider: any): Promise<void> {

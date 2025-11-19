@@ -8,101 +8,108 @@ import type { CodevaultConfig } from './types.js';
  * @readonly Only reads config, modifies process.env (ephemeral)
  * @param basePath Project path for loading config
  */
-export function applyConfigToEnv(basePath = '.'): void {
+export interface EnvOverrides {
+  [key: string]: string;
+}
+
+export function getConfigEnvOverrides(basePath = '.'): EnvOverrides {
   const config = loadConfig(basePath);
-  
-  // Only set env vars if they're not already set (env vars have priority)
-  
-  // OpenAI provider - Set new variables with backward compatibility
+  const overrides: EnvOverrides = {};
+
   if (config.providers?.openai) {
-    if (!process.env.CODEVAULT_EMBEDDING_API_KEY && !process.env.OPENAI_API_KEY && config.providers.openai.apiKey) {
-      process.env.CODEVAULT_EMBEDDING_API_KEY = config.providers.openai.apiKey;
-      process.env.OPENAI_API_KEY = config.providers.openai.apiKey; // Backward compatibility
+    if (config.providers.openai.apiKey) {
+      overrides.CODEVAULT_EMBEDDING_API_KEY = config.providers.openai.apiKey;
+      overrides.OPENAI_API_KEY = config.providers.openai.apiKey;
     }
-    
-    if (!process.env.CODEVAULT_EMBEDDING_BASE_URL && !process.env.OPENAI_BASE_URL && config.providers.openai.baseUrl) {
-      process.env.CODEVAULT_EMBEDDING_BASE_URL = config.providers.openai.baseUrl;
-      process.env.OPENAI_BASE_URL = config.providers.openai.baseUrl; // Backward compatibility
-    }
-    
-    if (!process.env.CODEVAULT_EMBEDDING_MODEL && !process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL && config.providers.openai.model) {
-      process.env.CODEVAULT_EMBEDDING_MODEL = config.providers.openai.model;
-      process.env.CODEVAULT_OPENAI_EMBEDDING_MODEL = config.providers.openai.model; // Backward compatibility
-    }
-    
-    if (!process.env.CODEVAULT_EMBEDDING_DIMENSIONS && !process.env.CODEVAULT_DIMENSIONS && config.providers.openai.dimensions) {
-      process.env.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.openai.dimensions);
-      process.env.CODEVAULT_DIMENSIONS = String(config.providers.openai.dimensions); // Backward compatibility
-    }
-  }
-  
 
-  
-  // Max tokens - Set new variable with backward compatibility
-  if (!process.env.CODEVAULT_EMBEDDING_MAX_TOKENS && !process.env.CODEVAULT_MAX_TOKENS && config.maxTokens) {
-    process.env.CODEVAULT_EMBEDDING_MAX_TOKENS = String(config.maxTokens);
-    process.env.CODEVAULT_MAX_TOKENS = String(config.maxTokens); // Backward compatibility
+    if (config.providers.openai.baseUrl) {
+      overrides.CODEVAULT_EMBEDDING_BASE_URL = config.providers.openai.baseUrl;
+      overrides.OPENAI_BASE_URL = config.providers.openai.baseUrl;
+    }
+
+    if (config.providers.openai.model) {
+      overrides.CODEVAULT_EMBEDDING_MODEL = config.providers.openai.model;
+      overrides.CODEVAULT_OPENAI_EMBEDDING_MODEL = config.providers.openai.model;
+    }
+
+    if (config.providers.openai.dimensions) {
+      overrides.CODEVAULT_EMBEDDING_DIMENSIONS = String(config.providers.openai.dimensions);
+      overrides.CODEVAULT_DIMENSIONS = String(config.providers.openai.dimensions);
+    }
   }
-  
-  // Rate limiting - Set new variables with backward compatibility
+
+  if (config.maxTokens) {
+    overrides.CODEVAULT_EMBEDDING_MAX_TOKENS = String(config.maxTokens);
+    overrides.CODEVAULT_MAX_TOKENS = String(config.maxTokens);
+  }
+
   if (config.rateLimit) {
-    if (!process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM && !process.env.CODEVAULT_RATE_LIMIT_RPM && config.rateLimit.rpm) {
-      process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM = String(config.rateLimit.rpm);
-      process.env.CODEVAULT_RATE_LIMIT_RPM = String(config.rateLimit.rpm); // Backward compatibility
+    if (config.rateLimit.rpm) {
+      overrides.CODEVAULT_EMBEDDING_RATE_LIMIT_RPM = String(config.rateLimit.rpm);
+      overrides.CODEVAULT_RATE_LIMIT_RPM = String(config.rateLimit.rpm);
     }
-    
-    if (!process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM && !process.env.CODEVAULT_RATE_LIMIT_TPM && config.rateLimit.tpm) {
-      process.env.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM = String(config.rateLimit.tpm);
-      process.env.CODEVAULT_RATE_LIMIT_TPM = String(config.rateLimit.tpm); // Backward compatibility
-    }
-  }
-  
-  // Encryption
-  if (config.encryption) {
-    if (!process.env.CODEVAULT_ENCRYPTION_KEY && config.encryption.key) {
-      process.env.CODEVAULT_ENCRYPTION_KEY = config.encryption.key;
-    }
-  }
-  
-  // Reranker
-  if (config.reranker) {
-    if (!process.env.CODEVAULT_RERANK_API_URL && config.reranker.apiUrl) {
-      process.env.CODEVAULT_RERANK_API_URL = config.reranker.apiUrl;
-    }
-    
-    if (!process.env.CODEVAULT_RERANK_API_KEY && config.reranker.apiKey) {
-      process.env.CODEVAULT_RERANK_API_KEY = config.reranker.apiKey;
-    }
-    
-    if (!process.env.CODEVAULT_RERANK_MODEL && config.reranker.model) {
-      process.env.CODEVAULT_RERANK_MODEL = config.reranker.model;
-    }
-  }
-  
-  // Chat LLM
-  if (config.chatLLM?.openai) {
-    if (!process.env.CODEVAULT_CHAT_API_KEY && config.chatLLM.openai.apiKey) {
-      process.env.CODEVAULT_CHAT_API_KEY = config.chatLLM.openai.apiKey;
-    }
-    
-    if (!process.env.CODEVAULT_CHAT_BASE_URL && config.chatLLM.openai.baseUrl) {
-      process.env.CODEVAULT_CHAT_BASE_URL = config.chatLLM.openai.baseUrl;
-    }
-    
-    if (!process.env.CODEVAULT_CHAT_MODEL && config.chatLLM.openai.model) {
-      process.env.CODEVAULT_CHAT_MODEL = config.chatLLM.openai.model;
-    }
-    
-    if (!process.env.CODEVAULT_CHAT_MAX_TOKENS && config.chatLLM.openai.maxTokens) {
-      process.env.CODEVAULT_CHAT_MAX_TOKENS = String(config.chatLLM.openai.maxTokens);
-    }
-    
-    if (!process.env.CODEVAULT_CHAT_TEMPERATURE && config.chatLLM.openai.temperature) {
-      process.env.CODEVAULT_CHAT_TEMPERATURE = String(config.chatLLM.openai.temperature);
-    }
-  }
-  
 
+    if (config.rateLimit.tpm) {
+      overrides.CODEVAULT_EMBEDDING_RATE_LIMIT_TPM = String(config.rateLimit.tpm);
+      overrides.CODEVAULT_RATE_LIMIT_TPM = String(config.rateLimit.tpm);
+    }
+  }
+
+  if (config.encryption?.key) {
+    overrides.CODEVAULT_ENCRYPTION_KEY = config.encryption.key;
+  }
+
+  if (config.reranker) {
+    if (config.reranker.apiUrl) {
+      overrides.CODEVAULT_RERANK_API_URL = config.reranker.apiUrl;
+    }
+
+    if (config.reranker.apiKey) {
+      overrides.CODEVAULT_RERANK_API_KEY = config.reranker.apiKey;
+    }
+
+    if (config.reranker.model) {
+      overrides.CODEVAULT_RERANK_MODEL = config.reranker.model;
+    }
+  }
+
+  if (config.chatLLM?.openai) {
+    if (config.chatLLM.openai.apiKey) {
+      overrides.CODEVAULT_CHAT_API_KEY = config.chatLLM.openai.apiKey;
+    }
+
+    if (config.chatLLM.openai.baseUrl) {
+      overrides.CODEVAULT_CHAT_BASE_URL = config.chatLLM.openai.baseUrl;
+    }
+
+    if (config.chatLLM.openai.model) {
+      overrides.CODEVAULT_CHAT_MODEL = config.chatLLM.openai.model;
+    }
+
+    if (config.chatLLM.openai.maxTokens) {
+      overrides.CODEVAULT_CHAT_MAX_TOKENS = String(config.chatLLM.openai.maxTokens);
+    }
+
+    if (config.chatLLM.openai.temperature !== undefined) {
+      overrides.CODEVAULT_CHAT_TEMPERATURE = String(config.chatLLM.openai.temperature);
+    }
+  }
+
+  return overrides;
+}
+
+/**
+ * Apply configuration to process.env for backward compatibility.
+ * This mutates environment only for variables not already set.
+ */
+export function applyConfigToEnv(basePath = '.'): void {
+  const overrides = getConfigEnvOverrides(basePath);
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (typeof process.env[key] === 'undefined') {
+      process.env[key] = value;
+    }
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
 import { OpenAI } from 'openai';
 import { createRateLimiter } from '../utils/rate-limiter.js';
+import type { ChatOptions } from '../config/resolver.js';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -25,13 +26,22 @@ export abstract class ChatLLMProvider {
 export class OpenAIChatProvider extends ChatLLMProvider {
   private openai: OpenAI | null = null;
   private model: string;
+  private apiKey?: string;
+  private baseUrl?: string;
+  private maxTokensOverride?: number;
+  private temperatureOverride?: number;
   rateLimiter: any;
 
-  constructor() {
+  constructor(options: ChatOptions = {}) {
     super();
-    this.model = process.env.CODEVAULT_CHAT_MODEL
+    this.model = options.model
+                 || process.env.CODEVAULT_CHAT_MODEL
                  || process.env.CODEVAULT_OPENAI_CHAT_MODEL // Backward compatibility
                  || 'gpt-4o';
+    this.apiKey = options.apiKey || process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY;
+    this.baseUrl = options.baseUrl || process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL;
+    this.maxTokensOverride = options.maxTokens;
+    this.temperatureOverride = options.temperature;
     // Use 'OpenAI' to match rate limiter defaults (rpm: 50)
     this.rateLimiter = createRateLimiter('OpenAI');
   }
@@ -40,12 +50,12 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     if (!this.openai) {
       const config: any = {};
       
-      if (process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY) {
-        config.apiKey = process.env.CODEVAULT_CHAT_API_KEY || process.env.OPENAI_API_KEY;
+      if (this.apiKey) {
+        config.apiKey = this.apiKey;
       }
       
-      if (process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL) {
-        config.baseURL = process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL;
+      if (this.baseUrl) {
+        config.baseURL = this.baseUrl;
       }
       
       this.openai = new OpenAI(config);
@@ -55,8 +65,12 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   async generateCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): Promise<string> {
     await this.init();
     
-    const temperature = options.temperature ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
-    const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
+    const temperature = options.temperature
+      ?? this.temperatureOverride
+      ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
+    const maxTokens = options.maxTokens
+      ?? this.maxTokensOverride
+      ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
     
     return await this.rateLimiter.execute(async () => {
       const completion = await this.openai!.chat.completions.create({
@@ -110,11 +124,11 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   }
 }
 
-export function createChatLLMProvider(providerName = 'auto'): ChatLLMProvider {
+export function createChatLLMProvider(providerName = 'auto', options: ChatOptions = {}): ChatLLMProvider {
   switch (providerName.toLowerCase()) {
     case 'openai':
     case 'auto':
     default:
-      return new OpenAIChatProvider();
+      return new OpenAIChatProvider(options);
   }
 }
