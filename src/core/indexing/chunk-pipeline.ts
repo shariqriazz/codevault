@@ -50,6 +50,7 @@ interface EmbedStoreParams {
 
 export class ChunkPipeline {
   private parser: Parser;
+  private processedNodes = new Set<number>();
 
   constructor() {
     this.parser = new Parser();
