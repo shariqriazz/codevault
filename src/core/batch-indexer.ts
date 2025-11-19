@@ -146,10 +146,9 @@ export class BatchEmbeddingProcessor {
     log.debug(`Processing batch of ${texts.length} chunks`);
 
     // Generate embeddings in batch (single API call for all)
-    const generate = async () => this.embeddingProvider.generateEmbeddings(texts);
-    const embeddings = this.embeddingProvider.rateLimiter
-      ? await this.embeddingProvider.rateLimiter.execute(generate)
-      : await generate();
+    // Avoid double-wrapping with the provider's rate limiter; providers already
+    // enforce their own rate limits internally.
+    const embeddings = await this.embeddingProvider.generateEmbeddings(texts);
 
     log.debug(`Batch complete (${texts.length} embeddings generated)`);
 
