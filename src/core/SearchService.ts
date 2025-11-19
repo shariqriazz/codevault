@@ -71,8 +71,9 @@ export class SearchService {
     const dbPath = path.join(basePath, '.codevault/codevault.db');
     const chunkDir = path.join(basePath, '.codevault/chunks');
     const codemapPath = path.join(basePath, 'codevault.codemap.json');
+    const normalizedQuery = this.normalizeQuery(query);
 
-    if (!query || !query.trim()) {
+    if (!normalizedQuery) {
       return this.getOverview(limit, workingPath);
     }
 
@@ -107,7 +108,7 @@ export class SearchService {
         if (embeddingProvider.init) {
           await embeddingProvider.init();
         }
-        queryEmbedding = await embeddingProvider.generateEmbedding(query);
+        queryEmbedding = await embeddingProvider.generateEmbedding(normalizedQuery);
       }
 
       for (const chunk of scopedChunks) {
@@ -145,7 +146,7 @@ export class SearchService {
           docBoost = DOC_BOOST;
         }
         
-        const finalScore = Math.min(vectorSimilarity + boostScore + docBoost, 1.0);
+        const finalScore = Math.min(1, Math.max(0, vectorSimilarity + boostScore + docBoost));
 
         const info = {
           id: chunk.id,
@@ -167,7 +168,7 @@ export class SearchService {
 
       if (symbolBoostEnabled) {
         try {
-          applySymbolBoost(results, { query, codemap: codemapData });
+          applySymbolBoost(results, { query: normalizedQuery, codemap: codemapData });
         } catch (error) {
             // Silent fail
         }
@@ -194,7 +195,7 @@ export class SearchService {
 
           if (bm25Index) {
             const allowedIds = new Set(scopedChunks.map((chunk) => chunk.id));
-            const bm25RawResults = bm25Index.search(query, selectionBudget);
+            const bm25RawResults = bm25Index.search(normalizedQuery, selectionBudget);
             const bm25Results = bm25RawResults.filter(result => allowedIds.has(result.id));
             bm25CandidateCount = bm25Results.length;
 
@@ -252,7 +253,7 @@ export class SearchService {
 
         if (vectorResults.length > 1 && normalizedScope.reranker === 'api') {
             try {
-              const reranked = await rerankWithAPI(query, vectorResults, {
+              const reranked = await rerankWithAPI(normalizedQuery, vectorResults, {
                 max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, vectorResults.length),
                 getText: (candidate) => {
                   const codeText = this.readChunkTextCached(candidate.sha, chunkDir, basePath) || '';
@@ -267,6 +268,12 @@ export class SearchService {
               // Silent fallback
             }
         }
+
+        // Enforce score bounds after boosts/reranking
+        vectorResults = vectorResults.map(candidate => ({
+          ...candidate,
+          score: Math.min(1, Math.max(candidate.score ?? 0, 0))
+        }));
       }
 
       const vectorSearchType = bm25Fused ? 'hybrid' : 'vector';
@@ -275,7 +282,7 @@ export class SearchService {
           const meta: any = {
             id: result.id,
             symbol: result.symbol,
-            score: Math.min(1, result.score || 0),
+            score: Math.min(1, Math.max(result.score || 0, 0)),
             intent: result.codevault_intent,
             description: result.codevault_description,
             searchType: vectorSearchType,
@@ -316,11 +323,10 @@ export class SearchService {
       }
 
       if (symbolBoostEnabled && combinedResults.length > 0 && combinedResults[0].meta.score > 0.8) {
-          await db.recordIntention(this.normalizeQuery(query), query, combinedResults[0].sha, combinedResults[0].meta.score);
+          await db.recordIntention(normalizedQuery, query, combinedResults[0].sha, combinedResults[0].meta.score);
       }
 
-      const pattern = query
-        .toLowerCase()
+      const pattern = normalizedQuery
         .replace(/\b[\w-]+Session\b/gi, '[SESSION]')
         .replace(/\bstripe\b/gi, '[PAYMENT_PROVIDER]')
         .replace(/\b\w+Service\b/gi, '[SERVICE]')

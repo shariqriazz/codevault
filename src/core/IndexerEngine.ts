@@ -88,326 +88,340 @@ export class IndexerEngine {
       throw new Error(`Directory ${repo} does not exist`);
     }
 
-    const normalizedChanged = Array.isArray(changedFiles)
-      ? Array.from(new Set(
-          changedFiles
-            .map(file => normalizeToProjectPath(repo, file))
-            .filter(Boolean) as string[]
-        ))
-      : null;
+    try {
+      const normalizedChanged = Array.isArray(changedFiles)
+        ? Array.from(new Set(
+            changedFiles
+              .map(file => normalizeToProjectPath(repo, file))
+              .filter(Boolean) as string[]
+          ))
+        : null;
 
-    const normalizedDeleted = Array.from(new Set(
-      (Array.isArray(deletedFiles) ? deletedFiles : [])
-        .map(file => normalizeToProjectPath(repo, file))
-        .filter(Boolean) as string[]
-    ));
+      const normalizedDeleted = Array.from(new Set(
+        (Array.isArray(deletedFiles) ? deletedFiles : [])
+          .map(file => normalizeToProjectPath(repo, file))
+          .filter(Boolean) as string[]
+      ));
 
-    const deletedSet = new Set(normalizedDeleted);
-    
-    const { files, toDelete } = await this.gatherFiles(repo, normalizedChanged);
-    
-    for (const file of toDelete) {
-      deletedSet.add(file);
-    }
-    const isPartialUpdate = normalizedChanged !== null;
+      const deletedSet = new Set(normalizedDeleted);
+      
+      const { files, toDelete } = await this.gatherFiles(repo, normalizedChanged);
+      
+      for (const file of toDelete) {
+        deletedSet.add(file);
+      }
+      const isPartialUpdate = normalizedChanged !== null;
 
-    this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider);
+      this.embeddingProvider = embeddingProviderOverride || createEmbeddingProvider(provider);
 
-    if (!embeddingProviderOverride && this.embeddingProvider.init) {
-      await this.embeddingProvider.init();
-    }
+      if (!embeddingProviderOverride && this.embeddingProvider.init) {
+        await this.embeddingProvider.init();
+      }
 
-    const providerName = this.embeddingProvider.getName();
-    const modelName = this.embeddingProvider.getModelName ? this.embeddingProvider.getModelName() : null;
-    const modelProfile = await getModelProfile(providerName, modelName || providerName);
-    const limits = getSizeLimits(modelProfile);
-    
-    if (!process.env.CODEVAULT_QUIET) {
-      logger.info(`Chunking Configuration`, {
-        provider: providerName,
-        model: modelName,
-        dimensions: this.embeddingProvider.getDimensions(),
-        mode: limits.unit
-      });
-    }
+      const providerName = this.embeddingProvider.getName();
+      const modelName = this.embeddingProvider.getModelName ? this.embeddingProvider.getModelName() : null;
+      const modelProfile = await getModelProfile(providerName, modelName || providerName);
+      const limits = getSizeLimits(modelProfile);
+      
+      if (!process.env.CODEVAULT_QUIET) {
+        logger.info(`Chunking Configuration`, {
+          provider: providerName,
+          model: modelName,
+          dimensions: this.embeddingProvider.getDimensions(),
+          mode: limits.unit
+        });
+      }
 
-    await initDatabase(this.embeddingProvider.getDimensions(), repo);
+      await initDatabase(this.embeddingProvider.getDimensions(), repo);
 
-    const codemapPath = path.join(repo, 'codevault.codemap.json');
-    this.chunkDir = path.join(repo, '.codevault/chunks');
-    const dbPath = path.join(repo, '.codevault/codevault.db');
-    
-    await this.checkDimensionMismatch(dbPath, this.embeddingProvider);
+      const codemapPath = path.join(repo, 'codevault.codemap.json');
+      this.chunkDir = path.join(repo, '.codevault/chunks');
+      const dbPath = path.join(repo, '.codevault/codevault.db');
+      
+      await this.checkDimensionMismatch(dbPath, this.embeddingProvider);
 
-    this.encryptionPreference = resolveEncryptionPreference({ mode: encryptMode, logger: console }); // keeping console for logger shim in encrypted-chunks
-    this.codemap = readCodemap(codemapPath);
+      this.encryptionPreference = resolveEncryptionPreference({ mode: encryptMode, logger: console }); // keeping console for logger shim in encrypted-chunks
+      this.codemap = readCodemap(codemapPath);
 
-    this.merkle = loadMerkle(repo);
-    this.updatedMerkle = cloneMerkle(this.merkle);
+      this.merkle = loadMerkle(repo);
+      this.updatedMerkle = cloneMerkle(this.merkle);
 
-    const parser = new Parser();
-    
-    this.db = new Database(dbPath);
-    
-    // Create batch processor for efficient embedding generation
-    this.batchProcessor = new BatchEmbeddingProcessor(this.embeddingProvider, this.db, BATCH_SIZE);
+      const parser = new Parser();
+      
+      this.db = new Database(dbPath);
+      
+      // Create batch processor for efficient embedding generation
+      this.batchProcessor = new BatchEmbeddingProcessor(this.embeddingProvider, this.db, BATCH_SIZE);
 
-    for (const rel of files) {
-      deletedSet.delete(rel);
+      for (const rel of files) {
+        deletedSet.delete(rel);
 
-      const abs = path.join(repo, rel);
-      const ext = path.extname(rel).toLowerCase();
-      const rule = LANG_RULES[ext];
+        const abs = path.join(repo, rel);
+        const ext = path.extname(rel).toLowerCase();
+        const rule = LANG_RULES[ext];
 
-      if (!rule) continue;
+        if (!rule) continue;
 
-      const existingChunks = new Map(
-        Object.entries(this.codemap)
-          .filter(([, metadata]) => metadata && metadata.file === rel) as [string, any][]
-      );
-      const staleChunkIds = new Set(existingChunks.keys());
-      const chunkMerkleHashes: string[] = [];
-      let fileHash: string | null = null;
-
-      try {
-        const source = await fs.promises.readFile(abs, 'utf8');
-        fileHash = await computeFastHash(source);
-
-        const previousMerkle = this.merkle[rel];
-        if (previousMerkle && previousMerkle.shaFile === fileHash) {
-          continue;
-        }
-
-        let tree;
-        try {
-          parser.setLanguage(rule.ts);
-          
-          if (source.length > SIZE_THRESHOLD) {
-            tree = parser.parse((index: number) => {
-              if (index < source.length) {
-                return source.slice(index, Math.min(index + CHUNK_SIZE, source.length));
-              }
-              return null;
-            });
-          } else {
-            tree = parser.parse(source);
-          }
-          
-          if (!tree || !tree.rootNode) {
-            throw new Error('Failed to create syntax tree');
-          }
-        } catch (parseError) {
-          throw parseError;
-        }
-
-        const collectedNodes: TreeSitterNode[] = [];
-        const collectNodes = (node: TreeSitterNode) => {
-           if (node.type === 'export_statement') {
-            let hasDeclaration = false;
-            for (let i = 0; i < node.childCount; i++) {
-              const child = node.child(i);
-              if (child && ['function_declaration', 'class_declaration', 'method_definition'].includes(child.type)) {
-                hasDeclaration = true;
-                break;
-              }
-            }
-            
-            if (!hasDeclaration && rule.nodeTypes.includes(node.type)) {
-              collectedNodes.push(node);
-              return;
-            }
-            
-            if (hasDeclaration) {
-              for (let i = 0; i < node.childCount; i++) {
-                const child = node.child(i);
-                if (child) {
-                  collectNodes(child);
-                }
-              }
-              return;
-            }
-          }
-          
-          if (rule.nodeTypes.includes(node.type)) {
-            collectedNodes.push(node);
-          }
-          for (let i = 0; i < node.childCount; i++) {
-            const child = node.child(i);
-            if (child) {
-              collectNodes(child);
-            }
-          }
-        };
-        
-        collectNodes(tree.rootNode);
-        
-        const nodeGroups = await groupNodesForChunking(
-          collectedNodes,
-          source,
-          modelProfile,
-          rule
+        const existingChunks = new Map(
+          Object.entries(this.codemap)
+            .filter(([, metadata]) => metadata && metadata.file === rel) as [string, any][]
         );
-        
-        this.processedNodes = new Set<number>();
+        const staleChunkIds = new Set(existingChunks.keys());
+        const chunkMerkleHashes: string[] = [];
+        let fileHash: string | null = null;
 
-        for (const nodeGroup of nodeGroups) {
-           if (nodeGroup.nodes.length === 1) {
-            await this.yieldChunk(nodeGroup.nodes[0], source, rule, limits, modelProfile, rel, staleChunkIds, chunkMerkleHashes, onProgress);
-          } else {
-            const combinedChunk = createCombinedChunk(nodeGroup, source);
-            if (combinedChunk) {
-              this.chunkingStats.totalNodes += nodeGroup.nodes.length;
-              this.chunkingStats.fileGrouped = (this.chunkingStats.fileGrouped || 0) + 1;
-              this.chunkingStats.functionsGrouped = (this.chunkingStats.functionsGrouped || 0) + nodeGroup.nodes.length;
-              
-              await this.processChunk(
-                combinedChunk.node,
-                combinedChunk.code,
-                `group_${nodeGroup.nodes.length}funcs`,
-                null,
-                source,
-                rel,
-                rule,
-                staleChunkIds,
-                chunkMerkleHashes,
-                onProgress
-              );
-            }
-          }
-        }
-
-        if (staleChunkIds.size > 0) {
-          await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
-          this.indexMutated = true;
-        }
-
-        if (fileHash) {
-          this.updatedMerkle[rel] = {
-            shaFile: fileHash,
-            chunkShas: chunkMerkleHashes
-          };
-          this.merkleDirty = true;
-        }
-      } catch (error) {
-        this.errors.push({ type: 'processing_error', file: rel, error: (error as Error).message });
-
-        // Fallback logic
         try {
-           if (!fs.existsSync(abs)) {
+          const source = await fs.promises.readFile(abs, 'utf8');
+          fileHash = await computeFastHash(source);
+
+          const previousMerkle = this.merkle[rel];
+          if (previousMerkle && previousMerkle.shaFile === fileHash) {
             continue;
           }
 
-          const source = await fs.promises.readFile(abs, 'utf8');
-          const fallbackSymbol = path.basename(rel) || rel;
-          const sha = crypto.createHash('sha1').update(source).digest('hex');
-          const chunkId = `${rel}:fallback:${sha.substring(0, 8)}`;
-          const chunkMerkleHash = await computeFastHash(source);
-          const fallbackMetadata = { tags: [], intent: null, description: null };
-          const contextInfo = {
-            nodeType: 'file',
-            startLine: 1,
-            endLine: source.split('\n').length,
-            codeLength: source.length,
-            hasDocumentation: false,
-            variableCount: 0
-          };
-
-          await this.embedAndStore({
-            code: source,
-            enhancedEmbeddingText: source,
-            chunkId,
-            sha,
-            lang: rule.lang,
-            rel,
-            symbol: fallbackSymbol,
-            chunkType: 'file',
-            codevaultMetadata: fallbackMetadata,
-            importantVariables: [],
-            docComments: null,
-            contextInfo,
-            symbolData: {
-              signature: `${fallbackSymbol}()`,
-              parameters: [],
-              returnType: null,
-              calls: []
+          let tree;
+          try {
+            parser.setLanguage(rule.ts);
+            
+            if (source.length > SIZE_THRESHOLD) {
+              tree = parser.parse((index: number) => {
+                if (index < source.length) {
+                  return source.slice(index, Math.min(index + CHUNK_SIZE, source.length));
+                }
+                return null;
+              });
+            } else {
+              tree = parser.parse(source);
             }
-          });
-
-          this.processedChunks++;
-          this.indexMutated = true;
-
-          if (onProgress) {
-            onProgress({ type: 'chunk_processed', file: rel, symbol: fallbackSymbol, chunkId });
+            
+            if (!tree || !tree.rootNode) {
+              throw new Error('Failed to create syntax tree');
+            }
+          } catch (parseError) {
+            throw parseError;
           }
 
-          staleChunkIds.delete(chunkId);
+          const collectedNodes: TreeSitterNode[] = [];
+          const collectNodes = (node: TreeSitterNode) => {
+             if (node.type === 'export_statement') {
+              let hasDeclaration = false;
+              for (let i = 0; i < node.childCount; i++) {
+                const child = node.child(i);
+                if (child && ['function_declaration', 'class_declaration', 'method_definition'].includes(child.type)) {
+                  hasDeclaration = true;
+                  break;
+                }
+              }
+              
+              if (!hasDeclaration && rule.nodeTypes.includes(node.type)) {
+                collectedNodes.push(node);
+                return;
+              }
+              
+              if (hasDeclaration) {
+                for (let i = 0; i < node.childCount; i++) {
+                  const child = node.child(i);
+                  if (child) {
+                    collectNodes(child);
+                  }
+                }
+                return;
+              }
+            }
+            
+            if (rule.nodeTypes.includes(node.type)) {
+              collectedNodes.push(node);
+            }
+            for (let i = 0; i < node.childCount; i++) {
+              const child = node.child(i);
+              if (child) {
+                collectNodes(child);
+              }
+            }
+          };
+          
+          collectNodes(tree.rootNode);
+          
+          const nodeGroups = await groupNodesForChunking(
+            collectedNodes,
+            source,
+            modelProfile,
+            rule
+          );
+          
+          this.processedNodes = new Set<number>();
+
+          for (const nodeGroup of nodeGroups) {
+             if (nodeGroup.nodes.length === 1) {
+              await this.yieldChunk(nodeGroup.nodes[0], source, rule, limits, modelProfile, rel, staleChunkIds, chunkMerkleHashes, onProgress);
+            } else {
+              const combinedChunk = createCombinedChunk(nodeGroup, source);
+              if (combinedChunk) {
+                this.chunkingStats.totalNodes += nodeGroup.nodes.length;
+                this.chunkingStats.fileGrouped = (this.chunkingStats.fileGrouped || 0) + 1;
+                this.chunkingStats.functionsGrouped = (this.chunkingStats.functionsGrouped || 0) + nodeGroup.nodes.length;
+                
+                await this.processChunk(
+                  combinedChunk.node,
+                  combinedChunk.code,
+                  `group_${nodeGroup.nodes.length}funcs`,
+                  null,
+                  source,
+                  rel,
+                  rule,
+                  staleChunkIds,
+                  chunkMerkleHashes,
+                  onProgress
+                );
+              }
+            }
+          }
+
           if (staleChunkIds.size > 0) {
             await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
             this.indexMutated = true;
           }
 
-          chunkMerkleHashes.length = 0;
-          chunkMerkleHashes.push(chunkMerkleHash);
-          fileHash = chunkMerkleHash;
-          this.updatedMerkle[rel] = {
-            shaFile: chunkMerkleHash,
-            chunkShas: [...chunkMerkleHashes]
-          };
-          this.merkleDirty = true;
+          if (fileHash) {
+            this.updatedMerkle[rel] = {
+              shaFile: fileHash,
+              chunkShas: chunkMerkleHashes
+            };
+            this.merkleDirty = true;
+          }
+        } catch (error) {
+          this.errors.push({ type: 'processing_error', file: rel, error: (error as Error).message });
 
-        } catch (fallbackError) {
-          this.errors.push({ type: 'fallback_error', file: rel, error: (fallbackError as Error).message });
+          // Fallback logic
+          try {
+             if (!fs.existsSync(abs)) {
+              continue;
+            }
+
+            const source = await fs.promises.readFile(abs, 'utf8');
+            const fallbackSymbol = path.basename(rel) || rel;
+            const sha = crypto.createHash('sha1').update(source).digest('hex');
+            const chunkId = `${rel}:fallback:${sha.substring(0, 8)}`;
+            const chunkMerkleHash = await computeFastHash(source);
+            const fallbackMetadata = { tags: [], intent: null, description: null };
+            const contextInfo = {
+              nodeType: 'file',
+              startLine: 1,
+              endLine: source.split('\n').length,
+              codeLength: source.length,
+              hasDocumentation: false,
+              variableCount: 0
+            };
+
+            await this.embedAndStore({
+              code: source,
+              enhancedEmbeddingText: source,
+              chunkId,
+              sha,
+              lang: rule.lang,
+              rel,
+              symbol: fallbackSymbol,
+              chunkType: 'file',
+              codevaultMetadata: fallbackMetadata,
+              importantVariables: [],
+              docComments: null,
+              contextInfo,
+              symbolData: {
+                signature: `${fallbackSymbol}()`,
+                parameters: [],
+                returnType: null,
+                calls: []
+              }
+            });
+
+            this.processedChunks++;
+            this.indexMutated = true;
+
+            if (onProgress) {
+              onProgress({ type: 'chunk_processed', file: rel, symbol: fallbackSymbol, chunkId });
+            }
+
+            staleChunkIds.delete(chunkId);
+            if (staleChunkIds.size > 0) {
+              await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
+              this.indexMutated = true;
+            }
+
+            chunkMerkleHashes.length = 0;
+            chunkMerkleHashes.push(chunkMerkleHash);
+            fileHash = chunkMerkleHash;
+            this.updatedMerkle[rel] = {
+              shaFile: chunkMerkleHash,
+              chunkShas: [...chunkMerkleHashes]
+            };
+            this.merkleDirty = true;
+
+          } catch (fallbackError) {
+            this.errors.push({ type: 'fallback_error', file: rel, error: (fallbackError as Error).message });
+          }
         }
       }
-    }
 
-    for (const fileRel of deletedSet) {
-      await this.removeFileArtifacts(fileRel);
-    }
+      for (const fileRel of deletedSet) {
+        await this.removeFileArtifacts(fileRel);
+      }
 
-    if (!isPartialUpdate) {
-      const existingFilesSet = new Set(files);
-      for (const fileRel of Object.keys(this.merkle)) {
-        if (!existingFilesSet.has(fileRel)) {
-          await this.removeFileArtifacts(fileRel);
+      if (!isPartialUpdate) {
+        const existingFilesSet = new Set(files);
+        for (const fileRel of Object.keys(this.merkle)) {
+          if (!existingFilesSet.has(fileRel)) {
+            await this.removeFileArtifacts(fileRel);
+          }
         }
       }
+
+      if (onProgress) {
+        onProgress({ type: 'finalizing' });
+      }
+      
+      if (this.merkleDirty) {
+        saveMerkle(repo, this.updatedMerkle);
+      }
+
+      attachSymbolGraphToCodemap(this.codemap);
+      this.codemap = writeCodemap(codemapPath, this.codemap);
+
+      const tokenStats = getTokenCountStats();
+      
+      if (!process.env.CODEVAULT_QUIET) {
+          logger.info('Chunking Statistics', { 
+              stats: this.chunkingStats,
+              processedChunks: this.processedChunks,
+              totalChunks: Object.keys(this.codemap).length
+          });
+      }
+
+      return {
+        success: true,
+        processedChunks: this.processedChunks,
+        totalChunks: Object.keys(this.codemap).length,
+        provider: this.embeddingProvider.getName(),
+        errors: this.errors,
+        chunkingStats: this.chunkingStats,
+        tokenStats: modelProfile.useTokens ? tokenStats : undefined
+      };
+    } finally {
+      // Ensure resources are cleaned up even on errors
+      try {
+        await this.batchProcessor?.flush();
+      } catch (error) {
+        this.errors.push({ type: 'finalize_error', error: (error as Error).message });
+      }
+
+      try {
+        if (this.db) {
+          this.db.close();
+          this.db = null;
+        }
+      } catch (error) {
+        this.errors.push({ type: 'db_close_error', error: (error as Error).message });
+      }
     }
-
-    if (onProgress) {
-      onProgress({ type: 'finalizing' });
-    }
-    
-    await this.batchProcessor.flush();
-    
-    if (this.merkleDirty) {
-      saveMerkle(repo, this.updatedMerkle);
-    }
-
-    this.db.close();
-
-    attachSymbolGraphToCodemap(this.codemap);
-    this.codemap = writeCodemap(codemapPath, this.codemap);
-
-    const tokenStats = getTokenCountStats();
-    
-    if (!process.env.CODEVAULT_QUIET) {
-        logger.info('Chunking Statistics', { 
-            stats: this.chunkingStats,
-            processedChunks: this.processedChunks,
-            totalChunks: Object.keys(this.codemap).length
-        });
-    }
-
-    return {
-      success: true,
-      processedChunks: this.processedChunks,
-      totalChunks: Object.keys(this.codemap).length,
-      provider: this.embeddingProvider.getName(),
-      errors: this.errors,
-      chunkingStats: this.chunkingStats,
-      tokenStats: modelProfile.useTokens ? tokenStats : undefined
-    };
   }
 
   private async yieldChunk(

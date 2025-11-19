@@ -18,9 +18,15 @@ export class SimpleLRU<K, V> {
   }
 
   set(key: K, value: V): void {
-    const firstKey = this.map.keys().next().value;
-    if (firstKey !== undefined) {
-      this.map.delete(firstKey);
+    // Refresh recency for existing keys
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.max) {
+      // Evict only when at capacity
+      const firstKey = this.map.keys().next().value;
+      if (firstKey !== undefined) {
+        this.map.delete(firstKey);
+      }
     }
     this.map.set(key, value);
   }

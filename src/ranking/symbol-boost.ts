@@ -214,8 +214,8 @@ export function applySymbolBoost(results: SearchResult[], { query, codemap }: { 
 
     if (boost > 0) {
       const cappedBoost = Math.min(boost, MAX_SYMBOL_BOOST);
-      const baseScore = typeof result.score === 'number' ? result.score : 0;
-      result.score = baseScore + cappedBoost;
+      const baseScore = Math.min(Math.max(typeof result.score === 'number' ? result.score : 0, 0), 1);
+      result.score = Math.min(1, baseScore + cappedBoost);
       result.symbolBoost = cappedBoost;
       result.symbolBoostSources = sources;
     }
