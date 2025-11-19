@@ -176,13 +176,6 @@ export class IndexerEngine {
             rule
           );
 
-          const existingChunks = new Map(
-            Object.entries(this.codemap)
-              .filter(([, metadata]) => metadata && metadata.file === rel) as [string, any][]
-          );
-          const staleChunkIds = new Set(existingChunks.keys());
-          const chunkMerkleHashes: string[] = [];
-
           await chunkPipeline.processGroups(
             nodeGroups,
             source,
