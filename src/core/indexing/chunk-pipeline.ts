@@ -1,9 +1,9 @@
-import Parser from 'tree-sitter';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
+import Parser from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
-import { groupNodesForChunking, createCombinedChunk } from '../../chunking/file-grouper.js';
+import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
 import { extractSymbolMetadata } from '../../symbols/extract.js';
 import { extractSymbolName } from '../symbol-extractor.js';
 import {
@@ -27,6 +27,11 @@ type SizeLimits = {
   unit: string;
 };
 
+export interface OversizedChunk {
+  code: string;
+  part: number;
+}
+
 interface ExistingChunks {
   staleChunkIds: Set<string>;
   existingChunks: Map<string, any>;
@@ -48,35 +53,26 @@ interface EmbedStoreParams {
   symbolData: any;
 }
 
-export class ChunkPipeline {
+/**
+ * Collects candidate AST nodes for chunking using a reusable parser instance.
+ */
+export class ASTTraverser {
   private parser: Parser;
-  private processedNodes = new Set<number>();
 
-  constructor() {
-    this.parser = new Parser();
+  constructor(parser?: Parser) {
+    this.parser = parser ?? new Parser();
   }
 
-  async collectNodesForFile(source: string, rule: LanguageRule) {
+  collectNodesForFile(source: string, rule: LanguageRule): TreeSitterNode[] {
     this.parser.setLanguage(rule.ts);
-    let tree;
-    if (source.length > SIZE_THRESHOLD) {
-      tree = this.parser.parse((index: number) => {
-        if (index < source.length) {
-          return source.slice(index, Math.min(index + CHUNK_SIZE, source.length));
-        }
-        return null;
-      });
-    } else {
-      tree = this.parser.parse(source);
-    }
-
-    if (!tree || !tree.rootNode) {
+    const tree = this.buildTree(source);
+    if (!tree?.rootNode) {
       throw new Error('Failed to create syntax tree');
     }
 
     const collectedNodes: TreeSitterNode[] = [];
     const collectNodes = (node: TreeSitterNode) => {
-       if (node.type === 'export_statement') {
+      if (node.type === 'export_statement') {
         let hasDeclaration = false;
         for (let i = 0; i < node.childCount; i++) {
           const child = node.child(i);
@@ -85,12 +81,12 @@ export class ChunkPipeline {
             break;
           }
         }
-        
+
         if (!hasDeclaration && rule.nodeTypes.includes(node.type)) {
           collectedNodes.push(node);
           return;
         }
-        
+
         if (hasDeclaration) {
           for (let i = 0; i < node.childCount; i++) {
             const child = node.child(i);
@@ -101,7 +97,7 @@ export class ChunkPipeline {
           return;
         }
       }
-      
+
       if (rule.nodeTypes.includes(node.type)) {
         collectedNodes.push(node);
       }
@@ -112,13 +108,85 @@ export class ChunkPipeline {
         }
       }
     };
-    
+
     collectNodes(tree.rootNode);
     return collectedNodes;
   }
 
+  private buildTree(source: string) {
+    if (source.length > SIZE_THRESHOLD) {
+      return this.parser.parse((index: number) => {
+        if (index < source.length) {
+          return source.slice(index, Math.min(index + CHUNK_SIZE, source.length));
+        }
+        return null;
+      });
+    }
+    return this.parser.parse(source);
+  }
+}
+
+export interface OverlapStrategy {
+  split(node: TreeSitterNode, source: string, limits: SizeLimits, profile: ModelProfile): Promise<OversizedChunk[]>;
+}
+
+/**
+ * Default overlap strategy that falls back to statement-level chunking with 20% overlap.
+ */
+export class StatementOverlapStrategy implements OverlapStrategy {
+  async split(
+    node: TreeSitterNode,
+    source: string,
+    limits: SizeLimits,
+    profile: ModelProfile
+  ): Promise<OversizedChunk[]> {
+    const statementChunks = await yieldStatementChunks(node, source, limits.max, limits.overlap, profile);
+    return statementChunks.map((chunk, index) => ({
+      code: chunk.code,
+      part: index + 1
+    }));
+  }
+}
+
+export class ChunkGrouper {
+  async groupNodes(
+    nodes: TreeSitterNode[],
+    source: string,
+    profile: ModelProfile,
+    rule: LanguageRule
+  ): Promise<NodeGroup[]> {
+    return groupNodesForChunking(nodes, source, profile, rule);
+  }
+}
+
+export interface ChunkPipelineDependencies {
+  traverser?: ASTTraverser;
+  chunkGrouper?: ChunkGrouper;
+  overlapStrategy?: OverlapStrategy;
+}
+
+export class ChunkPipeline {
+  private processedNodes = new Set<number>();
+  private traverser: ASTTraverser;
+  private chunkGrouper: ChunkGrouper;
+  private overlapStrategy: OverlapStrategy;
+
+  constructor(deps: ChunkPipelineDependencies = {}) {
+    this.traverser = deps.traverser ?? new ASTTraverser();
+    this.chunkGrouper = deps.chunkGrouper ?? new ChunkGrouper();
+    this.overlapStrategy = deps.overlapStrategy ?? new StatementOverlapStrategy();
+  }
+
+  async collectNodesForFile(source: string, rule: LanguageRule) {
+    return this.traverser.collectNodesForFile(source, rule);
+  }
+
+  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule) {
+    return this.chunkGrouper.groupNodes(nodes, source, profile, rule);
+  }
+
   async processGroups(
-    nodeGroups: any[],
+    nodeGroups: NodeGroup[],
     source: string,
     rule: LanguageRule,
     limits: SizeLimits,
@@ -242,17 +310,28 @@ export class ChunkPipeline {
       return;
     } else if (analysis.size > limits.max) {
       chunkingStats.statementFallback++;
-      const statementChunks = await yieldStatementChunks(
-        node, 
-        source, 
-        limits.max, 
-        limits.overlap, 
+      const oversizedChunks = await this.overlapStrategy.split(
+        node,
+        source,
+        limits,
         modelProfile
       );
       
-      for (let i = 0; i < statementChunks.length; i++) {
-        const stmtChunk = statementChunks[i];
-        await this.processChunk(node, stmtChunk.code, `${i + 1}`, parentNode, source, rel, rule, existing, chunkMerkleHashes, onProgress, embedAndStore, chunkingStats);
+      for (const stmtChunk of oversizedChunks) {
+        await this.processChunk(
+          node,
+          stmtChunk.code,
+          `${stmtChunk.part}`,
+          parentNode,
+          source,
+          rel,
+          rule,
+          existing,
+          chunkMerkleHashes,
+          onProgress,
+          embedAndStore,
+          chunkingStats
+        );
       }
       return;
     }
