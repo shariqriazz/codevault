@@ -80,7 +80,7 @@ export class CandidateRetriever {
         } catch (error) {
           logger.warn('Failed to parse codevault_tags for chunk', {
             chunkId: chunk.id,
-            error
+            error: error instanceof Error ? error.message : String(error)
           });
         }
       }

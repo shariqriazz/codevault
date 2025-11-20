@@ -153,30 +153,25 @@ export class BatchEmbeddingProcessor {
     log.debug(`Batch complete (${texts.length} embeddings generated)`);
 
     // Store all embeddings in database within a transaction
-    await this.db.transaction(() => {
-      for (let i = 0; i < batch.length; i++) {
-        const chunk = batch[i];
-        const embedding = embeddings[i];
-
-        this.db.insertChunk({
-          id: chunk.chunkId,
-          file_path: chunk.params.rel,
-          symbol: chunk.params.symbol,
-          sha: chunk.params.sha,
-          lang: chunk.params.lang,
-          chunk_type: chunk.params.chunkType,
-          embedding,
-          embedding_provider: this.embeddingProvider.getName(),
-          embedding_dimensions: this.embeddingProvider.getDimensions(),
-          codevault_tags: chunk.params.codevaultMetadata.tags,
-          codevault_intent: chunk.params.codevaultMetadata.intent,
-          codevault_description: chunk.params.codevaultMetadata.description,
-          doc_comments: chunk.params.docComments,
-          variables_used: chunk.params.importantVariables,
-          context_info: chunk.params.contextInfo
-        });
-      }
-    });
+    this.db.insertChunks(
+      batch.map((chunk, i) => ({
+        id: chunk.chunkId,
+        file_path: chunk.params.rel,
+        symbol: chunk.params.symbol,
+        sha: chunk.params.sha,
+        lang: chunk.params.lang,
+        chunk_type: chunk.params.chunkType,
+        embedding: embeddings[i],
+        embedding_provider: this.embeddingProvider.getName(),
+        embedding_dimensions: this.embeddingProvider.getDimensions(),
+        codevault_tags: chunk.params.codevaultMetadata.tags,
+        codevault_intent: chunk.params.codevaultMetadata.intent,
+        codevault_description: chunk.params.codevaultMetadata.description,
+        doc_comments: chunk.params.docComments,
+        variables_used: chunk.params.importantVariables,
+        context_info: chunk.params.contextInfo
+      }))
+    );
   }
 
   /**

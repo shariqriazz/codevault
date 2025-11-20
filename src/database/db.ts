@@ -85,11 +85,30 @@ export interface DatabaseChunk {
   updated_at?: string;
 }
 
+export interface InsertChunkParams {
+  id: string;
+  file_path: string;
+  symbol: string;
+  sha: string;
+  lang: string;
+  chunk_type: string;
+  embedding: ArrayLike<number>;
+  embedding_provider: string;
+  embedding_dimensions: number;
+  codevault_tags: string[];
+  codevault_intent: string | null;
+  codevault_description: string | null;
+  doc_comments: string | null;
+  variables_used: string[];
+  context_info: Record<string, unknown>;
+}
+
 export class CodeVaultDatabase {
   private db: Database.Database;
   private insertChunkStmt!: Database.Statement;
   private getChunksStmt!: Database.Statement;
   private deleteChunksStmt: Database.Statement | null = null;
+  private insertManyStmt: ((chunks: InsertChunkParams[]) => void) | null = null;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -248,23 +267,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  insertChunk(params: {
-    id: string;
-    file_path: string;
-    symbol: string;
-    sha: string;
-    lang: string;
-    chunk_type: string;
-    embedding: ArrayLike<number>;
-    embedding_provider: string;
-    embedding_dimensions: number;
-    codevault_tags: string[];
-    codevault_intent: string | null;
-    codevault_description: string | null;
-    doc_comments: string | null;
-    variables_used: string[];
-    context_info: Record<string, unknown>;
-  }): void {
+  insertChunk(params: InsertChunkParams): void {
     try {
       this.insertChunkStmt.run(
         params.id,
@@ -285,6 +288,45 @@ export class CodeVaultDatabase {
       );
     } catch (error) {
       log.error('Failed to insert chunk', error, { chunkId: params.id });
+      throw error;
+    }
+  }
+
+  insertChunks(chunks: InsertChunkParams[]): void {
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return;
+    }
+
+    if (!this.insertManyStmt) {
+      const insertMany = this.db.transaction((batch: typeof chunks) => {
+        for (const chunk of batch) {
+          this.insertChunkStmt.run(
+            chunk.id,
+            chunk.file_path,
+            chunk.symbol,
+            chunk.sha,
+            chunk.lang,
+            chunk.chunk_type,
+            encodeEmbedding(chunk.embedding),
+            chunk.embedding_provider,
+            chunk.embedding_dimensions,
+            JSON.stringify(chunk.codevault_tags),
+            chunk.codevault_intent,
+            chunk.codevault_description,
+            chunk.doc_comments,
+            JSON.stringify(chunk.variables_used),
+            JSON.stringify(chunk.context_info)
+          );
+        }
+      });
+
+      this.insertManyStmt = insertMany;
+    }
+
+    try {
+      this.insertManyStmt(chunks);
+    } catch (error) {
+      log.error('Failed to insert chunk batch', error, { count: chunks.length });
       throw error;
     }
   }
@@ -449,29 +491,13 @@ export class CodeVaultDatabase {
    * Note: better-sqlite3 transactions MUST be synchronous
    * If you need async operations, use beginTransaction/commit/rollback manually
    */
-  async transaction<T>(fn: () => Promise<T> | T): Promise<T> {
-    try {
-      // Start transaction
-      this.db.prepare('BEGIN TRANSACTION').run();
-
-      // Execute function (can be async)
-      const result = await fn();
-
-      // Commit if successful
-      this.db.prepare('COMMIT').run();
-
-      return result;
-    } catch (error) {
-      // Rollback on error
-      try {
-        this.db.prepare('ROLLBACK').run();
-      } catch (rollbackError) {
-        log.error('Failed to rollback transaction', rollbackError);
-      }
-
-      log.error('Transaction failed and was rolled back', error);
-      throw error;
-    }
+  /**
+   * Execute a synchronous function within a database transaction.
+   * better-sqlite3 transactions must be synchronous; do async work before/after.
+   */
+  transaction<T>(fn: () => T): T {
+    const run = this.db.transaction(fn);
+    return run();
   }
 
   /**

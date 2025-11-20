@@ -20,7 +20,10 @@ export function readGlobalConfig(): CodevaultConfig | null {
     const content = fs.readFileSync(GLOBAL_CONFIG_FILE, 'utf8');
     return JSON.parse(content);
   } catch (error) {
-    log.warn('Failed to read global config', { error, path: GLOBAL_CONFIG_FILE });
+    log.warn('Failed to read global config', {
+      error: error instanceof Error ? error.message : String(error),
+      path: GLOBAL_CONFIG_FILE
+    });
     return null;
   }
 }
@@ -39,7 +42,11 @@ export function readProjectConfig(basePath = '.'): CodevaultConfig | null {
     return JSON.parse(content);
   } catch (error) {
     const configPath = path.join(path.resolve(basePath), PROJECT_CONFIG_FILE);
-    log.warn('Failed to read project config', { error, path: configPath, basePath });
+    log.warn('Failed to read project config', {
+      error: error instanceof Error ? error.message : String(error),
+      path: configPath,
+      basePath
+    });
     return null;
   }
 }
