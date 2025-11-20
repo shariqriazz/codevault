@@ -1,23 +1,25 @@
 import crypto from 'crypto';
-import path from 'path';
-import fs from 'fs';
 import Parser from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
-import { extractSymbolMetadata } from '../../symbols/extract.js';
+import { extractSymbolMetadata, type SymbolMetadata } from '../../symbols/extract.js';
 import { extractSymbolName } from '../symbol-extractor.js';
 import {
   extractCodevaultMetadata,
   extractSemanticTags,
   extractImportantVariables,
   extractDocComments,
-  generateEnhancedEmbeddingText
+  generateEnhancedEmbeddingText,
+  type CodevaultMetadata
 } from '../metadata.js';
+import type { ImportantVariable } from '../metadata.js';
 import { computeFastHash } from '../../indexer/merkle.js';
 import { SIZE_THRESHOLD, CHUNK_SIZE } from '../../config/constants.js';
 import type { TreeSitterNode } from '../../types/ast.js';
 import type { LanguageRule } from '../../languages/rules.js';
 import type { ModelProfile } from '../../providers/base.js';
+import type { CodemapChunk } from '../../types/codemap.js';
+import type { ChunkingStats, ProgressEvent } from '../types.js';
 
 type SizeLimits = {
   optimal: number;
@@ -34,8 +36,27 @@ export interface OversizedChunk {
 
 interface ExistingChunks {
   staleChunkIds: Set<string>;
-  existingChunks: Map<string, any>;
+  existingChunks: Map<string, CodemapChunk>;
 }
+
+interface ContextInfo {
+  nodeType: string;
+  startLine: number;
+  endLine: number;
+  codeLength: number;
+  hasDocumentation: boolean;
+  variableCount: number;
+  isSubdivision: boolean;
+  hasParentContext: boolean;
+}
+
+interface SmallChunk {
+  node: TreeSitterNode;
+  code: string;
+  size: number;
+}
+
+type OnProgressCallback = ((event: ProgressEvent) => void) | null;
 
 interface EmbedStoreParams {
   code: string;
@@ -46,11 +67,11 @@ interface EmbedStoreParams {
   rel: string;
   symbol: string;
   chunkType: string;
-  codevaultMetadata: any;
-  importantVariables: any[];
+  codevaultMetadata: CodevaultMetadata;
+  importantVariables: ImportantVariable[];
   docComments: string | null;
-  contextInfo: any;
-  symbolData: any;
+  contextInfo: ContextInfo;
+  symbolData: SymbolMetadata;
 }
 
 /**
@@ -177,11 +198,11 @@ export class ChunkPipeline {
     this.overlapStrategy = deps.overlapStrategy ?? new StatementOverlapStrategy();
   }
 
-  async collectNodesForFile(source: string, rule: LanguageRule) {
+  async collectNodesForFile(source: string, rule: LanguageRule): Promise<TreeSitterNode[]> {
     return this.traverser.collectNodesForFile(source, rule);
   }
 
-  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule) {
+  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule): Promise<NodeGroup[]> {
     return this.chunkGrouper.groupNodes(nodes, source, profile, rule);
   }
 
@@ -194,9 +215,9 @@ export class ChunkPipeline {
     rel: string,
     existing: ExistingChunks,
     chunkMerkleHashes: string[],
-    onProgress: any,
+    onProgress: OnProgressCallback,
     embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-    chunkingStats: any
+    chunkingStats: ChunkingStats
   ): Promise<void> {
     this.processedNodes = new Set<number>();
 
@@ -230,17 +251,17 @@ export class ChunkPipeline {
   }
 
   private async yieldChunk(
-      node: TreeSitterNode, 
-      source: string, 
-      rule: LanguageRule, 
-      limits: SizeLimits, 
-      modelProfile: ModelProfile, 
+      node: TreeSitterNode,
+      source: string,
+      rule: LanguageRule,
+      limits: SizeLimits,
+      modelProfile: ModelProfile,
       rel: string,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: OnProgressCallback,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any,
+      chunkingStats: ChunkingStats,
       parentNode: TreeSitterNode | null = null
   ): Promise<void> {
     chunkingStats.totalNodes++;
@@ -263,12 +284,12 @@ export class ChunkPipeline {
         true
       );
       
-      const smallChunks: any[] = [];
-      
+      const smallChunks: SmallChunk[] = [];
+
       for (let i = 0; i < subAnalyses.length; i++) {
         const subAnalysis = subAnalyses[i];
         const subNode = subAnalysis.node;
-        
+
         if (subAnalysis.size < limits.min) {
           const subCode = source.slice(subNode.startIndex, subNode.endIndex);
           smallChunks.push({
@@ -286,12 +307,12 @@ export class ChunkPipeline {
           await this.yieldChunk(subNode, source, rule, limits, modelProfile, rel, existing, chunkMerkleHashes, onProgress, embedAndStore, chunkingStats, node);
         }
       }
-      
+
       if (smallChunks.length > 0) {
-        const totalSmallSize = smallChunks.reduce((sum: number, c: any) => sum + c.size, 0);
-        
+        const totalSmallSize = smallChunks.reduce((sum: number, c: SmallChunk) => sum + c.size, 0);
+
         if (totalSmallSize >= limits.min || smallChunks.length >= 3) {
-          const mergedCode = smallChunks.map((c: any) => c.code).join('\n\n');
+          const mergedCode = smallChunks.map((c: SmallChunk) => c.code).join('\n\n');
           const mergedNode: TreeSitterNode = {
             ...node,
             type: `${node.type}_merged`,
@@ -342,18 +363,18 @@ export class ChunkPipeline {
   }
 
   private async processChunk(
-      node: TreeSitterNode, 
-      code: string, 
-      suffix: string | null, 
+      node: TreeSitterNode,
+      code: string,
+      suffix: string | null,
       parentNode: TreeSitterNode | null,
       source: string,
       rel: string,
       rule: LanguageRule,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: OnProgressCallback,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any
+      chunkingStats: ChunkingStats
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
     if (!symbol) return;

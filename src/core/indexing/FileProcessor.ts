@@ -10,6 +10,7 @@ import type { IndexProjectOptions } from '../types.js';
 import type { CodemapChunk } from '../../types/codemap.js';
 import {normalizeChunkMetadata} from '../../types/codemap.js';
 import {writeChunkToDisk, removeChunkArtifacts} from '../../storage/encrypted-chunks.js';
+import type { ImportantVariable } from '../metadata.js';
 
 /**
  * FileProcessor handles the processing of individual files:
@@ -138,7 +139,9 @@ export class FileProcessor {
         endLine: source.split('\n').length,
         codeLength: source.length,
         hasDocumentation: false,
-        variableCount: 0
+        variableCount: 0,
+        isSubdivision: false,
+        hasParentContext: false
       };
 
       await this.embedAndStore({
@@ -158,7 +161,8 @@ export class FileProcessor {
           signature: `${fallbackSymbol}()`,
           parameters: [],
           returnType: null,
-          calls: []
+          calls: [],
+          keywords: []
         }
       });
 
@@ -209,7 +213,7 @@ export class FileProcessor {
       intent: string | null;
       description: string | null;
     };
-    importantVariables: string[];
+    importantVariables: ImportantVariable[];
     docComments: string | null;
     contextInfo: {
       nodeType: string;
@@ -218,12 +222,15 @@ export class FileProcessor {
       codeLength: number;
       hasDocumentation: boolean;
       variableCount: number;
+      isSubdivision?: boolean;
+      hasParentContext?: boolean;
     };
     symbolData: {
       signature: string;
       parameters: string[];
       returnType: string | null;
       calls: string[];
+      keywords?: string[];
     };
   }): Promise<void> {
     try {

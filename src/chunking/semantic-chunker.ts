@@ -2,11 +2,7 @@ import { analyzeCodeSize, batchAnalyzeCodeSize, type CodeSizeAnalysis } from './
 import type { ModelProfile } from '../providers/base.js';
 import { getSizeLimits } from '../providers/base.js';
 import type { TreeSitterNode } from '../types/ast.js';
-
-interface LanguageRule {
-  subdivisionTypes?: Record<string, string[]>;
-  [key: string]: any;
-}
+import type { LanguageRule } from '../languages/rules.js';
 
 export function findSemanticSubdivisions(node: TreeSitterNode, rule: LanguageRule): TreeSitterNode[] {
   if (!node || !rule) return [];

@@ -100,7 +100,7 @@ export function extractSemanticTags(filePath: string, symbolName: string | null,
   return Array.from(tags).slice(0, 10);
 }
 
-interface ImportantVariable {
+export interface ImportantVariable {
   type: string;
   name: string;
   value: string;
