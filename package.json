@@ -27,7 +27,13 @@
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "mcp": "node dist/mcp-server.js",
-    "test": "npm run build && node --test \"dist/tests/**/*.js\""
+    "test": "npm run build && node --test \"dist/tests/**/*.js\"",
+    "lint": "eslint 'src/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' --fix",
+    "format": "prettier --write 'src/**/*.{ts,js,json,md}'",
+    "format:check": "prettier --check 'src/**/*.{ts,js,json,md}'",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run typecheck && npm run lint && npm run format:check"
   },
   "keywords": [
     "mcp",
@@ -49,7 +55,7 @@
     "@modelcontextprotocol/sdk": "^1.20.2",
     "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
     "@tree-sitter-grammars/tree-sitter-markdown": "^0.3.2",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.4.1",
     "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
     "cli-progress": "^3.12.0",
@@ -57,7 +63,7 @@
     "dotenv": "^17.2.3",
     "fast-glob": "^3.3.3",
     "micromatch": "^4.0.8",
-    "openai": "^6.7.0",
+    "openai": "^6.9.1",
     "ora": "^9.0.0",
     "tiktoken": "^1.0.22",
     "tree-sitter": "^0.25.0",

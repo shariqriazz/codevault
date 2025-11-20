@@ -472,7 +472,8 @@ export class IndexerEngine {
         }
       }
     } catch (error) {
-      // Ignore migration check errors
+      // Log migration check errors for debugging but don't fail the operation
+      logger.debug('Migration check encountered an error (continuing)', { error: error instanceof Error ? error.message : String(error) });
     } finally {
       db.close();
     }

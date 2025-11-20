@@ -23,6 +23,12 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 - **⏱️ Rate Limiting**: Intelligent request/token throttling with automatic retry
 - **💾 Memory Efficient**: LRU caches with automatic cleanup for long-running processes
 
+## 📋 Prerequisites
+
+- **Node.js**: Version 18.0.0 or higher
+- **npm**: Comes with Node.js
+- **API Key**: OpenAI API key or compatible endpoint (Ollama for local models)
+
 ## 🚀 Quick Start
 
 ### Installation

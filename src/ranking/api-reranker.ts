@@ -1,3 +1,5 @@
+import { SEARCH_CONSTANTS, BATCH_CONSTANTS } from '../config/constants.js';
+
 function getAPIUrl(): string {
   return process.env.CODEVAULT_RERANK_API_URL || '';
 }
@@ -11,13 +13,13 @@ function getModel(): string {
 }
 
 function getMaxFromEnv(): number {
-  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX || '50', 10);
-  return Number.isFinite(envMax) && envMax > 0 ? envMax : 50;
+  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX || String(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES), 10);
+  return Number.isFinite(envMax) && envMax > 0 ? envMax : SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES;
 }
 
 function getMaxTokensFromEnv(): number {
-  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX_TOKENS || '8192', 10);
-  return Number.isFinite(envMax) && envMax > 0 ? envMax : 8192;
+  const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX_TOKENS || String(BATCH_CONSTANTS.MAX_ITEM_TOKENS), 10);
+  return Number.isFinite(envMax) && envMax > 0 ? envMax : BATCH_CONSTANTS.MAX_ITEM_TOKENS;
 }
 
 function truncateText(text: string, maxTokens: number): string {
@@ -193,7 +195,10 @@ export async function rerankWithAPI(query: string, candidates: Candidate[], opti
     return [...rerankedTop, ...remainder];
 
   } catch (error) {
-    console.error('API reranking failed:', (error as Error).message);
+    // Log the failure but gracefully fallback to original ranking
+    if (typeof console.error === 'function') {
+      console.error('API reranking failed, falling back to original ranking:', (error as Error).message);
+    }
     return candidates;
   }
 }

@@ -112,7 +112,8 @@ export class SearchService {
         try {
           applySymbolBoost(vectorPool, { query: normalizedQuery, codemap: codemapData });
         } catch (error) {
-          // Silent fail
+          // Log symbol boost failure but continue without it (degraded functionality is acceptable)
+          logger.warn('Symbol boost failed, continuing without boost', { error: error instanceof Error ? error.message : String(error) });
         }
       }
 
@@ -470,7 +471,8 @@ export class SearchService {
         return reranked as SearchCandidate[];
       }
     } catch (error) {
-      // Silent fallback
+      // Log reranking failure but fallback to original results gracefully
+      logger.warn('API reranking failed, falling back to original ranking', { error: error instanceof Error ? error.message : String(error) });
     }
     return vectorResults;
   }
