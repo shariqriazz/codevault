@@ -38,7 +38,6 @@ Thumbs.db
 .roo/
 
 *.tsbuildinfo
-package-lock.json
 
 coverage/
 
