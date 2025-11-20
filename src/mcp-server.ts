@@ -105,6 +105,12 @@ const __dirname = path.dirname(__filename);
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
+/**
+ * Minimal MCP server exposing CodeVault tools over stdio for AI assistants.
+ *
+ * Registers the search/index/update/context MCP tools, validates inputs with Zod,
+ * and returns structured errors suitable for clients.
+ */
 export class McpServer {
   private server: Server;
   private sessionContextPack: any = null;

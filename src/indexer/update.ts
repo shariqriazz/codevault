@@ -39,6 +39,17 @@ export interface UpdateIndexResult {
   errors: IndexError[];
 }
 
+/**
+ * Incrementally update the index for a repository by processing changed/deleted files.
+ *
+ * @param repoPath - Project root containing `.codevault` artifacts
+ * @param provider - Embedding provider name ('auto' uses config/defaults)
+ * @param changedFiles - Relative paths to re-index; if empty and no deletes, returns early
+ * @param deletedFiles - Relative paths whose artifacts should be removed
+ * @param onProgress - Optional progress callback for UI/CLI integrations
+ * @param embeddingProvider - Optional initialized provider instance (reuses watch provider)
+ * @param encrypt - Optional encryption mode override ('on' | 'off')
+ */
 export async function updateIndex({
   repoPath = '.',
   provider = 'auto',

@@ -7,6 +7,12 @@ export * from './base.js';
 export * from './openai.js';
 export * from './mock.js';
 
+/**
+ * Factory for embedding providers. Defaults to OpenAI, with a mock provider for testing.
+ *
+ * @param providerName - Provider id ('auto'|'openai'|'mock'|'test')
+ * @param options - Provider configuration (API key, base URL, dimensions, rate limits)
+ */
 export function createEmbeddingProvider(providerName = 'auto', options: EmbeddingOptions = {}): EmbeddingProvider {
   switch (providerName.toLowerCase()) {
     case 'mock':
