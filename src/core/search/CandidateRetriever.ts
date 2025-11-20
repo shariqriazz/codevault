@@ -48,14 +48,14 @@ export class CandidateRetriever {
     const results: SearchCandidate[] = [];
 
     // Generate query embedding
-    let queryEmbedding: number[] | null = null;
+    let queryEmbedding: ArrayLike<number> | null = null;
     if (chunks.length > 0) {
       queryEmbedding = await provider.generateEmbedding(query);
     }
 
     // Score each chunk
     for (const chunk of chunks) {
-      const embedding = JSON.parse(chunk.embedding.toString());
+      const embedding = this.decodeEmbedding(chunk);
       const vectorSimilarity = queryEmbedding
         ? this.cosineSimilarity(queryEmbedding, embedding)
         : 0;
@@ -129,7 +129,7 @@ export class CandidateRetriever {
   /**
    * Cosine similarity between two vectors
    */
-  private cosineSimilarity(a: number[], b: number[]): number {
+  private cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): number {
     if (a.length !== b.length) return 0;
 
     let dotProduct = 0;
@@ -142,6 +142,35 @@ export class CandidateRetriever {
       normB += b[i] * b[i];
     }
 
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * Decode and cache embedding to avoid repeated JSON parsing
+   */
+  private decodeEmbedding(chunk: DatabaseChunk): Float32Array {
+    const cached = (chunk as any).__cachedEmbedding as Float32Array | undefined;
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const parsed = JSON.parse(chunk.embedding.toString());
+      const vector = new Float32Array(parsed);
+      (chunk as any).__cachedEmbedding = vector;
+      return vector;
+    } catch (error) {
+      logger.warn('Failed to parse embedding for chunk, using empty vector', {
+        chunkId: chunk.id,
+        error
+      });
+      const empty = new Float32Array();
+      (chunk as any).__cachedEmbedding = empty;
+      return empty;
+    }
   }
 }
