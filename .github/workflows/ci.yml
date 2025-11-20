@@ -61,15 +61,22 @@ jobs:
     if: >
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      needs.checks.outputs.version_changed == 'true' &&
-      secrets.NPM_TOKEN != ''
+      needs.checks.outputs.version_changed == 'true'
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
+      - name: Skip publish when NPM_TOKEN is not set
+        if: ${{ env.NPM_TOKEN == '' }}
+        run: echo "NPM_TOKEN not set; skipping npm publish."
+
       - name: Checkout repository
+        if: ${{ env.NPM_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
+        if: ${{ env.NPM_TOKEN != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -77,12 +84,15 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Install dependencies
+        if: ${{ env.NPM_TOKEN != '' }}
         run: npm ci
 
       - name: Build
+        if: ${{ env.NPM_TOKEN != '' }}
         run: npm run build
 
       - name: Publish to npm (version bump detected)
+        if: ${{ env.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
