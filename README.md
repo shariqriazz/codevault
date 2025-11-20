@@ -7,19 +7,20 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 ## 🌟 Features
 
 - **🔍 Semantic Search**: Find code by meaning, not just keywords using vector embeddings
-- **🤖 MCP Integration**: Native support for Claude Desktop and other MCP clients
+- **🤖 MCP Integration**: Native support for Claude Desktop and other MCP clients (search, synthesize, update tools)
 - **💬 LLM-Synthesized Answers**: Ask questions in natural language, get markdown responses with code citations
 - **🗣️ Interactive Chat Mode**: Have multi-turn conversations about your codebase with conversation history
 - **🎯 Symbol-Aware Ranking**: Boost results based on function signatures, parameters, and relationships
 - **⚡ Hybrid Retrieval**: Combines vector embeddings with BM25 keyword matching via Reciprocal Rank Fusion
 - **🚀 Batch Processing**: Efficient API usage with configurable batching (50 chunks/batch by default)
+- **🧪 Integration Tests**: End-to-end coverage for indexing, search, encryption, and watch flows
 - **📦 Smart Chunking**: Token-aware semantic code splitting with overlap for optimal context
 - **🔄 Context Packs**: Save and reuse search scopes for different features/modules
 - **🏠 Local-First**: Works with local models (Ollama) or cloud APIs (OpenAI, Nebius, OpenRouter)
-- **🔐 Optional Encryption**: AES-256-GCM encryption for indexed code chunks
+- **🔐 Optional Encryption**: AES-256-GCM encryption for indexed code chunks (multi-key/rotation support)
 - **⚙️ Global Configuration**: One-time setup with interactive wizard for CLI convenience
 - **📊 Multi-Language Support**: 25+ programming languages via Tree-sitter
-- **🔎 File Watching**: Real-time index updates with debounced change detection
+- **🔎 File Watching**: Real-time index updates with debounced change detection and provider reuse
 - **⏱️ Rate Limiting**: Intelligent request/token throttling with automatic retry
 - **💾 Memory Efficient**: LRU caches with automatic cleanup for long-running processes
 

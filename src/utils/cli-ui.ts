@@ -145,9 +145,15 @@ export class IndexerUI {
       console.log(chalk.gray(`   Codemap:           ${chalk.white(summary.codemapSize)}`));
     }
 
-    console.log(chalk.cyan('\n🚀 Ready to search!'));
-    console.log(chalk.gray(`   Quick search:  ${chalk.white('codevault search "your query"')}`));
-    console.log(chalk.gray(`   With code:     ${chalk.white('codevault search-with-code "your query"')}\n`));
+    console.log(chalk.cyan('\n🚀 Ready to use!'));
+    console.log(chalk.gray(`   Quick search:       ${chalk.white('codevault search "your query"')}`));
+    console.log(chalk.gray(`   With code chunks:   ${chalk.white('codevault search-with-code "your query"')}`));
+    console.log(chalk.gray(`   Ask w/ synthesis:   ${chalk.white('codevault ask "How does auth work?"')}`));
+    console.log(chalk.gray(`   Interactive chat:   ${chalk.white('codevault chat')}`));
+    console.log(chalk.gray(`   Auto-update index:  ${chalk.white('codevault watch --debounce 500')}`));
+    console.log(chalk.gray(`   Partial reindex:    ${chalk.white('codevault update --files src/app.ts')}`));
+    console.log(chalk.gray(`   MCP server:         ${chalk.white('codevault mcp (Claude Desktop, etc.)')}`));
+    console.log('');
   }
 
   showError(message: string) {

@@ -26,7 +26,23 @@ export async function handleIndexProject(args: IndexProjectArgs) {
     content: [
       {
         type: 'text',
-        text: `✅ Project indexed successfully!\n\n📊 Statistics:\n- Processed chunks: ${result.processedChunks}\n- Total chunks: ${result.totalChunks}\n- Provider: ${result.provider}\n\n🔍 Ready to search!\n- Quick search: search_code with path="${cleanPath}"\n- With code: search_code_with_chunks with path="${cleanPath}"`,
+        text: [
+          '✅ Project indexed successfully!',
+          '',
+          '📊 Statistics:',
+          `- Processed chunks: ${result.processedChunks}`,
+          `- Total chunks: ${result.totalChunks}`,
+          `- Provider: ${result.provider}`,
+          '',
+          '🔍 Ready to use:',
+          `- Quick search: search_code { query, path: "${cleanPath}" }`,
+          `- With code: search_code_with_chunks { query, path: "${cleanPath}" }`,
+          `- Get chunk by SHA: get_code_chunk { sha, path: "${cleanPath}" }`,
+          `- Refresh index: update_project { path: "${cleanPath}" }`,
+          `- Stats overview: get_project_stats { path: "${cleanPath}" }`,
+          `- Ask Q&A: ask_codebase { question, path: "${cleanPath}" }`,
+          `- Context packs: use_context_pack { name, path: "${cleanPath}" }`
+        ].join('\n')
       },
     ],
   };
