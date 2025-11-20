@@ -26,7 +26,8 @@ export function registerSearchCommand(program: Command): void {
         const limit = parseInt(String(options.limit));
 
         const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, String(options.provider || 'auto'), resolvedPath, scopeFilters);
+        const provider = typeof options.provider === 'string' ? options.provider : 'auto';
+        const results = await searchCode(query, limit, provider, resolvedPath, scopeFilters);
 
         if (!results.success) {
           console.log(chalk.yellow(`\nNo results found for "${query}"`));

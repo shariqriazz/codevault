@@ -1,4 +1,4 @@
-import type Parser from 'tree-sitter';
+import Parser from 'tree-sitter';
 import LangBash from 'tree-sitter-bash';
 import LangC from 'tree-sitter-c';
 import LangCSharp from 'tree-sitter-c-sharp';
@@ -43,6 +43,7 @@ interface LanguageModule {
  * @param preferredKey - Optional key to check first when resolving
  * @returns The resolved language module or null if not found
  */
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): Parser.Language | null {
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   if (!module) {

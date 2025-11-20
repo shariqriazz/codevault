@@ -40,7 +40,7 @@ export class FileProcessor {
 
     const existingChunks = new Map(
       Object.entries(this.state.codemap)
-        .filter(([, metadata]) => metadata && metadata.file === rel) as [string, CodemapChunk][]
+        .filter(([, metadata]) => metadata && metadata.file === rel)
     );
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
@@ -323,7 +323,7 @@ export class FileProcessor {
       .filter(([, metadata]) => metadata && metadata.file === fileRel);
 
     if (entries.length > 0) {
-      const metadataLookup = new Map(entries as [string, CodemapChunk][]);
+      const metadataLookup = new Map(entries);
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
     }

@@ -79,6 +79,9 @@ test('indexes and searches end-to-end with the mock provider', async () => {
 
   assert.equal(indexResult.success, true);
   assert.equal(indexResult.provider, 'mock');
+  if (indexResult.errors.length > 0) {
+    console.log('Indexing errors:', JSON.stringify(indexResult.errors, null, 2));
+  }
   assert.equal(indexResult.errors.length, 0);
   assert.ok(indexResult.totalChunks > 0);
 

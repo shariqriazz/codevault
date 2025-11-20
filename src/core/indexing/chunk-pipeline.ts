@@ -86,7 +86,7 @@ export class ASTTraverser {
 
   collectNodesForFile(source: string, rule: LanguageRule): TreeSitterNode[] {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    this.parser.setLanguage(rule.ts as Parser.Language);
+    this.parser.setLanguage(rule.ts);
     const tree = this.buildTree(source);
     if (!tree?.rootNode) {
       throw new Error('Failed to create syntax tree');

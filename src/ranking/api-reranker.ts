@@ -95,7 +95,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error(`Rerank API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as unknown;
+  const data = await response.json();
 
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
