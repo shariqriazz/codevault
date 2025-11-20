@@ -2,11 +2,20 @@ import fs from 'fs';
 import path from 'path';
 import { Command } from 'commander';
 import { indexProject } from '../../core/indexer.js';
+import type { IndexProjectResult } from '../../core/types.js';
 import { IndexerUI } from '../../utils/cli-ui.js';
 import { indexProjectWithProgress } from '../../utils/indexer-with-progress.js';
 import { log } from '../../utils/logger.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from '../../providers/index.js';
 import { resolveProviderContext } from '../../config/resolver.js';
+
+interface IndexCommandOptions {
+  provider: string;
+  project?: string;
+  directory?: string;
+  encrypt?: string;
+  verbose?: boolean;
+}
 
 export function registerIndexCommand(program: Command): void {
   program
@@ -17,8 +26,8 @@ export function registerIndexCommand(program: Command): void {
     .option('--directory <path>', 'alias for project directory')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--verbose', 'show verbose output')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
+    .action(async (projectPath: string = '.', options: IndexCommandOptions) => {
+      const resolvedPath: string = options.project || options.directory || projectPath || '.';
       const ui = new IndexerUI();
 
       try {
@@ -49,7 +58,7 @@ export function registerIndexCommand(program: Command): void {
               optimal: limits.optimal
             },
             rateLimit: embeddingProvider.rateLimiter ? {
-              rpm: embeddingProvider.rateLimiter.getStats().rpm || 0
+              rpm: (embeddingProvider.rateLimiter as { getStats: () => { rpm: number | null } }).getStats().rpm || 0
             } : undefined
           });
 
@@ -59,7 +68,7 @@ export function registerIndexCommand(program: Command): void {
           console.log(`Provider: ${options.provider}`);
         }
 
-        let result;
+        let result: IndexProjectResult;
 
         if (!options.verbose) {
           result = await indexProjectWithProgress({
@@ -101,7 +110,7 @@ export function registerIndexCommand(program: Command): void {
             totalChunks: result.totalChunks,
             dbSize,
             codemapSize,
-            tokenStats: result.tokenStats
+            tokenStats: result.tokenStats as Record<string, unknown> | undefined
           });
 
           delete process.env.CODEVAULT_QUIET;

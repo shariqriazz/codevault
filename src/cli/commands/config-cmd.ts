@@ -13,6 +13,45 @@ import {
 import { runInteractiveConfig } from './interactive-config.js';
 import type { CodevaultConfig } from '../../config/types.js';
 
+// Type for any value in the config tree
+type ConfigValue = string | number | boolean | ConfigObject | undefined;
+type ConfigObject = { [key: string]: ConfigValue };
+
+// Command option interfaces
+interface InitOptions {
+  force?: boolean;
+  interactive?: boolean;
+}
+
+interface SetOptions {
+  local?: boolean | string;
+}
+
+interface GetOptions {
+  global?: boolean;
+  local?: boolean | string;
+}
+
+interface ListOptions {
+  global?: boolean;
+  local?: boolean | string;
+  sources?: boolean;
+}
+
+interface UnsetOptions {
+  local?: boolean | string;
+}
+
+// Type guard to check if a value is an object
+function isConfigObject(value: ConfigValue): value is ConfigObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// Type guard to check if a value is a string
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
 function displayConfig(config: CodevaultConfig | null, title: string): void {
   if (!config || Object.keys(config).length === 0) {
     console.log(chalk.gray(`  ${title}: (empty)`));
@@ -34,10 +73,10 @@ export function registerConfigCommands(program: Command): void {
     .description('Initialize global configuration (interactive)')
     .option('--force', 'Overwrite existing configuration')
     .option('--no-interactive', 'Skip interactive prompts, create basic config')
-    .action(async (options) => {
+    .action(async (options: InitOptions) => {
       // Use interactive mode by default
       if (options.interactive !== false) {
-        await runInteractiveConfig(options.force);
+        await runInteractiveConfig(options.force ?? false);
         return;
       }
 
@@ -77,9 +116,9 @@ export function registerConfigCommands(program: Command): void {
     .command('set <key> <value>')
     .description('Set a configuration value')
     .option('-l, --local [path]', 'Save to project config instead of global')
-    .action((key, value, options) => {
+    .action((key: string, value: string, options: SetOptions) => {
       const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+      const basePath = isString(options.local) ? options.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -90,25 +129,31 @@ export function registerConfigCommands(program: Command): void {
 
       // Parse key path (e.g., "openai.apiKey" -> ["openai", "apiKey"])
       const keyPath = key.split('.');
-      
+
       // Set the value
-      let current: any = config;
+      let current: ConfigObject = config as ConfigObject;
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
+        if (part === undefined) continue;
+
         if (!current[part]) {
           current[part] = {};
         }
-        current = current[part];
+        const next = current[part];
+        if (isConfigObject(next)) {
+          current = next;
+        }
       }
-      
+
       const lastKey = keyPath[keyPath.length - 1];
-      
+      if (lastKey === undefined) return;
+
       // Try to parse value as JSON, otherwise use as string
-      let parsedValue: any = value;
+      let parsedValue: ConfigValue = value;
       if (value === 'true') parsedValue = true;
       else if (value === 'false') parsedValue = false;
       else if (!isNaN(Number(value))) parsedValue = Number(value);
-      
+
       current[lastKey] = parsedValue;
 
       // Save config
@@ -127,13 +172,13 @@ export function registerConfigCommands(program: Command): void {
     .description('Get a configuration value')
     .option('-g, --global', 'Get from global config only')
     .option('-l, --local [path]', 'Get from project config only')
-    .action((key, options) => {
+    .action((key: string, options: GetOptions) => {
       let config: CodevaultConfig;
-      
+
       if (options.global) {
         config = readGlobalConfig() || {};
       } else if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath = isString(options.local) ? options.local : '.';
         config = readProjectConfig(basePath) || {};
       } else {
         config = loadConfig();
@@ -141,10 +186,10 @@ export function registerConfigCommands(program: Command): void {
 
       // Navigate key path
       const keyPath = key.split('.');
-      let value: any = config;
-      
+      let value: ConfigValue = config as ConfigObject;
+
       for (const part of keyPath) {
-        if (value && typeof value === 'object') {
+        if (isConfigObject(value)) {
           value = value[part];
         } else {
           value = undefined;
@@ -154,7 +199,7 @@ export function registerConfigCommands(program: Command): void {
 
       if (value === undefined) {
         console.log(chalk.yellow(`Key '${key}' not found`));
-      } else if (typeof value === 'object') {
+      } else if (isConfigObject(value)) {
         console.log(JSON.stringify(value, null, 2));
       } else {
         console.log(value);
@@ -169,11 +214,11 @@ export function registerConfigCommands(program: Command): void {
     .option('-g, --global', 'Show global config only')
     .option('-l, --local [path]', 'Show project config only')
     .option('-s, --sources', 'Show all configuration sources')
-    .action((options) => {
+    .action((options: ListOptions) => {
       if (options.sources) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath = isString(options.local) ? options.local : '.';
         const sources = getConfigSources(basePath);
-        
+
         console.log(chalk.bold('Configuration Sources:\n'));
         displayConfig(sources.global, 'Global (~/.codevault/config.json)');
         console.log('');
@@ -199,7 +244,7 @@ export function registerConfigCommands(program: Command): void {
       }
 
       if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath = isString(options.local) ? options.local : '.';
         const config = readProjectConfig(basePath);
         console.log(chalk.bold('Project Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
@@ -223,9 +268,9 @@ export function registerConfigCommands(program: Command): void {
     .command('unset <key>')
     .description('Remove a configuration value')
     .option('-l, --local [path]', 'Remove from project config instead of global')
-    .action((key, options) => {
+    .action((key: string, options: UnsetOptions) => {
       const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+      const basePath = isString(options.local) ? options.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -236,19 +281,27 @@ export function registerConfigCommands(program: Command): void {
 
       // Parse and navigate to parent of key
       const keyPath = key.split('.');
-      let current: any = config;
-      
+      let current: ConfigObject = config as ConfigObject;
+
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
+        if (part === undefined) return;
+
         if (!current[part]) {
           console.log(chalk.yellow(`Key '${key}' not found`));
           return;
         }
-        current = current[part];
+        const next = current[part];
+        if (isConfigObject(next)) {
+          current = next;
+        } else {
+          console.log(chalk.yellow(`Key '${key}' not found`));
+          return;
+        }
       }
 
       const lastKey = keyPath[keyPath.length - 1];
-      if (!(lastKey in current)) {
+      if (lastKey === undefined || !(lastKey in current)) {
         console.log(chalk.yellow(`Key '${key}' not found`));
         return;
       }

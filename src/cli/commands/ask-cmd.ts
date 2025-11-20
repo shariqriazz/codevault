@@ -1,14 +1,40 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { synthesizeAnswer, synthesizeAnswerStreaming } from '../../synthesis/synthesizer.js';
-import { 
-  formatSynthesisResult, 
-  formatErrorMessage, 
+import {
+  synthesizeAnswer,
+  synthesizeAnswerStreaming,
+  type SynthesisResult
+} from '../../synthesis/synthesizer.js';
+import {
+  formatSynthesisResult,
+  formatErrorMessage,
   formatNoResultsMessage,
-  addCitationFooter 
+  addCitationFooter
 } from '../../synthesis/markdown-formatter.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
+import type { ScopeFilters } from '../../types/search.js';
+
+/**
+ * CLI options for the ask command
+ */
+interface AskCommandOptions {
+  provider: string;
+  chatProvider: string;
+  path: string;
+  project?: string;
+  directory?: string;
+  maxChunks: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker: string;
+  multiQuery?: boolean;
+  temperature: string;
+  stream?: boolean;
+  citations?: boolean;
+  metadata?: boolean;
+}
 
 export function registerAskCommand(program: Command): void {
   program
@@ -29,17 +55,17 @@ export function registerAskCommand(program: Command): void {
     .option('--stream', 'stream the response in real-time')
     .option('--citations', 'add citation footer')
     .option('--no-metadata', 'hide search metadata')
-    .action(async (question, options) => {
+    .action(async (question: string, options: AskCommandOptions) => {
       try {
         // Suppress verbose logs
         process.env.CODEVAULT_QUIET = 'true';
-        
-        const resolvedPath = options.project || options.directory || options.path || '.';
-        const maxChunks = parseInt(options.maxChunks, 10);
-        const temperature = parseFloat(options.temperature);
-        const useReranking = options.reranker !== 'off';
-        
-        const { scope: scopeFilters } = resolveScopeWithPack(
+
+        const resolvedPath: string = options.project || options.directory || options.path || '.';
+        const maxChunks: number = parseInt(options.maxChunks, 10);
+        const temperature: number = parseFloat(options.temperature);
+        const useReranking: boolean = options.reranker !== 'off';
+
+        const { scope: scopeFilters }: { scope: ScopeFilters } = resolveScopeWithPack(
           {
             path_glob: options.path_glob,
             tags: options.tags,
@@ -56,12 +82,16 @@ export function registerAskCommand(program: Command): void {
           }).start();
 
           let firstChunk = true;
-          
+
           try {
+            const provider: string = options.provider;
+            const chatProvider: string = options.chatProvider;
+            const workingPath: string = resolvedPath;
+
             for await (const chunk of synthesizeAnswerStreaming(question, {
-              provider: options.provider,
-              chatProvider: options.chatProvider,
-              workingPath: resolvedPath,
+              provider,
+              chatProvider,
+              workingPath,
               scope: scopeFilters,
               maxChunks,
               useReranking,
@@ -94,14 +124,19 @@ export function registerAskCommand(program: Command): void {
           color: 'cyan'
         }).start();
 
-        const result = await synthesizeAnswer(question, {
-          provider: options.provider,
-          chatProvider: options.chatProvider,
-          workingPath: resolvedPath,
+        const provider: string = options.provider;
+        const chatProvider: string = options.chatProvider;
+        const workingPath: string = resolvedPath;
+        const useMultiQuery: boolean = options.multiQuery ?? false;
+
+        const result: SynthesisResult = await synthesizeAnswer(question, {
+          provider,
+          chatProvider,
+          workingPath,
           scope: scopeFilters,
           maxChunks,
           useReranking,
-          useMultiQuery: options.multiQuery,
+          useMultiQuery,
           temperature
         });
 
@@ -132,18 +167,19 @@ export function registerAskCommand(program: Command): void {
           includeStats: false
         });
 
-        if (options.citations && result.answer) {
+        const includeCitations: boolean = options.citations ?? false;
+        if (includeCitations && result.answer) {
           output = addCitationFooter(output);
         }
 
         console.log(output);
-        
+
         // Show concise footer
         console.log();
         console.log(chalk.gray('━'.repeat(80)));
-        const searchType = result.metadata?.searchType || 'hybrid';
-        const provider = result.chatProvider || 'auto';
-        console.log(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
+        const searchType: string = result.metadata?.searchType || 'hybrid';
+        const resultProvider: string = result.chatProvider || 'auto';
+        console.log(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${resultProvider}`));
         console.log();
 
         delete process.env.CODEVAULT_QUIET;

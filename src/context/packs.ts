@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ContextPackSchema, extractScopeFromPackDefinition, type ContextPack } from '../types/context-pack.js';
+import { ContextPackSchema, extractScopeFromPackDefinition, type ContextPackScope } from '../types/context-pack.js';
 import { normalizeScopeFilters } from '../search/scope.js';
 import type { ScopeFilters } from '../types/search.js';
 
@@ -8,11 +8,11 @@ const CONTEXT_PACK_DIR = '.codevault/contextpacks';
 const ACTIVE_STATE_FILENAME = 'active-pack.json';
 const PACK_SCOPE_KEYS = ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost'];
 
-interface PackInfo {
+export interface PackInfo {
   key: string;
   name: string;
   description: string | null;
-  scope: Record<string, any>;
+  scope: Partial<ContextPackScope>;
   path: string;
   invalid?: boolean;
 }
@@ -47,7 +47,7 @@ function buildCacheKey(filePath: string): string {
   return path.resolve(filePath);
 }
 
-function readJsonFile(filePath: string): any {
+function readJsonFile(filePath: string): unknown {
   const content = fs.readFileSync(filePath, 'utf8');
   try {
     return JSON.parse(content);
@@ -56,9 +56,9 @@ function readJsonFile(filePath: string): any {
   }
 }
 
-function toContextPackObject(key: string, filePath: string, data: any): PackInfo {
+function toContextPackObject(key: string, filePath: string, data: unknown): PackInfo {
   const parsed = ContextPackSchema.parse(data);
-  const scope = extractScopeFromPackDefinition(parsed);
+  const rawScope = extractScopeFromPackDefinition(parsed);
   const packName = typeof parsed.name === 'string' && parsed.name.trim().length > 0
     ? parsed.name.trim()
     : key;
@@ -67,10 +67,13 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
     ? parsed.description.trim()
     : undefined;
 
-  const scopeDefinition: Record<string, any> = {};
+  const scopeDefinition: Partial<ContextPackScope> = {};
   for (const scopeKey of PACK_SCOPE_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(scope, scopeKey) && typeof scope[scopeKey] !== 'undefined') {
-      scopeDefinition[scopeKey] = scope[scopeKey];
+    if (Object.prototype.hasOwnProperty.call(rawScope, scopeKey)) {
+      const value = rawScope[scopeKey] as unknown;
+      if (typeof value !== 'undefined') {
+        (scopeDefinition as Record<string, unknown>)[scopeKey] = value;
+      }
     }
   }
 
@@ -156,17 +159,19 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
       return null;
     }
 
-    const key = typeof rawState.key === 'string' ? rawState.key : null;
+    const stateObj = rawState as Record<string, unknown>;
+    const key = typeof stateObj.key === 'string' ? stateObj.key : null;
     if (!key) {
       return null;
     }
 
     const pack = loadContextPack(key, basePath);
+    const appliedAt = typeof stateObj.appliedAt === 'string' ? stateObj.appliedAt : null;
     return {
       ...pack,
-      appliedAt: rawState.appliedAt || null
+      appliedAt
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -185,7 +190,7 @@ export function setActiveContextPack(name: string, basePath = '.'): PackInfo {
 }
 
 export function resolveScopeWithPack(
-  overrides: any = {},
+  overrides: Partial<ContextPackScope> = {},
   options: { basePath?: string; sessionPack?: SessionPack | null } = {}
 ): { scope: ScopeFilters; pack: { key: string; name: string; description: string | null } | null } {
   const basePath = options.basePath || '.';
@@ -204,23 +209,29 @@ export function resolveScopeWithPack(
     basePack = getActiveContextPack(basePath);
   }
 
-  const combined: any = {};
+  const combined: Partial<ContextPackScope> = {};
 
   if (basePack && basePack.scope) {
     for (const key of PACK_SCOPE_KEYS) {
       if (Object.prototype.hasOwnProperty.call(basePack.scope, key)) {
-        combined[key] = basePack.scope[key];
+        const value = basePack.scope[key as keyof ContextPackScope];
+        if (typeof value !== 'undefined') {
+          (combined as Record<string, unknown>)[key] = value;
+        }
       }
     }
   }
 
   for (const key of PACK_SCOPE_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(overrides, key) && typeof overrides[key] !== 'undefined') {
-      combined[key] = overrides[key];
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+      const value = overrides[key as keyof ContextPackScope];
+      if (typeof value !== 'undefined') {
+        (combined as Record<string, unknown>)[key] = value;
+      }
     }
   }
 
-  const scope = normalizeScopeFilters(combined);
+  const scope = normalizeScopeFilters(combined as Partial<ScopeFilters>);
   const packInfo = basePack
     ? { key: basePack.key, name: basePack.name, description: basePack.description || null }
     : null;

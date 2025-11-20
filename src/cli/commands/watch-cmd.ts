@@ -1,6 +1,14 @@
 import { Command } from 'commander';
 import { startWatch } from '../../indexer/watch.js';
 
+interface WatchCommandOptions {
+  provider: string;
+  project?: string;
+  directory?: string;
+  debounce: string;
+  encrypt?: string;
+}
+
 export function registerWatchCommand(program: Command): void {
   program
     .command('watch [path]')
@@ -10,9 +18,9 @@ export function registerWatchCommand(program: Command): void {
     .option('--directory <path>', 'alias for project directory')
     .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
-      const debounceMs = parseInt(options.debounce, 10);
+    .action(async (projectPath: string = '.', options: WatchCommandOptions) => {
+      const resolvedPath: string = options.project || options.directory || projectPath || '.';
+      const debounceMs: number = parseInt(options.debounce, 10);
 
       console.log(`👀 Watching ${resolvedPath} for changes...`);
       console.log(`Provider: ${options.provider}`);
@@ -24,7 +32,7 @@ export function registerWatchCommand(program: Command): void {
           provider: options.provider,
           debounceMs,
           encrypt: options.encrypt,
-          onBatch: ({ changed, deleted }) => {
+          onBatch: ({ changed, deleted }: { changed: string[]; deleted: string[] }) => {
             console.log(`🔁 Indexed ${changed.length} changed / ${deleted.length} deleted files`);
           }
         });
@@ -33,7 +41,7 @@ export function registerWatchCommand(program: Command): void {
         console.log('✅ Watcher active. Press Ctrl+C to stop.');
 
         await new Promise<void>(resolve => {
-          const shutdown = () => {
+          const shutdown = (): void => {
             console.log('\nStopping watcher...');
             void controller.close().then(() => {
               process.off('SIGINT', shutdown);

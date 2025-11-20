@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
+import type { SearchCodeResult, SearchResult, GetChunkResult } from '../../core/types.js';
 
 export function registerSearchWithCodeCommand(program: Command): void {
   program
@@ -19,7 +20,20 @@ export function registerSearchWithCodeCommand(program: Command): void {
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
     .option('--max-code-size <bytes>', 'max code size to display per chunk', '100000')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath: string = '.', options: {
+      limit: string;
+      provider: string;
+      project?: string;
+      directory?: string;
+      path_glob?: string[];
+      tags?: string[];
+      lang?: string[];
+      reranker: 'off' | 'api';
+      hybrid: string;
+      bm25: string;
+      symbol_boost: string;
+      maxCodeSize?: string;
+    }) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
@@ -28,7 +42,7 @@ export function registerSearchWithCodeCommand(program: Command): void {
         const maxCodeSize = parseInt(options.maxCodeSize || '100000');
 
         const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
+        const results: SearchCodeResult = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
 
         if (!results.success) {
           console.log(chalk.yellow(`\nNo results found for "${query}"`));
@@ -45,20 +59,20 @@ export function registerSearchWithCodeCommand(program: Command): void {
 
         console.log(chalk.cyan(`\n🔍 Found ${results.results.length} results with code for "${query}"\n`));
 
-        const { getChunk } = await import('../../core/search.js');
+        const { getChunk }: { getChunk: (sha: string, basePath: string) => Promise<GetChunkResult> } = await import('../../core/search.js');
 
         for (let index = 0; index < results.results.length; index++) {
-          const result = results.results[index];
+          const result: SearchResult = results.results[index];
           const score = (result.meta.score * 100).toFixed(0);
 
           console.log(chalk.gray('━'.repeat(80)));
           console.log(chalk.white(`📄 ${result.path} · ${result.meta.symbol}() · Score: ${score}%`));
           console.log(chalk.gray('━'.repeat(80)));
 
-          const chunkResult = await getChunk(result.sha, resolvedPath);
+          const chunkResult: GetChunkResult = await getChunk(result.sha, resolvedPath);
 
           if (chunkResult.success && chunkResult.code) {
-            let code = chunkResult.code;
+            let code: string = chunkResult.code;
             let truncated = false;
 
             if (code.length > maxCodeSize) {
@@ -73,7 +87,7 @@ export function registerSearchWithCodeCommand(program: Command): void {
               console.log(chalk.yellow(`\n⚠️  Code truncated (${chunkResult.code.length} chars, showing ${maxCodeSize})`));
             }
           } else {
-            console.log(chalk.red(`\n❌ Error retrieving code: ${chunkResult.error}`));
+            console.log(chalk.red(`\n❌ Error retrieving code: ${chunkResult.error || 'Unknown error'}`));
           }
 
           console.log('');

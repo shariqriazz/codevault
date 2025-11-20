@@ -95,7 +95,7 @@ export function registerChatCommand(program: Command): void {
 
             // Handle commands
             if (trimmedQuestion.startsWith('/')) {
-              const handled = await handleCommand(trimmedQuestion, conversationContext);
+              const handled = handleCommand(trimmedQuestion, conversationContext);
               if (handled === 'exit') {
                 isRunning = false;
                 break;
@@ -151,7 +151,7 @@ export function registerChatCommand(program: Command): void {
             }
 
           } catch (error) {
-            if ((error as any).code === 'ERR_USE_AFTER_CLOSE') {
+            if ((error as Error & { code?: string }).code === 'ERR_USE_AFTER_CLOSE') {
               // User pressed Ctrl+C
               isRunning = false;
               break;
@@ -175,10 +175,10 @@ export function registerChatCommand(program: Command): void {
 /**
  * Handle special commands in chat mode
  */
-async function handleCommand(
+function handleCommand(
   command: string,
   context: ConversationContext
-): Promise<string | void> {
+): string | void {
   const cmd = command.toLowerCase().trim();
 
   switch (cmd) {
@@ -206,7 +206,6 @@ async function handleCommand(
       break;
 
     case '/stats': {
-      const summary = getConversationSummary(context);
       const uniqueFiles = new Set(
         Array.from(context.allChunks.values()).map(chunk => chunk.result.path)
       );

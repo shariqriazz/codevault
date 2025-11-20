@@ -13,7 +13,7 @@ export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPac
       path_glob: args.path_glob,
       tags: args.tags,
       lang: args.lang,
-      reranker: args.reranker,
+      reranker: args.reranker === 'on' ? 'api' : 'off',
     },
     { basePath: cleanPath, sessionPack: sessionContextPack }
   );

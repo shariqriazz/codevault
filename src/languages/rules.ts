@@ -1,11 +1,22 @@
+import type Parser from 'tree-sitter';
 import { RESOLVED_LANGUAGES } from './tree-sitter-loader.js';
 
+/**
+ * Language rule defining how to parse and chunk code for a specific language.
+ * Each language has Tree-sitter parsing rules and patterns for semantic chunking.
+ */
 export interface LanguageRule {
+  /** Language identifier (e.g., 'javascript', 'python') */
   lang: string;
-  ts: any;
+  /** Tree-sitter language object from resolved language module */
+  ts: Parser.Language;
+  /** AST node types that define semantic boundaries (e.g., 'function_declaration', 'class_definition') */
   nodeTypes: string[];
+  /** Mapping of parent node types to their subdivision node types for semantic splitting */
   subdivisionTypes?: Record<string, string[]>;
+  /** AST node types representing variable declarations */
   variableTypes?: string[];
+  /** Regex pattern for extracting comments (or null if not applicable) */
   commentPattern: RegExp | null;
 }
 

@@ -1,6 +1,13 @@
 import { Command } from 'commander';
 import { indexProject } from '../../core/indexer.js';
 
+interface UpdateCommandOptions {
+  provider: string;
+  project?: string;
+  directory?: string;
+  encrypt?: string;
+}
+
 export function registerUpdateCommand(program: Command): void {
   program
     .command('update [path]')
@@ -9,8 +16,8 @@ export function registerUpdateCommand(program: Command): void {
     .option('--project <path>', 'alias for project path')
     .option('--directory <path>', 'alias for project directory')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
+    .action(async (projectPath: string = '.', options: UpdateCommandOptions) => {
+      const resolvedPath: string = options.project || options.directory || projectPath || '.';
       console.log('🔄 Updating project index...');
       console.log(`Provider: ${options.provider}`);
       try {
