@@ -1,3 +1,7 @@
+import fs from 'fs';
+import path from 'path';
+import { validatePathSafety } from '../indexer/merkle.js';
+
 /**
  * Utility functions for path resolution and normalization
  */
@@ -20,8 +24,21 @@ export function resolveProjectRoot(input?: {
   
   const rawPath = input.project || input.directory || input.path || '.';
   const trimmed = typeof rawPath === 'string' ? rawPath.trim() : '.';
-  
-  return trimmed.length > 0 ? trimmed : '.';
+  const absolute = path.resolve(trimmed.length > 0 ? trimmed : '.');
+  const validation = validatePathSafety(process.cwd(), absolute);
+
+  if (!validation.safe || !validation.normalized) {
+    const error: any = new Error(`Path "${absolute}" is outside the project root`);
+    error.code = 'PATH_VALIDATION_FAILED';
+    throw error;
+  }
+
+  const resolved = path.join(process.cwd(), validation.normalized);
+  try {
+    return fs.realpathSync(resolved);
+  } catch {
+    return resolved;
+  }
 }
 
 /**
