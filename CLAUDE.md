@@ -14,6 +14,7 @@ This is a TypeScript/Node.js project (v1.7.3) that provides:
 - **LRU caching** for performance optimization
 - **Batch processing** with retry logic and fallbacks
 - **Integration tests** covering index → search → encryption → watch flows
+- **CI/CD** with typecheck/lint/tests on PR/main and npm publish on version bumps (NPM_TOKEN)
 
 ## Architecture
 

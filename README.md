@@ -21,6 +21,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 - **⚙️ Global Configuration**: One-time setup with interactive wizard for CLI convenience
 - **📊 Multi-Language Support**: 25+ programming languages via Tree-sitter
 - **🔎 File Watching**: Real-time index updates with debounced change detection and provider reuse
+- **✅ CI/CD**: Typecheck + lint + tests on PR/main; auto-publish to npm on version bumps (with NPM_TOKEN)
 - **⏱️ Rate Limiting**: Intelligent request/token throttling with automatic retry
 - **💾 Memory Efficient**: LRU caches with automatic cleanup for long-running processes
 
@@ -200,9 +201,14 @@ See complete setup guide: **[MCP Setup Guide](docs/MCP_SETUP.md)**
         "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b"
       }
     }
-  }
+}
 }
 ```
+
+## 🛠️ Development & CI/CD
+
+- CI runs on PRs and pushes to `main`: `npm run typecheck`, `npm run lint`, and `npm test`.
+- Version bumps on `main` auto-publish to npm when `NPM_TOKEN` is configured in repo secrets.
 
 **Example configs:**
 - [NPX (Recommended)](examples/claude-desktop-config-npx.example.json)
