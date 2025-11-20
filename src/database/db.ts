@@ -511,8 +511,14 @@ export class CodeVaultDatabase {
    * better-sqlite3 transactions must be synchronous; do async work before/after.
    */
   transaction<T>(fn: () => T): T {
-    const run = this.db.transaction(fn);
-    return run();
+    const wrapped = this.db.transaction(() => {
+      const result = fn();
+      if (result && typeof (result as any).then === 'function') {
+        throw new Error('better-sqlite3 transactions must be synchronous; avoid returning a Promise.');
+      }
+      return result;
+    });
+    return wrapped();
   }
 
   /**
