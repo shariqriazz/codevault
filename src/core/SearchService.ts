@@ -46,19 +46,91 @@ interface SearchCandidate {
   [key: string]: any;
 }
 
+interface ChunkLoadingStats {
+  totalAttempted: number;
+  failed: number;
+  reasons: Map<string, number>;
+}
+
 export class SearchService {
   private bm25Cache: SimpleLRU<string, { index: BM25Index; added: Set<string> }>;
   private chunkCache: SimpleLRU<string, string | null>;
+  private chunkLoadingStats: ChunkLoadingStats;
 
   constructor() {
     this.bm25Cache = new SimpleLRU(CACHE_CONSTANTS.MAX_BM25_CACHE_SIZE);
     this.chunkCache = new SimpleLRU(CACHE_CONSTANTS.MAX_CHUNK_TEXT_CACHE_SIZE);
+    this.chunkLoadingStats = { totalAttempted: 0, failed: 0, reasons: new Map() };
   }
 
   public clearCaches(): void {
     logger.debug('Clearing search caches explicitly.');
     this.bm25Cache.clear();
     this.chunkCache.clear();
+  }
+
+  private resetChunkLoadingStats(): void {
+    this.chunkLoadingStats = { totalAttempted: 0, failed: 0, reasons: new Map() };
+  }
+
+  private getChunkLoadingFailures() {
+    if (this.chunkLoadingStats.failed === 0) {
+      return undefined;
+    }
+
+    const reasons: any = {};
+    for (const [reason, count] of this.chunkLoadingStats.reasons.entries()) {
+      reasons[reason] = count;
+    }
+
+    return {
+      totalAttempted: this.chunkLoadingStats.totalAttempted,
+      failed: this.chunkLoadingStats.failed,
+      reasons
+    };
+  }
+
+  private buildWarnings(): string[] | undefined {
+    if (this.chunkLoadingStats.failed === 0) {
+      return undefined;
+    }
+
+    const warnings: string[] = [];
+    const stats = this.chunkLoadingStats;
+
+    if (stats.reasons.has('encryption_key_required')) {
+      const count = stats.reasons.get('encryption_key_required');
+      warnings.push(
+        `Could not load ${count} encrypted chunk(s). Set CODEVAULT_ENCRYPTION_KEY environment variable to access encrypted chunks.`
+      );
+    }
+
+    if (stats.reasons.has('encryption_auth_failed')) {
+      const count = stats.reasons.get('encryption_auth_failed');
+      warnings.push(
+        `Failed to decrypt ${count} chunk(s). The encryption key may be incorrect.`
+      );
+    }
+
+    if (stats.reasons.has('file_not_found')) {
+      const count = stats.reasons.get('file_not_found');
+      warnings.push(
+        `${count} chunk file(s) not found. The index may be out of sync. Try re-indexing.`
+      );
+    }
+
+    const otherFailures = stats.failed -
+      (stats.reasons.get('encryption_key_required') || 0) -
+      (stats.reasons.get('encryption_auth_failed') || 0) -
+      (stats.reasons.get('file_not_found') || 0);
+
+    if (otherFailures > 0) {
+      warnings.push(
+        `${otherFailures} chunk(s) failed to load due to other errors. Check logs for details.`
+      );
+    }
+
+    return warnings.length > 0 ? warnings : undefined;
   }
 
   public async search(
@@ -68,6 +140,9 @@ export class SearchService {
     workingPath: string = '.',
     scopeOptions: ScopeFilters = {}
   ): Promise<SearchCodeResult> {
+    // Reset chunk loading stats at the start of each search
+    this.resetChunkLoadingStats();
+
     const basePath = path.resolve(workingPath);
     const dbPath = path.join(basePath, '.codevault/codevault.db');
     const chunkDir = path.join(basePath, '.codevault/chunks');
@@ -195,6 +270,8 @@ export class SearchService {
             enabled: symbolBoostEnabled,
             boosted: symbolBoostEnabled && vectorResults.some((result: any) => typeof result.symbolBoost === 'number' && result.symbolBoost > 0)
         },
+        chunkLoadingFailures: this.getChunkLoadingFailures(),
+        warnings: this.buildWarnings(),
         results: combinedResults
       };
 
@@ -537,12 +614,31 @@ export class SearchService {
     const cached = this.chunkCache.get(cacheKey);
     if (cached !== undefined) return cached;
 
+    this.chunkLoadingStats.totalAttempted++;
+
     try {
       const result = readChunkFromDisk({ chunkDir, sha });
       const code = result ? result.code : null;
       this.chunkCache.set(cacheKey, code);
+      if (!result) {
+        // File not found
+        this.chunkLoadingStats.failed++;
+        const reason = 'file_not_found';
+        this.chunkLoadingStats.reasons.set(reason, (this.chunkLoadingStats.reasons.get(reason) || 0) + 1);
+      }
       return code;
-    } catch {
+    } catch (error: any) {
+      // Track the specific failure reason from error code
+      this.chunkLoadingStats.failed++;
+      const reason = error.code ? String(error.code).toLowerCase() : 'unknown_error';
+      this.chunkLoadingStats.reasons.set(reason, (this.chunkLoadingStats.reasons.get(reason) || 0) + 1);
+
+      // Log the error for debugging
+      logger.warn(`Failed to load chunk ${sha}`, {
+        error: error.message,
+        code: error.code
+      });
+
       this.chunkCache.set(cacheKey, null);
       return null;
     }
