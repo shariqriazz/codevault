@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { LANG_RULES } from '../../languages/rules.js';
-import { groupNodesForChunking } from '../../chunking/file-grouper.js';
 import { computeFastHash } from '../../indexer/merkle.js';
 import { ChunkPipeline } from './chunk-pipeline.js';
 import type { IndexContextData } from './IndexContext.js';
@@ -57,7 +56,7 @@ export class FileProcessor {
 
       // Collect and group nodes
       const collectedNodes = await this.chunkPipeline.collectNodesForFile(source, rule);
-      const nodeGroups = await groupNodesForChunking(
+      const nodeGroups = await this.chunkPipeline.groupNodes(
         collectedNodes,
         source,
         this.context.modelProfile,
