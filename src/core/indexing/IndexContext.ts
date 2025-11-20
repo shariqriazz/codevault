@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs';
-import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider } from '../../providers/index.js';
+import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider, type ModelProfile } from '../../providers/index.js';
 import { BATCH_SIZE } from '../../providers/base.js';
 import { readCodemap, type Codemap } from '../../codemap/io.js';
 import { loadMerkle, cloneMerkle, type MerkleTree } from '../../indexer/merkle.js';
-import { resolveEncryptionPreference } from '../../storage/encrypted-chunks.js';
+import { resolveEncryptionPreference, type EncryptionPreference } from '../../storage/encrypted-chunks.js';
 import { Database, initDatabase } from '../../database/db.js';
 import { BatchEmbeddingProcessor } from '../batch-indexer.js';
 import { logger } from '../../utils/logger.js';
@@ -18,12 +18,18 @@ export interface IndexContextData {
   providerInstance: EmbeddingProvider;
   providerName: string;
   modelName: string | null;
-  modelProfile: any;
-  limits: any;
+  modelProfile: ModelProfile;
+  limits: {
+    optimal: number;
+    min: number;
+    max: number;
+    overlap: number;
+    unit: string;
+  };
   codemapPath: string;
   chunkDir: string;
   dbPath: string;
-  encryptionPreference: any;
+  encryptionPreference: EncryptionPreference;
   codemap: Codemap;
   merkle: MerkleTree;
   updatedMerkle: MerkleTree;

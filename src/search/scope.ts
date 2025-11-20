@@ -6,7 +6,10 @@ function toArray<T>(value: unknown): T[] {
   if (!value) {
     return [];
   }
-  return Array.isArray(value) ? value : [value as T];
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+  return [value as T];
 }
 
 function normalizeList(values: unknown): string[] {
@@ -85,13 +88,14 @@ export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): D
   let filtered = chunks;
 
   if (normalized.path_glob && normalized.path_glob.length > 0) {
+    const pathGlob = normalized.path_glob;
     filtered = filtered.filter(chunk => {
       const filePath = chunk.file_path || '';
       if (!filePath) {
         return false;
       }
 
-      return micromatch.isMatch(filePath, normalized.path_glob!, { dot: true });
+      return micromatch.isMatch(filePath, pathGlob, { dot: true });
     });
   }
 
@@ -103,13 +107,13 @@ export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): D
       }
 
       try {
-        const tags = JSON.parse(chunk.codevault_tags || '[]');
+        const tags: unknown = JSON.parse(chunk.codevault_tags || '[]');
         if (!Array.isArray(tags)) {
           return false;
         }
 
         return tags.some(tag => typeof tag === 'string' && tagSet.has(tag.toLowerCase()));
-      } catch (error) {
+      } catch {
         return false;
       }
     });

@@ -1,11 +1,11 @@
 import { saveMerkle } from '../../indexer/merkle.js';
 import { writeCodemap } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
-import { getTokenCountStats } from '../../chunking/token-counter.js';
+import { getTokenCountStats, type TokenCountStats } from '../../chunking/token-counter.js';
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
-import type { IndexProjectResult } from '../types.js';
+import type { IndexProjectResult, ProgressEvent } from '../types.js';
 
 /**
  * IndexFinalizationStage handles the finalization of the indexing process:
@@ -20,7 +20,7 @@ export class IndexFinalizationStage {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null
+    private onProgress: ((event: ProgressEvent) => void) | null
   ) {}
 
   /**
@@ -91,7 +91,7 @@ export class IndexFinalizationStage {
   /**
    * Build the final result object
    */
-  private buildResult(tokenStats: any): IndexProjectResult {
+  private buildResult(tokenStats: TokenCountStats): IndexProjectResult {
     return {
       success: true,
       processedChunks: this.state.processedChunks,

@@ -26,7 +26,6 @@ export interface SearchCandidate {
   symbolBoostSources?: string[];
   rerankerScore?: number;
   rerankerRank?: number;
-  [key: string]: any;
 }
 
 /**
@@ -71,8 +70,8 @@ export class CandidateRetriever {
       // Tag boost
       if (chunk.codevault_tags) {
         try {
-          const tags = JSON.parse(chunk.codevault_tags || '[]');
-          tags.forEach((tag: string) => {
+          const tags = JSON.parse(chunk.codevault_tags || '[]') as unknown[];
+          tags.forEach((tag: unknown) => {
             if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {
               boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
             }
@@ -152,8 +151,8 @@ export class CandidateRetriever {
   /**
    * Decode and cache embedding to avoid repeated JSON parsing
    */
-  private decodeEmbedding(chunk: DatabaseChunk): Float32Array {
-    const cached = (chunk as any).__cachedEmbedding as Float32Array | undefined;
+  private decodeEmbedding(chunk: DatabaseChunk & { __cachedEmbedding?: Float32Array }): Float32Array {
+    const cached = chunk.__cachedEmbedding;
     if (cached) {
       return cached;
     }
@@ -165,7 +164,7 @@ export class CandidateRetriever {
     if (vector.length === 0 && chunk.embedding && chunk.embedding.length > 0) {
       logger.warn('Embedding decoded to empty vector', { chunkId: chunk.id });
     }
-    (chunk as any).__cachedEmbedding = vector;
+    chunk.__cachedEmbedding = vector;
     return vector;
   }
 }

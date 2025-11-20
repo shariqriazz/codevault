@@ -5,6 +5,38 @@ import zlib from 'zlib';
 import { log } from '../utils/logger.js';
 import { ENCRYPTION_CONSTANTS } from '../config/constants.js';
 
+// Type-safe error with code property
+interface ErrorWithCode extends Error {
+  code: string;
+  cause?: unknown;
+}
+
+// Helper to create typed errors
+function createErrorWithCode(message: string, code: string, cause?: unknown): ErrorWithCode {
+  const error = new Error(message) as ErrorWithCode;
+  error.code = code;
+  if (cause !== undefined) {
+    error.cause = cause;
+  }
+  return error;
+}
+
+// Type guard for ErrorWithCode
+function isErrorWithCode(error: unknown): error is ErrorWithCode {
+  return (
+    error instanceof Error &&
+    typeof (error as ErrorWithCode).code === 'string'
+  );
+}
+
+// Helper to extract error message safely
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 const {
   MAGIC_HEADER,
   SALT_LENGTH,
@@ -183,7 +215,7 @@ export function getEncryptionKeySet(): EncryptionKeySet {
 const warnedInvalidMode = new Set<string>();
 let warnedInvalidKey = false;
 
-function normalizeMode(mode: any): string | undefined {
+function normalizeMode(mode: unknown): string | undefined {
   if (typeof mode !== 'string') {
     return undefined;
   }
@@ -264,21 +296,23 @@ function buildDecryptionAttempts(payload: Buffer): Array<{ version: number; offs
 function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
   const header = payload.subarray(0, MAGIC_HEADER_BUFFER.length);
   if (!header.equals(MAGIC_HEADER_BUFFER)) {
-    const error: any = new Error('Encrypted chunk payload has an unknown header.');
-    error.code = 'ENCRYPTION_FORMAT_UNRECOGNIZED';
-    throw error;
+    throw createErrorWithCode(
+      'Encrypted chunk payload has an unknown header.',
+      'ENCRYPTION_FORMAT_UNRECOGNIZED'
+    );
   }
 
   const attempts = buildDecryptionAttempts(payload);
-  const errors: any[] = [];
+  const errors: ErrorWithCode[] = [];
 
   for (const attempt of attempts) {
     const { version, offset } = attempt;
     if (version > CURRENT_ENCRYPTION_VERSION) {
       errors.push(
-        Object.assign(new Error(`Unsupported encryption version ${version}`), {
-          code: 'ENCRYPTION_VERSION_UNSUPPORTED'
-        })
+        createErrorWithCode(
+          `Unsupported encryption version ${version}`,
+          'ENCRYPTION_VERSION_UNSUPPORTED'
+        )
       );
       continue;
     }
@@ -286,9 +320,10 @@ function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
     const minimumLength = offset + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1;
     if (!payload || payload.length < minimumLength) {
       errors.push(
-        Object.assign(new Error('Encrypted chunk payload is truncated.'), {
-          code: 'ENCRYPTION_PAYLOAD_INVALID'
-        })
+        createErrorWithCode(
+          'Encrypted chunk payload is truncated.',
+          'ENCRYPTION_PAYLOAD_INVALID'
+        )
       );
       continue;
     }
@@ -309,15 +344,14 @@ function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
 
     try {
       return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    } catch (error) {
-      const authError: any = new Error('authentication failed');
-      authError.code = 'ENCRYPTION_AUTH_FAILED';
-      authError.cause = error;
-      errors.push(authError);
+    } catch (error: unknown) {
+      errors.push(
+        createErrorWithCode('authentication failed', 'ENCRYPTION_AUTH_FAILED', error)
+      );
     }
   }
 
-  const finalError = errors[errors.length - 1] || new Error('Decryption failed');
+  const finalError: Error = errors[errors.length - 1] || new Error('Decryption failed');
   throw finalError;
 }
 
@@ -385,19 +419,20 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
     }
 
     if (candidateKeys.length === 0) {
-      const error: any = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`);
-      error.code = 'ENCRYPTION_KEY_REQUIRED';
-      throw error;
+      throw createErrorWithCode(
+        `Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`,
+        'ENCRYPTION_KEY_REQUIRED'
+      );
     }
 
     const payload = fs.readFileSync(encryptedPath);
     let decrypted: Buffer | null = null;
-    const errors: any[] = [];
+    const errors: unknown[] = [];
     for (const candidate of candidateKeys) {
       try {
         decrypted = decryptBuffer(payload, candidate);
         break;
-      } catch (error: any) {
+      } catch (error: unknown) {
         errors.push(error);
         continue;
       }
@@ -405,28 +440,30 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
 
     if (!decrypted) {
       const lastError = errors[errors.length - 1];
-      if (lastError && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
-        const authError: any = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`);
-        authError.code = 'ENCRYPTION_AUTH_FAILED';
-        authError.cause = lastError;
-        throw authError;
+      if (isErrorWithCode(lastError) && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
+        throw createErrorWithCode(
+          `Failed to decrypt chunk ${sha}: authentication failed.`,
+          'ENCRYPTION_AUTH_FAILED',
+          lastError
+        );
       }
-      const genericError: any = new Error(
-        `Failed to decrypt chunk ${sha}: ${(lastError as Error)?.message || 'unknown error'}`
+      const errorCode = isErrorWithCode(lastError) ? lastError.code : 'ENCRYPTION_DECRYPT_FAILED';
+      throw createErrorWithCode(
+        `Failed to decrypt chunk ${sha}: ${getErrorMessage(lastError)}`,
+        errorCode,
+        lastError
       );
-      genericError.code = (lastError)?.code || 'ENCRYPTION_DECRYPT_FAILED';
-      genericError.cause = lastError;
-      throw genericError;
     }
 
     try {
       const code = zlib.gunzipSync(decrypted).toString('utf8');
       return { code, encrypted: true };
-    } catch (error: any) {
-      const decompressionError: any = new Error(`Failed to decompress chunk ${sha}: ${error.message}`);
-      decompressionError.code = 'CHUNK_DECOMPRESSION_FAILED';
-      decompressionError.cause = error;
-      throw decompressionError;
+    } catch (error: unknown) {
+      throw createErrorWithCode(
+        `Failed to decompress chunk ${sha}: ${getErrorMessage(error)}`,
+        'CHUNK_DECOMPRESSION_FAILED',
+        error
+      );
     }
   }
 
@@ -435,11 +472,12 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
       const compressed = fs.readFileSync(plainPath);
       const code = zlib.gunzipSync(compressed).toString('utf8');
       return { code, encrypted: false };
-    } catch (error: any) {
-      const readError: any = new Error(`Failed to read chunk ${sha}: ${error.message}`);
-      readError.code = 'CHUNK_READ_FAILED';
-      readError.cause = error;
-      throw readError;
+    } catch (error: unknown) {
+      throw createErrorWithCode(
+        `Failed to read chunk ${sha}: ${getErrorMessage(error)}`,
+        'CHUNK_READ_FAILED',
+        error
+      );
     }
   }
 

@@ -22,7 +22,24 @@ export class ResultMapper {
     searchType: string
   ): SearchResult[] {
     return candidates.map(result => {
-      const meta: any = {
+      const meta: {
+        id: string;
+        symbol: string;
+        score: number;
+        intent?: string;
+        description?: string;
+        searchType: string;
+        vectorScore: number;
+        hybridScore?: number;
+        bm25Score?: number;
+        bm25Rank?: number;
+        vectorRank?: number;
+        rerankerScore?: number;
+        rerankerRank?: number;
+        symbolBoost?: number;
+        symbolBoostSources?: string[];
+        scoreRaw?: number;
+      } = {
         id: result.id,
         symbol: result.symbol,
         score: Math.min(1, Math.max(result.score || 0, 0)),
@@ -140,14 +157,22 @@ export class ResultMapper {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
+  private buildBm25Document(
+    chunk: Record<string, unknown>,
+    codeText: string | null
+  ): string {
     if (!chunk) return '';
 
+    const symbol = typeof chunk.symbol === 'string' ? chunk.symbol : '';
+    const filePath = typeof chunk.file_path === 'string' ? chunk.file_path : '';
+    const description = typeof chunk.codevault_description === 'string' ? chunk.codevault_description : '';
+    const intent = typeof chunk.codevault_intent === 'string' ? chunk.codevault_intent : '';
+
     const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
+      symbol,
+      filePath,
+      description,
+      intent,
       codeText
     ].filter(value => typeof value === 'string' && value.trim().length > 0);
 

@@ -7,6 +7,7 @@ import { ChunkPipeline } from './chunk-pipeline.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
 import type { IndexProjectOptions } from '../types.js';
+import type { CodemapChunk } from '../../types/codemap.js';
 import {normalizeChunkMetadata} from '../../types/codemap.js';
 import {writeChunkToDisk, removeChunkArtifacts} from '../../storage/encrypted-chunks.js';
 
@@ -38,7 +39,7 @@ export class FileProcessor {
 
     const existingChunks = new Map(
       Object.entries(this.state.codemap)
-        .filter(([, metadata]) => metadata && (metadata as any).file === rel) as [string, any][]
+        .filter(([, metadata]) => metadata && metadata.file === rel) as [string, CodemapChunk][]
     );
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
@@ -111,7 +112,7 @@ export class FileProcessor {
     rel: string,
     abs: string,
     rule: { lang: string } | null | undefined,
-    existingChunks: Map<string, any>,
+    existingChunks: Map<string, CodemapChunk>,
     staleChunkIds: Set<string>,
     chunkMerkleHashes: string[]
   ): Promise<void> {
@@ -203,11 +204,27 @@ export class FileProcessor {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: {
+      tags: string[];
+      intent: string | null;
+      description: string | null;
+    };
+    importantVariables: string[];
     docComments: string | null;
-    contextInfo: any;
-    symbolData: any;
+    contextInfo: {
+      nodeType: string;
+      startLine: number;
+      endLine: number;
+      codeLength: number;
+      hasDocumentation: boolean;
+      variableCount: number;
+    };
+    symbolData: {
+      signature: string;
+      parameters: string[];
+      returnType: string | null;
+      calls: string[];
+    };
   }): Promise<void> {
     try {
       if (!this.context.batchProcessor) {
@@ -273,7 +290,7 @@ export class FileProcessor {
   /**
    * Delete chunks from database and file system
    */
-  private async deleteChunks(chunkIds: string[], metadataLookup = new Map<string, any>()): Promise<void> {
+  private async deleteChunks(chunkIds: string[], metadataLookup = new Map<string, CodemapChunk>()): Promise<void> {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       return;
     }
@@ -296,10 +313,10 @@ export class FileProcessor {
    */
   async removeFileArtifacts(fileRel: string): Promise<void> {
     const entries = Object.entries(this.state.codemap)
-      .filter(([, metadata]) => metadata && (metadata as any).file === fileRel);
+      .filter(([, metadata]) => metadata && metadata.file === fileRel);
 
     if (entries.length > 0) {
-      const metadataLookup = new Map(entries as [string, any][]);
+      const metadataLookup = new Map(entries as [string, CodemapChunk][]);
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
     }
