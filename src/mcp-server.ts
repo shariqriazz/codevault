@@ -27,6 +27,7 @@ import { clearSearchCaches } from './core/search.js';
 import { clearTokenCache } from './chunking/token-counter.js';
 import { logger } from './utils/logger.js';
 import { ZodError } from 'zod';
+import type { ContextPack } from './types/context-pack.js';
 
 type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
 
@@ -50,7 +51,9 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   const normalizedError = error instanceof Error ? error : new Error(String(error));
-  const code = (error as any)?.code;
+  const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : undefined;
 
   if (code === 'ENCRYPTION_KEY_REQUIRED') {
     return {
@@ -80,14 +83,19 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   return {
-    code: code || 'RUNTIME_ERROR',
+    code: code ?? 'RUNTIME_ERROR',
     type: 'runtime',
     message: normalizedError.message,
     details: normalizedError.stack ? { stack: normalizedError.stack } : undefined
   };
 }
 
-function buildMcpErrorResponse(error: unknown) {
+interface McpErrorResponse {
+  content: Array<{ type: string; text: string }>;
+  isError: boolean;
+}
+
+function buildMcpErrorResponse(error: unknown): McpErrorResponse {
   const payload = formatMcpError(error);
   return {
     content: [
@@ -103,7 +111,13 @@ function buildMcpErrorResponse(error: unknown) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+interface PackageJson {
+  version: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as PackageJson;
 
 /**
  * Minimal MCP server exposing CodeVault tools over stdio for AI assistants.
@@ -113,7 +127,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: any = null;
+  private sessionContextPack: ContextPack | null = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -132,7 +146,7 @@ export class McpServer {
     this.setupHandlers();
   }
 
-  private setupHandlers() {
+  private setupHandlers(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: Tool[] = [
         {
@@ -311,8 +325,8 @@ export class McpServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as any).issues)) {
-          const validationError = `Validation Error: ${(error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+        if (error instanceof ZodError) {
+          const validationError = `Validation Error: ${error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
           return {
             content: [{ type: 'text', text: validationError }],
             isError: true,
@@ -326,7 +340,7 @@ export class McpServer {
     });
   }
 
-  public async start() {
+  public async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
@@ -336,16 +350,16 @@ export class McpServer {
     this.setupShutdownHandlers();
   }
 
-  private scheduleCacheCleanup() {
+  private scheduleCacheCleanup(): void {
     if (this.cacheCleanupTimer) {
       clearInterval(this.cacheCleanupTimer);
     }
-    
+
     this.cacheCleanupTimer = setInterval(() => {
       try {
         clearSearchCaches();
         clearTokenCache();
-        
+
         logger.debug('Cache cleared periodically');
       } catch (error) {
         // Ignore errors during cleanup
@@ -353,7 +367,7 @@ export class McpServer {
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
   }
 
-  private setupShutdownHandlers() {
+  private setupShutdownHandlers(): void {
     const cleanup = async () => {
       if (this.cacheCleanupTimer) {
         clearInterval(this.cacheCleanupTimer);

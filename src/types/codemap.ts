@@ -60,7 +60,7 @@ const KNOWN_FIELDS = new Set([
   'encrypted'
 ]);
 
-function sanitizeStringArray(value: any, options: { lowercase?: boolean } = {}): string[] {
+function sanitizeStringArray(value: unknown, options: { lowercase?: boolean } = {}): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -83,7 +83,7 @@ function sanitizeStringArray(value: any, options: { lowercase?: boolean } = {}):
   return Array.from(unique.values());
 }
 
-function sanitizeOptionalString(value: any): string | undefined {
+function sanitizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
@@ -92,7 +92,7 @@ function sanitizeOptionalString(value: any): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function sanitizePathWeight(value: any): number {
+function sanitizePathWeight(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return DEFAULT_PATH_WEIGHT;
   }
@@ -102,7 +102,7 @@ function sanitizePathWeight(value: any): number {
   return value;
 }
 
-function sanitizeSuccessRate(value: any): number {
+function sanitizeSuccessRate(value: unknown): number {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return DEFAULT_SUCCESS_RATE;
   }
@@ -115,12 +115,12 @@ function sanitizeSuccessRate(value: any): number {
   return value;
 }
 
-function sanitizeLastUsed(value: any): string | undefined {
+function sanitizeLastUsed(value: unknown): string | undefined {
   if (!value) {
     return undefined;
   }
 
-  const date = typeof value === 'string' ? new Date(value) : value;
+  const date = typeof value === 'string' ? new Date(value) : (value as Date);
   if (!(date instanceof Date) || Number.isNaN(date.valueOf())) {
     return undefined;
   }
@@ -128,7 +128,7 @@ function sanitizeLastUsed(value: any): string | undefined {
   return date.toISOString();
 }
 
-function sanitizeVariableCount(value: any): number {
+function sanitizeVariableCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return 0;
   }
@@ -136,8 +136,8 @@ function sanitizeVariableCount(value: any): number {
   return rounded < 0 ? 0 : rounded;
 }
 
-function extractExtras(source: any): Record<string, any> {
-  const extras: Record<string, any> = {};
+function extractExtras(source: unknown): Record<string, unknown> {
+  const extras: Record<string, unknown> = {};
   if (!source || typeof source !== 'object') {
     return extras;
   }
@@ -151,8 +151,8 @@ function extractExtras(source: any): Record<string, any> {
   return extras;
 }
 
-function internalNormalize(raw: any): CodemapChunk {
-  const fallback = raw && typeof raw === 'object' ? raw : {};
+function internalNormalize(raw: unknown): CodemapChunk {
+  const fallback = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const parsed = CodemapChunkSchema.safeParse(fallback);
   const data = parsed.success ? parsed.data : fallback;
   const extras = extractExtras(data);
@@ -194,7 +194,7 @@ function internalNormalize(raw: any): CodemapChunk {
     ? data.symbol
     : null;
 
-  const normalized: any = {
+  const normalized: CodemapChunk = {
     ...extras,
     file,
     symbol,
@@ -236,19 +236,19 @@ function internalNormalize(raw: any): CodemapChunk {
   return normalized;
 }
 
-export function normalizeChunkMetadata(raw: any, previous?: CodemapChunk): CodemapChunk {
+export function normalizeChunkMetadata(raw: unknown, previous?: CodemapChunk): CodemapChunk {
   const base = previous ? internalNormalize(previous) : undefined;
-  const incoming = raw && typeof raw === 'object' ? raw : {};
+  const incoming = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const merged = base ? { ...base, ...incoming } : incoming;
   return internalNormalize(merged);
 }
 
-export function normalizeCodemapRecord(raw: any): Codemap {
+export function normalizeCodemapRecord(raw: unknown): Codemap {
   if (!raw || typeof raw !== 'object') {
     return {};
   }
 
-  const entries = Object.entries(raw)
+  const entries = Object.entries(raw as Record<string, unknown>)
     .filter(([key]) => typeof key === 'string' && key.length > 0)
     .map(([chunkId, value]) => [chunkId, normalizeChunkMetadata(value)] as [string, CodemapChunk]);
 

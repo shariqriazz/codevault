@@ -41,11 +41,11 @@ interface LanguageModule {
  *
  * @param module - The module to resolve
  * @param preferredKey - Optional key to check first when resolving
- * @returns The resolved language module or null
+ * @returns The resolved language module
  */
 function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): unknown {
   if (!module) {
-    return null;
+    return module;
   }
 
   // Check if module is an object
