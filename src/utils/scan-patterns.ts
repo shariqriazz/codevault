@@ -21,8 +21,7 @@ export const DEFAULT_SCAN_IGNORES = [
   '**/package-lock.json',
   '**/yarn.lock',
   '**/pnpm-lock.yaml',
-  '**/*.json',
-  '**/*.sh',
+  '**/*.min.json',
   '**/examples/**',
   '**/assets/**'
 ];
