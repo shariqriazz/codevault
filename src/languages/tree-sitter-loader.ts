@@ -41,77 +41,98 @@ interface LanguageModule {
  *
  * @param module - The module to resolve
  * @param preferredKey - Optional key to check first when resolving
- * @returns The resolved language module
+ * @returns The resolved language module or null if not found
  */
-function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): unknown {
+function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): Parser.Language | null {
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
   if (!module) {
-    return module;
+    return null;
   }
 
   // Check if module is an object
   if (typeof module !== 'object' || module === null) {
-    return module;
+    return null;
   }
 
   const langModule = module as LanguageModule;
 
   // Check for default export
   if ('default' in langModule && langModule.default !== undefined) {
-    return resolveTreeSitterLanguage(langModule.default, preferredKey);
+    const resolved = resolveTreeSitterLanguage(langModule.default, preferredKey);
+    if (resolved) return resolved;
   }
 
   // Check for preferred key
   if (preferredKey && preferredKey in langModule && langModule[preferredKey] !== undefined) {
-    return resolveTreeSitterLanguage(langModule[preferredKey], null);
+    const resolved = resolveTreeSitterLanguage(langModule[preferredKey], null);
+    if (resolved) return resolved;
   }
 
   // Check if this module has a language property
   if ('language' in langModule && typeof langModule.language === 'object' && langModule.language !== null) {
-    return langModule;
+    return langModule.language as Parser.Language;
+  }
+
+  // Check if this module itself looks like a language object (has name property)
+  // Some tree-sitter modules export the language object directly
+  if ('name' in langModule && typeof langModule.name === 'string') {
+    return langModule as unknown as Parser.Language;
   }
 
   // Search through all values for a language object
   const values = Object.values(langModule);
   for (const value of values) {
     const resolved = resolveTreeSitterLanguage(value, null);
-    if (resolved && typeof resolved === 'object' && resolved !== null) {
-      const resolvedModule = resolved as LanguageModule;
-      if ('language' in resolvedModule && typeof resolvedModule.language === 'object' && resolvedModule.language !== null) {
-        return resolved;
-      }
+    if (resolved) {
+      return resolved;
     }
   }
 
-  return module;
+  return null;
+/* eslint-enable @typescript-eslint/no-unsafe-assignment */
+}
+
+/**
+ * Helper function to safely resolve a language or throw an error.
+ */
+function resolveLanguageOrThrow(module: unknown, languageName: string, preferredKey?: string): Parser.Language {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const resolved = resolveTreeSitterLanguage(module, preferredKey ?? null);
+  if (!resolved) {
+    throw new Error(`Failed to resolve tree-sitter language: ${languageName}`);
+  }
+  return resolved;
 }
 
 /**
  * Resolved tree-sitter language objects for all supported languages.
  * These can be passed directly to Parser.setLanguage().
  */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 export const RESOLVED_LANGUAGES: Record<string, Parser.Language> = {
-  bash: resolveTreeSitterLanguage(LangBash) as Parser.Language,
-  c: resolveTreeSitterLanguage(LangC) as Parser.Language,
-  csharp: resolveTreeSitterLanguage(LangCSharp) as Parser.Language,
-  cpp: resolveTreeSitterLanguage(LangCpp) as Parser.Language,
-  css: resolveTreeSitterLanguage(LangCSS) as Parser.Language,
-  elixir: resolveTreeSitterLanguage(LangElixir) as Parser.Language,
-  go: resolveTreeSitterLanguage(LangGo) as Parser.Language,
-  haskell: resolveTreeSitterLanguage(LangHaskell) as Parser.Language,
-  html: resolveTreeSitterLanguage(LangHTML) as Parser.Language,
-  java: resolveTreeSitterLanguage(LangJava) as Parser.Language,
-  javascript: resolveTreeSitterLanguage(LangJS, 'javascript') as Parser.Language,
-  json: resolveTreeSitterLanguage(LangJSON) as Parser.Language,
-  kotlin: resolveTreeSitterLanguage(LangKotlin) as Parser.Language,
-  lua: resolveTreeSitterLanguage(LangLua) as Parser.Language,
-  markdown: resolveTreeSitterLanguage(LangMarkdown) as Parser.Language,
-  ocaml: resolveTreeSitterLanguage(LangOCaml, 'ocaml') as Parser.Language,
-  php: resolveTreeSitterLanguage(LangPHP, 'php') as Parser.Language,
-  python: resolveTreeSitterLanguage(LangPython) as Parser.Language,
-  ruby: resolveTreeSitterLanguage(LangRuby) as Parser.Language,
-  rust: resolveTreeSitterLanguage(LangRust) as Parser.Language,
-  scala: resolveTreeSitterLanguage(LangScala) as Parser.Language,
-  swift: resolveTreeSitterLanguage(LangSwift) as Parser.Language,
-  tsx: resolveTreeSitterLanguage(LangTSX) as Parser.Language,
-  typescript: resolveTreeSitterLanguage(LangTS) as Parser.Language
+  bash: resolveLanguageOrThrow(LangBash, 'bash'),
+  c: resolveLanguageOrThrow(LangC, 'c'),
+  csharp: resolveLanguageOrThrow(LangCSharp, 'csharp'),
+  cpp: resolveLanguageOrThrow(LangCpp, 'cpp'),
+  css: resolveLanguageOrThrow(LangCSS, 'css'),
+  elixir: resolveLanguageOrThrow(LangElixir, 'elixir'),
+  go: resolveLanguageOrThrow(LangGo, 'go'),
+  haskell: resolveLanguageOrThrow(LangHaskell, 'haskell'),
+  html: resolveLanguageOrThrow(LangHTML, 'html'),
+  java: resolveLanguageOrThrow(LangJava, 'java'),
+  javascript: resolveLanguageOrThrow(LangJS, 'javascript', 'javascript'),
+  json: resolveLanguageOrThrow(LangJSON, 'json'),
+  kotlin: resolveLanguageOrThrow(LangKotlin, 'kotlin'),
+  lua: resolveLanguageOrThrow(LangLua, 'lua'),
+  markdown: resolveLanguageOrThrow(LangMarkdown, 'markdown'),
+  ocaml: resolveLanguageOrThrow(LangOCaml, 'ocaml', 'ocaml'),
+  php: resolveLanguageOrThrow(LangPHP, 'php', 'php'),
+  python: resolveLanguageOrThrow(LangPython, 'python'),
+  ruby: resolveLanguageOrThrow(LangRuby, 'ruby'),
+  rust: resolveLanguageOrThrow(LangRust, 'rust'),
+  scala: resolveLanguageOrThrow(LangScala, 'scala'),
+  swift: resolveLanguageOrThrow(LangSwift, 'swift'),
+  tsx: resolveLanguageOrThrow(LangTSX, 'tsx'),
+  typescript: resolveLanguageOrThrow(LangTS, 'typescript')
 };
+/* eslint-enable @typescript-eslint/no-unsafe-assignment */

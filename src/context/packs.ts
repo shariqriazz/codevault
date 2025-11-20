@@ -17,7 +17,7 @@ export interface PackInfo {
   invalid?: boolean;
 }
 
-interface SessionPack extends PackInfo {
+export interface SessionPack extends PackInfo {
   basePath: string;
 }
 

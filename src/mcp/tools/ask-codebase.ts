@@ -28,13 +28,22 @@ export const askCodebaseResultSchema = z.object({
   error: z.string().optional()
 });
 
+interface ErrorLogger {
+  debugLog?: (message: string, data?: unknown) => void;
+  log?: (error: unknown, context?: unknown) => void;
+}
+
+interface SessionPack {
+  [key: string]: unknown;
+}
+
 interface CreateHandlerOptions {
-  sessionPack?: any;
-  errorLogger?: any;
+  sessionPack?: SessionPack;
+  errorLogger?: ErrorLogger;
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
-  const { sessionPack, errorLogger } = options;
+  const { sessionPack: _sessionPack, errorLogger } = options;
 
   return async (params: {
     question: string;
@@ -70,7 +79,7 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
         lang: Array.isArray(lang) ? lang : lang ? [lang] : undefined
       };
 
-      if (errorLogger?.debugLog) {
+      if (errorLogger && typeof errorLogger.debugLog === 'function') {
         errorLogger.debugLog('ask_codebase called', {
           question,
           provider,
@@ -122,14 +131,14 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
       };
 
     } catch (error) {
-      if (errorLogger?.log) {
+      if (errorLogger && typeof errorLogger.log === 'function') {
         errorLogger.log(error, {
           operation: 'ask_codebase',
           question,
           path: workingPath
         });
       }
-      
+
       return {
         success: false,
         content: formatErrorMessage((error as Error).message, question)
@@ -138,7 +147,12 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
   };
 }
 
-export function registerAskCodebaseTool(server: any, options: CreateHandlerOptions = {}) {
+interface MCPServer {
+  tool: (name: string, schema: Record<string, z.ZodTypeAny>, handler: (params: unknown) => Promise<unknown>) => void;
+  [key: string]: unknown;
+}
+
+export function registerAskCodebaseTool(server: MCPServer, options: CreateHandlerOptions = {}) {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(
@@ -156,8 +170,21 @@ export function registerAskCodebaseTool(server: any, options: CreateHandlerOptio
       multi_query: z.boolean().optional().describe('Break complex questions into sub-queries'),
       temperature: z.number().min(0).max(2).optional().describe('LLM temperature (default: 0.7)')
     },
-    async (params: any) => {
-      const result = await handler(params);
+    async (params: unknown) => {
+      const validatedParams = params as {
+        question: string;
+        provider?: string;
+        chat_provider?: string;
+        path?: string;
+        max_chunks?: number;
+        path_glob?: string | string[];
+        tags?: string | string[];
+        lang?: string | string[];
+        reranker?: 'on' | 'off';
+        multi_query?: boolean;
+        temperature?: number;
+      };
+      const result = await handler(validatedParams);
       return {
         content: [
           {

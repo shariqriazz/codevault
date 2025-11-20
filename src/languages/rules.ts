@@ -20,6 +20,7 @@ export interface LanguageRule {
   commentPattern: RegExp | null;
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 export const LANG_RULES: Record<string, LanguageRule> = {
   '.php': {
     lang: 'php',
@@ -386,6 +387,7 @@ export const LANG_RULES: Record<string, LanguageRule> = {
     commentPattern: /<!--[\s\S]*?-->/g
   }
 };
+/* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
 export function getSupportedLanguageExtensions(): string[] {
   return Object.keys(LANG_RULES);

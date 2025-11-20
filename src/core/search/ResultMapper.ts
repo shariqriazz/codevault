@@ -96,9 +96,9 @@ export class ResultMapper {
     try {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
-        getText: candidate => {
-          const codeText = this.readChunkText(candidate.sha, chunkDir) || '';
-          return this.buildBm25Document(candidate, codeText);
+        getText: (candidate) => {
+          const codeText = this.readChunkText((candidate as SearchCandidate).sha, chunkDir) || '';
+          return this.buildBm25Document(candidate as SearchCandidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
         apiKey: providerContext.reranker.apiKey,

@@ -12,8 +12,16 @@ declare module 'tree-sitter' {
     rootNode: SyntaxNode;
   }
 
+  export interface Language {
+    [key: string]: unknown;
+  }
+
   export default class Parser {
-    setLanguage(language: any): void;
-    parse(input: string | ((index: number, position?: any) => string | null)): Tree;
+    setLanguage(language: Language): void;
+    parse(input: string | ((index: number, position?: { row: number; column: number }) => string | null)): Tree;
+  }
+
+  export namespace Parser {
+    export { Language };
   }
 }

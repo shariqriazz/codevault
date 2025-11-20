@@ -18,7 +18,7 @@ export const ContextPackScopeSchema = z.object({
 export const ContextPackSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   scope: ContextPackScopeSchema.optional(),
   path_glob: stringOrStringArray.optional(),
   tags: stringOrStringArray.optional(),
@@ -33,7 +33,9 @@ export const ContextPackSchema = z.object({
 export type ContextPackScope = z.infer<typeof ContextPackScopeSchema>;
 export type ContextPack = z.infer<typeof ContextPackSchema>;
 
-export function extractScopeFromPackDefinition(definition: ContextPack): Record<string, any> {
+type ScopeValue = string | string[] | boolean | undefined;
+
+export function extractScopeFromPackDefinition(definition: ContextPack): Record<string, ScopeValue> {
   if (!definition || typeof definition !== 'object') {
     return {};
   }
@@ -42,11 +44,16 @@ export function extractScopeFromPackDefinition(definition: ContextPack): Record<
     ? { ...definition.scope }
     : {};
 
-  const scope = { ...scopeCandidate };
+  const scope: Record<string, ScopeValue> = { ...scopeCandidate };
 
-  for (const key of ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost']) {
-    if (Object.prototype.hasOwnProperty.call(definition, key) && typeof (definition as any)[key] !== 'undefined') {
-      (scope as any)[key] = (definition as any)[key];
+  const scopeKeys = ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost'] as const;
+
+  for (const key of scopeKeys) {
+    if (Object.prototype.hasOwnProperty.call(definition, key)) {
+      const value = definition[key];
+      if (value !== undefined) {
+        scope[key] = value as ScopeValue;
+      }
     }
   }
 

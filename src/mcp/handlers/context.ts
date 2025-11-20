@@ -1,7 +1,8 @@
 import { resolveProjectRoot } from '../../utils/path-helpers.js';
+import type { SessionPack } from '../../context/packs.js';
 import { UseContextPackArgs } from '../schemas.js';
 
-export async function handleUseContextPack(args: UseContextPackArgs, setSessionPack: (pack: any) => void) {
+export async function handleUseContextPack(args: UseContextPackArgs, setSessionPack: (pack: SessionPack | null) => void) {
   const cleanPath = resolveProjectRoot(args);
   const name = args.name;
 
@@ -15,7 +16,7 @@ export async function handleUseContextPack(args: UseContextPackArgs, setSessionP
   try {
     const { loadContextPack } = await import('../../context/packs.js');
     const pack = loadContextPack(name, cleanPath);
-    setSessionPack({ ...pack, basePath: cleanPath });
+    setSessionPack({ ...pack, basePath: cleanPath } as SessionPack);
 
     return {
       content: [

@@ -18,15 +18,15 @@ export function registerSearchCommand(program: Command): void {
     .option('--hybrid <mode>', 'hybrid search (on|off)', 'on')
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath = '.', options: Record<string, unknown>) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath = options.project || options.directory || projectPath || '.';
-        const limit = parseInt(options.limit);
+        const resolvedPath = String(options.project || options.directory || projectPath || '.');
+        const limit = parseInt(String(options.limit));
 
         const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
+        const results = await searchCode(query, limit, String(options.provider || 'auto'), resolvedPath, scopeFilters);
 
         if (!results.success) {
           console.log(chalk.yellow(`\nNo results found for "${query}"`));

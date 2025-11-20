@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as handlers from './mcp/handlers/index.js';
+import type { SessionPack } from './context/packs.js';
 import {
   SearchCodeArgsSchema,
   SearchCodeWithChunksArgsSchema,
@@ -127,7 +128,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: ContextPack | null = null;
+  private sessionContextPack: SessionPack | null = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {

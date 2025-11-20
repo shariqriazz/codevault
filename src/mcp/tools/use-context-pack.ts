@@ -13,15 +13,24 @@ export const useContextPackResultSchema = z.object({
     key: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    scope: z.record(z.string(), z.any())
+    scope: z.record(z.string(), z.unknown())
   }).optional()
 });
 
+interface ErrorLogger {
+  debugLog?: (message: string, data?: unknown) => void;
+  log?: (error: unknown, context?: unknown) => void;
+}
+
+interface ContextPack {
+  [key: string]: unknown;
+}
+
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
-  setSessionPack: (pack: any) => void;
+  setSessionPack: (pack: ContextPack) => void;
   clearSessionPack: () => void;
-  errorLogger?: any;
+  errorLogger?: ErrorLogger;
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
@@ -50,7 +59,7 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
       const sessionPack = {
         ...pack,
         basePath
-      };
+      } as ContextPack;
 
       if (typeof setSessionPack === 'function') {
         setSessionPack(sessionPack);
@@ -86,7 +95,12 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions) {
+interface MCPServer {
+  tool: (name: string, schema: Record<string, z.ZodTypeAny>, handler: (params: unknown) => Promise<unknown>) => void;
+  [key: string]: unknown;
+}
+
+export function registerUseContextPackTool(server: MCPServer, options: CreateHandlerOptions) {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -95,8 +109,9 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    async (params: any) => {
-      const result = await handler(params);
+    async (params: unknown) => {
+      const validatedParams = params as { name: string; path?: string };
+      const result = await handler(validatedParams);
       return {
         content: [
           {

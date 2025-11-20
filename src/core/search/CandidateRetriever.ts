@@ -6,7 +6,7 @@ import { logger } from '../../utils/logger.js';
 /**
  * SearchCandidate represents a chunk with search scores and metadata
  */
-export interface SearchCandidate {
+export interface SearchCandidate extends Record<string, unknown> {
   id: string;
   sha: string;
   file_path: string;

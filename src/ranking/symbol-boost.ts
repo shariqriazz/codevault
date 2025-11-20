@@ -15,6 +15,15 @@ interface SearchResult {
   symbolNeighborStrength?: number;
 }
 
+interface CodeEntry {
+  symbol?: string;
+  symbol_signature?: string;
+  symbol_parameters?: string[];
+  symbol_neighbors?: string[];
+  sha?: string;
+  [key: string]: unknown;
+}
+
 // Regex cache for performance
 const regexCache = new Map<string, RegExp>();
 const MAX_CACHE_SIZE = 1000;
@@ -63,7 +72,7 @@ function splitSymbolWords(symbol: string): string[] {
     .filter(word => word.length > 0);
 }
 
-function computeSignatureMatchStrength(query: string, entry: any): number {
+function computeSignatureMatchStrength(query: string, entry: CodeEntry | null | undefined): number {
   if (!entry) {
     return 0;
   }
@@ -144,8 +153,8 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   return Math.max(0, Math.min(weight / 4, 1));
 }
 
-function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: any }> {
-  const index = new Map();
+function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: CodeEntry }> {
+  const index = new Map<string, { chunkId: string; entry: CodeEntry }>();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }
@@ -154,7 +163,7 @@ function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: 
     if (!entry || typeof entry.sha !== 'string') {
       continue;
     }
-    index.set(entry.sha, { chunkId, entry });
+    index.set(entry.sha, { chunkId, entry: entry as CodeEntry });
   }
 
   return index;
@@ -172,7 +181,7 @@ export function applySymbolBoost(results: SearchResult[], { query, codemap }: { 
   const shaIndex = buildShaIndex(codemap);
 
   for (const result of results) {
-    const metadata = codemap[result.id];
+    const metadata = codemap[result.id] as CodeEntry | undefined;
     if (!metadata) {
       continue;
     }

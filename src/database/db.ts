@@ -46,7 +46,7 @@ function tryParseJsonEmbedding(buffer: Buffer): Float32Array | null {
   }
 
   try {
-    const parsed = JSON.parse(buffer.toString('utf8'));
+    const parsed: unknown = JSON.parse(buffer.toString('utf8'));
     if (!Array.isArray(parsed)) {
       return null;
     }
@@ -423,9 +423,9 @@ export class CodeVaultDatabase {
     }
   }
 
-  async searchByIntention(normalizedQuery: string): Promise<any> {
+  async searchByIntention(normalizedQuery: string): Promise<unknown[]> {
     try {
-      return this.db.prepare(`
+      const results: unknown = this.db.prepare(`
         SELECT
           i.target_sha,
           i.confidence,
@@ -441,9 +441,10 @@ export class CodeVaultDatabase {
         ORDER BY i.confidence DESC, i.usage_count DESC
         LIMIT 1
       `).get(normalizedQuery);
+      return results ? [results] : [];
     } catch (error) {
       log.error('Failed to search by intention', error, { query: normalizedQuery });
-      return null;
+      return [];
     }
   }
 
@@ -519,7 +520,7 @@ export class CodeVaultDatabase {
   transaction<T>(fn: () => T): T {
     const wrapped = this.db.transaction(() => {
       const result = fn();
-      if (result && typeof (result as any).then === 'function') {
+      if (result && typeof result === 'object' && result !== null && 'then' in result && typeof (result as { then: unknown }).then === 'function') {
         throw new Error('better-sqlite3 transactions must be synchronous; avoid returning a Promise.');
       }
       return result;

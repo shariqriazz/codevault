@@ -135,16 +135,16 @@ export function parseMultiQueryResponse(response: string): string[] {
     if (!jsonMatch) {
       return [];
     }
-    
-    const queries = JSON.parse(jsonMatch[0]);
-    
+
+    const queries: unknown = JSON.parse(jsonMatch[0]);
+
     if (!Array.isArray(queries)) {
       return [];
     }
-    
+
     return queries
-      .filter(q => typeof q === 'string' && q.trim().length > 0)
-      .map(q => q.trim())
+      .filter((q: unknown): q is string => typeof q === 'string' && q.trim().length > 0)
+      .map((q: string) => q.trim())
       .slice(0, 4); // Max 4 queries
   } catch (error) {
     console.error('Failed to parse multi-query response:', error);
