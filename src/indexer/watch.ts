@@ -5,8 +5,9 @@ import { toPosixPath } from './merkle.js';
 import { getSupportedLanguageExtensions } from '../languages/rules.js';
 import { createEmbeddingProvider, type EmbeddingProvider } from '../providers/index.js';
 import { resolveProviderContext } from '../config/resolver.js';
+import { WATCHER_CONSTANTS } from '../config/constants.js';
 
-const DEFAULT_DEBOUNCE_MS = 500;
+const DEFAULT_DEBOUNCE_MS = WATCHER_CONSTANTS.DEFAULT_DEBOUNCE_MS;
 const IGNORED_GLOBS = [
   '**/node_modules/**',
   '**/.git/**',
@@ -51,7 +52,7 @@ export function startWatch({
     : ['**/*'];
 
   const effectiveDebounce = Number.isFinite(Number.parseInt(String(debounceMs), 10))
-    ? Math.max(Number.parseInt(String(debounceMs), 10), 50)
+    ? Math.max(Number.parseInt(String(debounceMs), 10), WATCHER_CONSTANTS.MIN_DEBOUNCE_MS)
     : DEFAULT_DEBOUNCE_MS;
 
   const watcher = chokidar.watch(watchPatterns, {
@@ -59,8 +60,8 @@ export function startWatch({
     ignoreInitial: true,
     ignored: IGNORED_GLOBS,
     awaitWriteFinish: {
-      stabilityThreshold: Math.max(effectiveDebounce, 100),
-      pollInterval: 50
+      stabilityThreshold: Math.max(effectiveDebounce, WATCHER_CONSTANTS.STABILITY_THRESHOLD_MS),
+      pollInterval: WATCHER_CONSTANTS.POLL_INTERVAL_MS
     },
     persistent: true
   });
@@ -212,7 +213,7 @@ export function startWatch({
     }
   }
 
-  const settleDelay = Math.min(effectiveDebounce, 200);
+  const settleDelay = Math.min(effectiveDebounce, WATCHER_CONSTANTS.SETTLE_DELAY_MS);
 
   async function drainPending(): Promise<void> {
     if (timer) {

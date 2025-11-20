@@ -109,15 +109,13 @@ export class OpenAIProvider extends EmbeddingProvider {
         const truncatedText = text.slice(0, maxChars);
         const itemTokens = estimateTokens(truncatedText);
         
-        // Skip items that exceed single item limit
+        // Fail if item exceeds single item limit - don't create zero-vector pollution
         if (itemTokens > MAX_ITEM_TOKENS) {
-          if (!process.env.CODEVAULT_QUIET) {
-            console.warn(`  ⚠️  Text at index ${i} exceeds max token limit (${itemTokens} > ${MAX_ITEM_TOKENS}), skipping`);
-          }
-          processedIndices.push(i);
-          // Add empty embedding as placeholder
-          allEmbeddings.push(new Array(this.getDimensions()).fill(0));
-          continue;
+          throw new Error(
+            `Text at index ${i} exceeds maximum token limit (${itemTokens} > ${MAX_ITEM_TOKENS}). ` +
+            `This would create corrupted embeddings. Consider reducing chunk size or increasing ` +
+            `CODEVAULT_EMBEDDING_MAX_TOKENS. Text preview: ${text.slice(0, 100)}...`
+          );
         }
         
         // Add to batch if it fits

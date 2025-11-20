@@ -4,7 +4,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 
 ## Project Overview
 
-This is a TypeScript/Node.js project (v1.5.0) that provides:
+This is a TypeScript/Node.js project (v1.7.3, requires Node.js >=18.0.0) that provides:
 - **Semantic code search** using vector embeddings with 25+ languages
 - **MCP (Model Context Protocol)** integration for AI assistants
 - **Symbol-aware ranking** for better code understanding
