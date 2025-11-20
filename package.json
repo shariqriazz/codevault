@@ -98,6 +98,9 @@
     "@types/cli-progress": "^3.11.6",
     "@types/micromatch": "^4.0.10",
     "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.9.3"
   }
 }
