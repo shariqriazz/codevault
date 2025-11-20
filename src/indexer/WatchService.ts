@@ -186,7 +186,10 @@ export class WatchService {
 }
 
 /**
- * Start watching a repository (factory function for backward compatibility)
+ * Start watching a repository and automatically batch index changes.
+ *
+ * @param options - Watch configuration (repoPath, provider, debounceMs, encryption)
+ * @returns Controller with handles for `ready`, `flush`, and `close`
  */
 export function startWatch(options: WatchServiceOptions = {}): WatchController {
   const service = new WatchService(options);

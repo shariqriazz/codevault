@@ -47,6 +47,11 @@ interface ChunkToEmbed {
   };
 }
 
+/**
+ * Batches chunk embeddings for efficiency and handles retry/backoff with a SQLite sink.
+ *
+ * Use `addChunk` to enqueue work and `flush` to force processing of remaining items.
+ */
 export class BatchEmbeddingProcessor {
   private batch: ChunkToEmbed[] = [];
   private batchSize: number;

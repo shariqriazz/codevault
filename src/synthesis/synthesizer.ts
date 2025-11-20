@@ -12,6 +12,9 @@ import type { SearchResult } from '../core/types.js';
 import { resolveProviderContext } from '../config/resolver.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Options controlling search + synthesis behavior.
+ */
 export interface SynthesisOptions {
   provider?: string;
   chatProvider?: string;
@@ -56,6 +59,13 @@ function validateLLMResponse(response: string): { safe: boolean; issues: string[
   return { safe: issues.length === 0, issues };
 }
 
+/**
+ * Perform hybrid search and produce a natural-language answer with retrieved code context.
+ *
+ * @param query - User-provided question or instruction
+ * @param options - Provider, scope, and synthesis controls
+ * @returns Structured synthesis result containing the answer, metadata, and any warnings
+ */
 export async function synthesizeAnswer(
   query: string,
   options: SynthesisOptions = {}

@@ -16,6 +16,9 @@ export interface ModelProfile {
 }
 
 export abstract class EmbeddingProvider {
+  /**
+   * Generate an embedding vector for a single text input.
+   */
   abstract generateEmbedding(text: string): Promise<number[]>;
   abstract getDimensions(): number;
   abstract getName(): string;
