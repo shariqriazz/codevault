@@ -1,4 +1,4 @@
-import type { DatabaseChunk } from '../../database/db.js';
+import { decodeEmbedding, type DatabaseChunk } from '../../database/db.js';
 import type { EmbeddingProvider } from '../../providers/index.js';
 import { DOC_BOOST, DOC_BOOST_CONSTANTS } from '../../config/constants.js';
 import { logger } from '../../utils/logger.js';
@@ -158,19 +158,14 @@ export class CandidateRetriever {
       return cached;
     }
 
-    try {
-      const parsed = JSON.parse(chunk.embedding.toString());
-      const vector = new Float32Array(parsed);
-      (chunk as any).__cachedEmbedding = vector;
-      return vector;
-    } catch (error) {
-      logger.warn('Failed to parse embedding for chunk, using empty vector', {
-        chunkId: chunk.id,
-        error
-      });
-      const empty = new Float32Array();
-      (chunk as any).__cachedEmbedding = empty;
-      return empty;
+    const vector = decodeEmbedding(
+      chunk.embedding,
+      chunk.embedding_dimensions || undefined
+    );
+    if (vector.length === 0 && chunk.embedding && chunk.embedding.length > 0) {
+      logger.warn('Embedding decoded to empty vector', { chunkId: chunk.id });
     }
+    (chunk as any).__cachedEmbedding = vector;
+    return vector;
   }
 }
