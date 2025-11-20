@@ -199,14 +199,33 @@ export async function yieldStatementChunks(
         size: currentSize,
         unit: profile.useTokens ? 'tokens' : 'characters'
       });
-      
-      // Use the provided overlapSize parameter instead of hardcoded 20%
-      const overlapRatio = Math.min(1, Math.max(0, overlapSize / maxSize));
-      const overlapLines = Math.max(1, Math.floor(currentChunk.length * overlapRatio));
-      currentChunk = currentChunk.slice(-overlapLines);
-      currentSize = profile.useTokens && profile.tokenCounter
-        ? await profile.tokenCounter(currentChunk.join('\n'))
-        : currentChunk.join('\n').length;
+
+      // Ensure minimum 20% overlap by token/character count, not line count
+      // This prevents overlap from degrading to 1-2% for large chunks
+      const MIN_OVERLAP_RATIO = 0.2;
+      const targetOverlapSize = Math.max(
+        overlapSize,
+        Math.floor(maxSize * MIN_OVERLAP_RATIO)
+      );
+
+      // Calculate how many lines we need to achieve target overlap size
+      let overlapAccumulatedSize = 0;
+      let linesToKeep = 0;
+
+      // Walk backwards through lines to accumulate target overlap size
+      for (let i = currentChunk.length - 1; i >= 0 && overlapAccumulatedSize < targetOverlapSize; i--) {
+        const lineText = currentChunk[i];
+        const lineSize = profile.useTokens && profile.tokenCounter
+          ? await profile.tokenCounter(lineText)
+          : lineText.length;
+        overlapAccumulatedSize += lineSize;
+        linesToKeep++;
+      }
+
+      // Keep at least 1 line for overlap
+      linesToKeep = Math.max(1, linesToKeep);
+      currentChunk = currentChunk.slice(-linesToKeep);
+      currentSize = overlapAccumulatedSize;
     }
     
     currentChunk.push(line);

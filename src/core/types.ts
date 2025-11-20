@@ -98,6 +98,18 @@ export interface SearchCodeResult {
     enabled: boolean;
     boosted: boolean;
   };
+  chunkLoadingFailures?: {
+    totalAttempted: number;
+    failed: number;
+    reasons: {
+      encryption_key_required?: number;
+      encryption_auth_failed?: number;
+      chunk_decompression_failed?: number;
+      chunk_read_failed?: number;
+      file_not_found?: number;
+    };
+  };
+  warnings?: string[];
   results: SearchResult[];
   error?: string;
   message?: string;
