@@ -1,5 +1,5 @@
-import { OpenAI } from 'openai';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { OpenAI, type ClientOptions } from 'openai';
+import { createRateLimiter, type RateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 
 export interface ChatMessage {
@@ -19,8 +19,8 @@ export abstract class ChatLLMProvider {
   abstract getName(): string;
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
-  
-  rateLimiter?: any;
+
+  rateLimiter?: RateLimiter;
 }
 
 export class OpenAIChatProvider extends ChatLLMProvider {
@@ -30,7 +30,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   private baseUrl?: string;
   private maxTokensOverride?: number;
   private temperatureOverride?: number;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: ChatOptions = {}) {
     super();
@@ -48,16 +48,16 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
-      
+      const config: ClientOptions = {};
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
   }

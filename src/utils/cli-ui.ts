@@ -1,10 +1,10 @@
 import cliProgress from 'cli-progress';
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import chalk from 'chalk';
 
 export class IndexerUI {
   private progressBar: cliProgress.SingleBar | null = null;
-  private spinner: any = null;
+  private spinner: Ora | null = null;
   private startTime: number = 0;
   private totalFiles: number = 0;
   private processedFiles: number = 0;
@@ -123,7 +123,7 @@ export class IndexerUI {
     totalChunks: number;
     dbSize?: string;
     codemapSize?: string;
-    tokenStats?: any;
+    tokenStats?: Record<string, unknown>;
   }) {
     console.log(chalk.white('\n📊 Summary'));
     console.log(chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`));

@@ -11,9 +11,23 @@ interface QueueItem<T> {
   estimatedTokens: number;
 }
 
+interface ResultWithUsage {
+  usage?: {
+    total_tokens?: number;
+  };
+}
+
+interface ErrorWithStatus {
+  message?: string;
+  status?: number;
+  statusCode?: number;
+}
+
 export class RateLimiter {
   private rpm: number | null;
   private tpm: number | null;
+  // Queue holds items with different generic types, so any is necessary here
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private queue: QueueItem<any>[] = [];
   private processing = false;
   private requestTimes: number[] = [];
@@ -139,11 +153,12 @@ export class RateLimiter {
       this.queue.shift();
 
       try {
-        const result = await fn();
-        
-        const tokensUsed = estimatedTokens || (result)?.usage?.total_tokens || 0;
-        this.recordRequest(tokensUsed);
-        
+        const result: unknown = await fn();
+
+        const resultWithUsage = result as ResultWithUsage;
+        const tokensUsed = estimatedTokens || resultWithUsage?.usage?.total_tokens || 0;
+        this.recordRequest(typeof tokensUsed === 'number' ? tokensUsed : 0);
+
         resolve(result);
       } catch (error) {
         if (this.isRateLimitError(error)) {
@@ -170,12 +185,13 @@ export class RateLimiter {
 
   private isRateLimitError(error: unknown): boolean {
     if (!error) return false;
-    
-    const message = (error as any).message || '';
-    const status = (error as any).status || (error as any).statusCode || 0;
-    
-    return status === 429 || 
-           message.includes('429') || 
+
+    const errorWithStatus = error as ErrorWithStatus;
+    const message = errorWithStatus.message || '';
+    const status = errorWithStatus.status || errorWithStatus.statusCode || 0;
+
+    return status === 429 ||
+           message.includes('429') ||
            message.includes('rate limit') ||
            message.includes('too many requests');
   }

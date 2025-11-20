@@ -6,10 +6,14 @@ import { validatePathSafety } from '../indexer/merkle.js';
  * Utility functions for path resolution and normalization
  */
 
+interface PathValidationError extends Error {
+  code: string;
+}
+
 /**
  * Resolves the project root path from various input options
  * Supports multiple parameter names for backwards compatibility (project, directory, path)
- * 
+ *
  * @param input - Object containing potential path parameters
  * @returns Normalized path string, defaults to '.' if no path provided
  */
@@ -21,14 +25,14 @@ export function resolveProjectRoot(input?: {
   if (!input) {
     return '.';
   }
-  
+
   const rawPath = input.project || input.directory || input.path || '.';
   const trimmed = typeof rawPath === 'string' ? rawPath.trim() : '.';
   const absolute = path.resolve(trimmed.length > 0 ? trimmed : '.');
   const validation = validatePathSafety(process.cwd(), absolute);
 
   if (!validation.safe || !validation.normalized) {
-    const error: any = new Error(`Path "${absolute}" is outside the project root`);
+    const error = new Error(`Path "${absolute}" is outside the project root`) as PathValidationError;
     error.code = 'PATH_VALIDATION_FAILED';
     throw error;
   }

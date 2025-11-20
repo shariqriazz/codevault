@@ -1,5 +1,5 @@
-import { OpenAI } from 'openai';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { OpenAI, type ClientOptions } from 'openai';
+import { createRateLimiter, type RateLimiter } from '../utils/rate-limiter.js';
 import {
   EmbeddingProvider,
   getModelProfile,
@@ -16,7 +16,7 @@ export class OpenAIProvider extends EmbeddingProvider {
   private apiKey?: string;
   private baseUrl?: string;
   private dimensionsOverride?: number;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: EmbeddingOptions = {}) {
     super();
@@ -33,16 +33,16 @@ export class OpenAIProvider extends EmbeddingProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
-      
+      const config: ClientOptions = {};
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
   }
