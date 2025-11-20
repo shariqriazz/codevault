@@ -3,6 +3,68 @@ import fs from 'fs';
 import path from 'path';
 import { log } from '../utils/logger.js';
 
+const DB_SCHEMA_VERSION = 2;
+
+function encodeEmbedding(embedding: ArrayLike<number>): Buffer {
+  const buffer = Buffer.allocUnsafe(embedding.length * 4);
+  for (let i = 0; i < embedding.length; i++) {
+    buffer.writeFloatLE(Number(embedding[i]) || 0, i * 4);
+  }
+  return buffer;
+}
+
+function tryParseJsonEmbedding(buffer: Buffer): Float32Array | null {
+  if (!buffer || buffer.length === 0) {
+    return null;
+  }
+
+  // Fast reject for binary buffers
+  const firstByte = buffer[0];
+  const isLikelyJson =
+    firstByte === 91 || // '['
+    firstByte === 123 || // '{'
+    firstByte === 45 || // '-'
+    (firstByte >= 48 && firstByte <= 57); // digits
+
+  if (!isLikelyJson) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(buffer.toString('utf8'));
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+
+    const vector = new Float32Array(parsed.length);
+    for (let i = 0; i < parsed.length; i++) {
+      vector[i] = Number(parsed[i]) || 0;
+    }
+    return vector;
+  } catch {
+    return null;
+  }
+}
+
+export function decodeEmbedding(buffer: Buffer, dimensions?: number): Float32Array {
+  const jsonEmbedding = tryParseJsonEmbedding(buffer);
+  if (jsonEmbedding) {
+    return jsonEmbedding;
+  }
+
+  if (!buffer || buffer.length < 4 || buffer.length % 4 !== 0) {
+    return new Float32Array();
+  }
+
+  const length = buffer.length / 4;
+  const targetLength =
+    typeof dimensions === 'number' && dimensions > 0
+      ? Math.min(dimensions, length)
+      : length;
+
+  return new Float32Array(buffer.buffer, buffer.byteOffset, targetLength);
+}
+
 export interface DatabaseChunk {
   id: string;
   file_path: string;
@@ -43,6 +105,7 @@ export class CodeVaultDatabase {
 
     // Check if tables exist and create if needed
     this.ensureTablesExist();
+    this.migrateLegacyEmbeddings();
   }
 
   /**
@@ -135,6 +198,56 @@ export class CodeVaultDatabase {
     }
   }
 
+  /**
+   * Migrate legacy JSON embeddings to binary Float32 buffers
+   */
+  private migrateLegacyEmbeddings(): void {
+    try {
+      const userVersion = this.db.pragma('user_version', { simple: true }) as number;
+      if (userVersion >= DB_SCHEMA_VERSION) {
+        return;
+      }
+
+      const selectStmt = this.db.prepare(`
+        SELECT id, embedding, embedding_dimensions
+        FROM code_chunks
+      `);
+      const updateStmt = this.db.prepare(`
+        UPDATE code_chunks
+        SET embedding = ?
+        WHERE id = ?
+      `);
+
+      const migrate = this.db.transaction(() => {
+        let converted = 0;
+        for (const row of selectStmt.iterate() as Iterable<{
+          id: string;
+          embedding: Buffer;
+          embedding_dimensions: number;
+        }>) {
+          const parsed = tryParseJsonEmbedding(row.embedding);
+          if (!parsed) continue;
+
+          const encoded = encodeEmbedding(parsed);
+          updateStmt.run(encoded, row.id);
+          converted++;
+        }
+
+        if (converted > 0) {
+          log.info('Migrated legacy JSON embeddings to binary', { converted });
+        } else {
+          log.debug('No legacy embeddings found for migration');
+        }
+      });
+
+      migrate();
+      this.db.pragma(`user_version = ${DB_SCHEMA_VERSION}`);
+    } catch (error) {
+      log.error('Failed to migrate embeddings to binary', error);
+      throw error;
+    }
+  }
+
   insertChunk(params: {
     id: string;
     file_path: string;
@@ -142,7 +255,7 @@ export class CodeVaultDatabase {
     sha: string;
     lang: string;
     chunk_type: string;
-    embedding: number[];
+    embedding: ArrayLike<number>;
     embedding_provider: string;
     embedding_dimensions: number;
     codevault_tags: string[];
@@ -160,7 +273,7 @@ export class CodeVaultDatabase {
         params.sha,
         params.lang,
         params.chunk_type,
-        Buffer.from(JSON.stringify(params.embedding)),
+        encodeEmbedding(params.embedding),
         params.embedding_provider,
         params.embedding_dimensions,
         JSON.stringify(params.codevault_tags),
