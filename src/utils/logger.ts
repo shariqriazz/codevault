@@ -13,8 +13,10 @@ export enum LogLevel {
   SILENT = 4,
 }
 
+export type LogValue = string | number | boolean | null | undefined | LogValue[] | { [key: string]: LogValue };
+
 interface LogMetadata {
-  [key: string]: any;
+  [key: string]: LogValue;
 }
 
 class Logger {
