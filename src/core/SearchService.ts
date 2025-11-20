@@ -98,10 +98,42 @@ export class SearchService {
 
       // Apply scope filtering
       const scopedChunks = applyScope(chunks, normalizedScope) as any[];
+      const selectionBudget = Math.max(limit, RRF_K);
+      const bm25CandidateLimit = Math.max(
+        selectionBudget,
+        SEARCH_CONSTANTS.BM25_PREFILTER_LIMIT
+      );
+
+      // Limit vector scoring to BM25-selected candidates when available
+      let bm25PrefilterResults: Array<{ id: string; score: number }> | undefined;
+      let vectorCandidates = scopedChunks;
+      if (hybridEnabled && bm25Enabled) {
+        const prefilter = this.fusion.prefilterCandidates({
+          hybridEnabled,
+          bm25Enabled,
+          query: normalizedQuery,
+          providerName: context.provider.getName(),
+          providerDimensions: context.provider.getDimensions(),
+          chunkDir: context.chunkDir,
+          basePath,
+          scopedChunks,
+          limit: bm25CandidateLimit
+        });
+
+        bm25PrefilterResults = prefilter.bm25Results;
+        if (prefilter.candidateIds.size > 0) {
+          const filtered = scopedChunks.filter(chunk =>
+            prefilter.candidateIds.has(chunk.id)
+          );
+          if (filtered.length > 0) {
+            vectorCandidates = filtered;
+          }
+        }
+      }
 
       // Build vector pool
       const { chunkInfoById, vectorPool } = await this.retriever.buildVectorPool(
-        scopedChunks,
+        vectorCandidates,
         context.provider,
         normalizedQuery
       );
@@ -121,8 +153,11 @@ export class SearchService {
       }
 
       // Hybrid fusion
-      const selectionBudget = Math.max(limit, RRF_K);
-      const { fusedResults, bm25Fused, bm25CandidateCount } = this.fusion.fuseResults({
+      const {
+        fusedResults,
+        bm25Fused,
+        bm25CandidateCount: fusedBm25CandidateCount
+      } = this.fusion.fuseResults({
         hybridEnabled,
         bm25Enabled,
         selectionBudget,
@@ -131,10 +166,15 @@ export class SearchService {
         providerDimensions: context.provider.getDimensions(),
         chunkDir: context.chunkDir,
         basePath,
-        scopedChunks,
+        scopedChunks: vectorCandidates,
         chunkInfoById,
-        vectorPool
+        vectorPool,
+        bm25ResultsOverride: bm25PrefilterResults
       });
+      const bm25CandidateCount =
+        bm25PrefilterResults && bm25PrefilterResults.length > 0
+          ? bm25PrefilterResults.length
+          : fusedBm25CandidateCount;
 
       // Select and sort results
       let results =

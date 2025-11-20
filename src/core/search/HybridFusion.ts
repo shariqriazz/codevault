@@ -39,6 +39,56 @@ export class HybridFusion {
   }
 
   /**
+   * Use BM25 to prefilter candidates before vector scoring
+   */
+  prefilterCandidates(params: {
+    hybridEnabled: boolean;
+    bm25Enabled: boolean;
+    query: string;
+    providerName: string;
+    providerDimensions: number;
+    chunkDir: string;
+    basePath: string;
+    scopedChunks: DatabaseChunk[];
+    limit: number;
+  }): { candidateIds: Set<string>; bm25Results: Array<{ id: string; score: number }> } {
+    const {
+      hybridEnabled,
+      bm25Enabled,
+      query,
+      providerName,
+      providerDimensions,
+      chunkDir,
+      basePath,
+      scopedChunks,
+      limit
+    } = params;
+
+    if (!hybridEnabled || !bm25Enabled) {
+      return { candidateIds: new Set(), bm25Results: [] };
+    }
+
+    const bm25Index = this.ensureBm25IndexForChunks(
+      basePath,
+      chunkDir,
+      providerName,
+      providerDimensions,
+      scopedChunks
+    );
+
+    if (!bm25Index) {
+      return { candidateIds: new Set(), bm25Results: [] };
+    }
+
+    const allowedIds = new Set(scopedChunks.map(chunk => chunk.id));
+    const bm25RawResults = bm25Index.search(query, limit);
+    const bm25Results = bm25RawResults.filter(result => allowedIds.has(result.id));
+    const candidateIds = new Set(bm25Results.map(result => result.id));
+
+    return { candidateIds, bm25Results };
+  }
+
+  /**
    * Attempt hybrid fusion of vector and BM25 results
    */
   fuseResults(params: {
@@ -53,6 +103,7 @@ export class HybridFusion {
     scopedChunks: DatabaseChunk[];
     chunkInfoById: Map<string, SearchCandidate>;
     vectorPool: SearchCandidate[];
+    bm25ResultsOverride?: Array<{ id: string; score: number }>;
   }): {
     fusedResults: SearchCandidate[];
     bm25Fused: boolean;
@@ -69,7 +120,8 @@ export class HybridFusion {
       basePath,
       scopedChunks,
       chunkInfoById,
-      vectorPool
+      vectorPool,
+      bm25ResultsOverride
     } = params;
 
     let fusedResults: SearchCandidate[] = [];
@@ -87,16 +139,24 @@ export class HybridFusion {
 
       if (bm25Index) {
         const allowedIds = new Set(scopedChunks.map(chunk => chunk.id));
-        const bm25RawResults = bm25Index.search(query, selectionBudget);
+        const bm25RawResults =
+          bm25ResultsOverride && bm25ResultsOverride.length > 0
+            ? bm25ResultsOverride
+            : bm25Index.search(query, selectionBudget);
+
         const bm25Results = bm25RawResults.filter(result => allowedIds.has(result.id));
         bm25CandidateCount = bm25Results.length;
+        const bm25ResultsForFusion = bm25Results.slice(0, selectionBudget);
 
-        if (bm25Results.length > 0) {
+        if (bm25ResultsForFusion.length > 0) {
           const fused = reciprocalRankFusion({
             vectorResults: vectorPool
               .slice(0, selectionBudget)
               .map(item => ({ id: item.id, score: item.score })),
-            bm25Results: bm25Results.map(item => ({ id: item.id, score: item.score })),
+            bm25Results: bm25ResultsForFusion.map(item => ({
+              id: item.id,
+              score: item.score
+            })),
             limit: selectionBudget,
             k: RRF_K
           });
