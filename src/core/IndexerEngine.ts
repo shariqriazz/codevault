@@ -6,6 +6,7 @@ import { IndexContext } from './indexing/IndexContext.js';
 import { IndexState } from './indexing/IndexState.js';
 import { FileProcessor } from './indexing/FileProcessor.js';
 import { IndexFinalizationStage } from './indexing/IndexFinalizationStage.js';
+import { INDEXING_CONSTANTS } from '../config/constants.js';
 
 /**
  * IndexerEngine orchestrates the code indexing process using a stage-based architecture:
@@ -60,10 +61,11 @@ export class IndexerEngine {
     const fileProcessor = new FileProcessor(context, state, onProgress);
 
     // Stage 2: Process files
-    for (const rel of files) {
+    const concurrency = this.resolveConcurrency();
+    await this.runWithConcurrency(files, concurrency, async rel => {
       deletedSet.delete(rel);
       await fileProcessor.processFile(rel);
-    }
+    });
 
     // Stage 3: Handle deleted files
     for (const fileRel of deletedSet) {
@@ -83,5 +85,39 @@ export class IndexerEngine {
     // Stage 4: Finalization
     const finalizer = new IndexFinalizationStage(context, state, onProgress);
     return await finalizer.finalize();
+  }
+
+  private resolveConcurrency(): number {
+    const requested = this.options.concurrency;
+    const parsedEnv = INDEXING_CONSTANTS.DEFAULT_CONCURRENCY;
+    const value = typeof requested === 'number' && !Number.isNaN(requested)
+      ? requested
+      : parsedEnv;
+    const safeValue = Number.isFinite(value) ? value : 1;
+    return Math.max(1, Math.floor(safeValue));
+  }
+
+  private async runWithConcurrency<T>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T) => Promise<void>
+  ): Promise<void> {
+    if (!items.length) return;
+
+    const queue = [...items];
+    const workers = Array.from(
+      { length: Math.min(concurrency, queue.length) },
+      async () => {
+        while (queue.length > 0) {
+          const next = queue.shift();
+          if (typeof next === 'undefined') {
+            break;
+          }
+          await worker(next);
+        }
+      }
+    );
+
+    await Promise.all(workers);
   }
 }

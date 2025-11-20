@@ -8,6 +8,7 @@ export interface IndexProjectOptions {
   deletedFiles?: string[];
   embeddingProviderOverride?: EmbeddingProvider | null;
   encryptMode?: string;
+  concurrency?: number;
 }
 
 export interface IndexProjectResult {
