@@ -5,6 +5,21 @@ import { log } from '../utils/logger.js';
 
 const DB_SCHEMA_VERSION = 2;
 
+const DB_PRAGMA_DEFAULTS = {
+  cacheSize: ((): number => {
+    const parsed = Number(process.env.CODEVAULT_DB_CACHE_SIZE ?? '-16000'); // ~16MB
+    return Number.isFinite(parsed) ? parsed : -16000;
+  })(),
+  mmapSize: ((): number => {
+    const parsed = Number(process.env.CODEVAULT_DB_MMAP_SIZE ?? '268435456'); // 256MB
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 268435456;
+  })(),
+  tempStore: ((): 'MEMORY' | 'FILE' => {
+    const raw = (process.env.CODEVAULT_DB_TEMP_STORE || 'MEMORY').toString().toUpperCase();
+    return raw === 'FILE' ? 'FILE' : 'MEMORY';
+  })()
+};
+
 function encodeEmbedding(embedding: ArrayLike<number>): Buffer {
   const buffer = Buffer.allocUnsafe(embedding.length * 4);
   for (let i = 0; i < embedding.length; i++) {
@@ -118,9 +133,9 @@ export class CodeVaultDatabase {
 
     // Optimize for performance
     this.db.pragma('synchronous = NORMAL');
-    this.db.pragma('cache_size = -64000'); // 64MB cache
-    this.db.pragma('temp_store = MEMORY');
-    this.db.pragma('mmap_size = 30000000000'); // 30GB mmap
+    this.db.pragma(`cache_size = ${DB_PRAGMA_DEFAULTS.cacheSize}`);
+    this.db.pragma(`temp_store = ${DB_PRAGMA_DEFAULTS.tempStore}`);
+    this.db.pragma(`mmap_size = ${DB_PRAGMA_DEFAULTS.mmapSize}`);
 
     // Check if tables exist and create if needed
     this.ensureTablesExist();
