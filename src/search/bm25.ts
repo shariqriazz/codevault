@@ -1,6 +1,8 @@
 import bm25Factory from 'wink-bm25-text-search';
+import { log } from '../utils/logger.js';
 
 const DEFAULT_FIELD = 'body';
+const MIN_DOCS_FOR_CONSOLIDATION = 3;
 
 function defaultPrep(text: string): string[] {
   if (!text) {
@@ -48,14 +50,33 @@ export class BM25Index {
   }
 
   consolidate(): void {
-    if (!this.consolidated) {
+    if (this.consolidated) {
+      return;
+    }
+
+    if (this.documents.size < MIN_DOCS_FOR_CONSOLIDATION) {
+      // wink-bm25-text-search throws when consolidating very small collections
+      this.consolidated = true;
+      return;
+    }
+
+    try {
       this.engine.consolidate();
+    } catch (error) {
+      log.warn('BM25 consolidation failed; skipping BM25 for this search', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
       this.consolidated = true;
     }
   }
 
   search(query: string, limit = 60): Array<{ id: string; score: number }> {
     if (!query || !query.trim()) {
+      return [];
+    }
+
+    if (this.documents.size < MIN_DOCS_FOR_CONSOLIDATION) {
       return [];
     }
 

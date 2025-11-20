@@ -78,7 +78,7 @@ export function validatePathSafety(
 ): { safe: boolean; normalized: string | null; reason?: string } {
   try {
     const absBase = fs.realpathSync(basePath);
-    const absTarget = path.resolve(basePath, targetPath);
+    const absTarget = path.resolve(absBase, targetPath);
     const relative = path.relative(absBase, absTarget);
 
     if (relative === '') {
