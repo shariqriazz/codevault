@@ -15,7 +15,7 @@ function defaultPrep(text: string): string[] {
 }
 
 export class BM25Index {
-  private engine: any;
+  private engine: ReturnType<typeof bm25Factory>;
   private documents = new Set<string>();
   private consolidated = false;
 

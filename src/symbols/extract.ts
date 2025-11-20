@@ -1,4 +1,5 @@
 import type { TreeSitterNode } from '../types/ast.js';
+import type { CodemapChunk } from '../types/codemap.js';
 import { CHUNKING_CONSTANTS, SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
 
 const KEYWORD_BLACKLIST = new Set([
@@ -226,8 +227,11 @@ export function extractSymbolMetadata({ node, source, symbol }: {
   };
 }
 
-export function queryMatchesSignature(query: string, metadata: any): boolean {
-  if (!metadata) {
+export function queryMatchesSignature(
+  query: string,
+  metadata: Partial<CodemapChunk> | null | undefined
+): boolean {
+  if (!metadata || typeof metadata !== 'object') {
     return false;
   }
 

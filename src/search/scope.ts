@@ -1,20 +1,21 @@
 import micromatch from 'micromatch';
 import { DEFAULT_RERANKER, RERANKER_OPTIONS, type ScopeFilters, type RerankMode } from '../types/search.js';
+import type { DatabaseChunk } from '../database/db.js';
 
-function toArray(value: any): any[] {
+function toArray<T>(value: unknown): T[] {
   if (!value) {
     return [];
   }
-  return Array.isArray(value) ? value : [value];
+  return Array.isArray(value) ? value : [value as T];
 }
 
-function normalizeList(values: any): string[] {
+function normalizeList(values: unknown): string[] {
   return toArray(values)
     .map(value => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean);
 }
 
-function normalizeToggle(value: any, defaultValue: boolean): boolean {
+function normalizeToggle(value: unknown, defaultValue: boolean): boolean {
   if (typeof value === 'boolean') {
     return value;
   }
@@ -33,20 +34,20 @@ function normalizeToggle(value: any, defaultValue: boolean): boolean {
   return defaultValue;
 }
 
-export function normalizeScopeFilters(scope: any = {}): ScopeFilters {
+export function normalizeScopeFilters(scope: Partial<ScopeFilters> = {}): ScopeFilters {
   const normalized: ScopeFilters = {};
 
-  const normalizedPath = normalizeList(scope.path_glob || scope.pathGlob || scope.path);
+  const normalizedPath = normalizeList(scope.path_glob);
   if (normalizedPath.length > 0) {
     normalized.path_glob = normalizedPath;
   }
 
-  const normalizedTags = normalizeList(scope.tags || scope.tag);
+  const normalizedTags = normalizeList(scope.tags);
   if (normalizedTags.length > 0) {
     normalized.tags = normalizedTags.map(tag => tag.toLowerCase());
   }
 
-  const normalizedLang = normalizeList(scope.lang || scope.language || scope.languages);
+  const normalizedLang = normalizeList(scope.lang);
   if (normalizedLang.length > 0) {
     normalized.lang = normalizedLang.map(lang => lang.toLowerCase());
   }
@@ -69,8 +70,6 @@ export function normalizeScopeFilters(scope: any = {}): ScopeFilters {
 
   return normalized;
 }
-
-import type { DatabaseChunk } from '../database/db.js';
 
 export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): DatabaseChunk[] {
   if (!Array.isArray(chunks) || chunks.length === 0) {
