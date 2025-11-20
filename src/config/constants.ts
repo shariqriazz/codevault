@@ -38,6 +38,14 @@ export const CACHE_CONSTANTS = {
 } as const;
 
 /**
+ * Indexing Configuration
+ */
+export const INDEXING_CONSTANTS = {
+  /** Number of files to process in parallel during indexing */
+  DEFAULT_CONCURRENCY: parseInt(process.env.CODEVAULT_INDEXING_CONCURRENCY || '8', 10),
+} as const;
+
+/**
  * Search Configuration
  */
 export const SEARCH_CONSTANTS = {
