@@ -23,6 +23,10 @@ export async function getChunk(sha: string, workingPath?: string): Promise<GetCh
   return await searchService.getChunk(sha, workingPath);
 }
 
+export async function warmupSearch(workingPath?: string, provider?: string): Promise<void> {
+  await searchService.warmup(workingPath, provider);
+}
+
 export function clearSearchCaches(): void {
   searchService.clearCaches();
 }

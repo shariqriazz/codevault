@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createEmbeddingProvider, type EmbeddingProvider } from '../../providers/index.js';
-import { Database } from '../../database/db.js';
+import { Database, type DatabaseChunk } from '../../database/db.js';
 import { readCodemapAsync, type Codemap } from '../../codemap/io.js';
 import { resolveProviderContext } from '../../config/resolver.js';
 
@@ -23,6 +23,8 @@ export interface SearchContext {
   dbPath: string;
   chunkDir: string;
   codemapPath: string;
+  codemapMtime: number;
+  chunksCache: { chunks: DatabaseChunk[]; dbMtime: number } | null;
 }
 
 export class SearchContextManager {
@@ -43,6 +45,7 @@ export class SearchContextManager {
 
     // Return cached context if available
     if (this.context) {
+      await this.refreshCodemapIfNeeded(this.context);
       return this.context;
     }
 
@@ -50,6 +53,7 @@ export class SearchContextManager {
     const dbPath = path.join(this.basePath, '.codevault/codevault.db');
     const chunkDir = path.join(this.basePath, '.codevault/chunks');
     const codemapPath = path.join(this.basePath, 'codevault.codemap.json');
+    const codemapMtime = this.getFileMtime(codemapPath);
 
     // Validate database exists
     if (!fs.existsSync(dbPath)) {
@@ -77,11 +81,46 @@ export class SearchContextManager {
       providerContext,
       dbPath,
       chunkDir,
-      codemapPath
+      codemapPath,
+      codemapMtime,
+      chunksCache: null
     };
 
     this.lastProvider = providerName;
     return this.context;
+  }
+
+  /**
+   * Warm search state by initializing provider, codemap, and chunk cache
+   */
+  async warmup(providerName: string = 'auto'): Promise<SearchContext> {
+    const context = await this.getContext(providerName);
+    await this.refreshCodemapIfNeeded(context);
+    await this.getChunks(context);
+    return context;
+  }
+
+  /**
+   * Get chunks for the current provider/dimensions with caching
+   */
+  async getChunks(context: SearchContext): Promise<DatabaseChunk[]> {
+    const dbMtime = this.getFileMtime(context.dbPath);
+    const hasCachedChunks = Boolean(context.chunksCache);
+    const cacheFresh =
+      hasCachedChunks &&
+      (dbMtime === 0 || (context.chunksCache?.dbMtime ?? 0) === dbMtime);
+
+    if (hasCachedChunks && cacheFresh && context.chunksCache) {
+      return context.chunksCache.chunks;
+    }
+
+    const chunks = await context.db.getChunks(
+      context.provider.getName(),
+      context.provider.getDimensions()
+    );
+
+    context.chunksCache = { chunks, dbMtime };
+    return chunks;
   }
 
   /**
@@ -90,6 +129,29 @@ export class SearchContextManager {
    */
   getCached(): SearchContext | null {
     return this.context;
+  }
+
+  /**
+   * Refresh codemap if underlying file changed
+   */
+  private async refreshCodemapIfNeeded(context: SearchContext): Promise<void> {
+    const currentMtime = this.getFileMtime(context.codemapPath);
+    if (currentMtime > 0 && currentMtime > context.codemapMtime) {
+      context.codemap = await readCodemapAsync(context.codemapPath);
+      context.codemapMtime = currentMtime;
+    }
+  }
+
+  /**
+   * Safely fetch file mtime, returning 0 if missing
+   */
+  private getFileMtime(filePath: string): number {
+    try {
+      const stats = fs.statSync(filePath);
+      return stats.mtimeMs;
+    } catch {
+      return 0;
+    }
   }
 
   /**
@@ -102,6 +164,9 @@ export class SearchContextManager {
       } catch (error) {
         // Ignore close errors
       }
+    }
+    if (this.context) {
+      this.context.chunksCache = null;
     }
     this.context = null;
     this.lastProvider = null;

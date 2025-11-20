@@ -33,6 +33,23 @@ export class SearchService {
     this.mapper = new ResultMapper();
   }
 
+  public async warmup(
+    workingPath: string = '.',
+    provider: string = 'auto'
+  ): Promise<void> {
+    const basePath = path.resolve(workingPath);
+
+    if (!this.contextManager || this.lastWorkingPath !== basePath) {
+      if (this.contextManager) {
+        this.contextManager.cleanup();
+      }
+      this.contextManager = new SearchContextManager(basePath);
+      this.lastWorkingPath = basePath;
+    }
+
+    await this.contextManager.warmup(provider);
+  }
+
   public clearCaches(): void {
     logger.debug('Clearing search caches explicitly.');
     this.fusion.clearCaches();
@@ -64,6 +81,10 @@ export class SearchService {
       this.contextManager = new SearchContextManager(basePath);
       this.lastWorkingPath = basePath;
     }
+    const contextManager = this.contextManager;
+    if (!contextManager) {
+      throw new Error('Search context manager failed to initialize');
+    }
 
     // Reset stats for this search
     this.fusion.resetChunkLoadingStats();
@@ -76,13 +97,10 @@ export class SearchService {
 
     try {
       // Get or initialize search context
-      const context = await this.contextManager.getContext(effectiveProvider);
+      const context = await contextManager.warmup(effectiveProvider);
 
       // Fetch chunks from database
-      const chunks = await context.db.getChunks(
-        context.provider.getName(),
-        context.provider.getDimensions()
-      );
+      const chunks = await contextManager.getChunks(context);
 
       if (chunks.length === 0) {
         return this.createErrorResult(
