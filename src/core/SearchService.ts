@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Database } from '../database/db.js';
+import { Database, type DatabaseChunk } from '../database/db.js';
 import { normalizeScopeFilters, applyScope } from '../search/scope.js';
 import { applySymbolBoost } from '../ranking/symbol-boost.js';
 import { logger } from '../utils/logger.js';
@@ -9,7 +9,7 @@ import { RRF_K, SEARCH_CONSTANTS } from '../config/constants.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchCodeResult, SearchResult, GetChunkResult } from './types.js';
 import { SearchContextManager } from './search/SearchContextManager.js';
-import { CandidateRetriever } from './search/CandidateRetriever.js';
+import { CandidateRetriever, type SearchCandidate } from './search/CandidateRetriever.js';
 import { HybridFusion } from './search/HybridFusion.js';
 import { ResultMapper } from './search/ResultMapper.js';
 
@@ -115,7 +115,7 @@ export class SearchService {
       }
 
       // Apply scope filtering
-      const scopedChunks = applyScope(chunks, normalizedScope) as any[];
+      const scopedChunks = applyScope(chunks, normalizedScope);
       const selectionBudget = Math.max(limit, RRF_K);
       const bm25CandidateLimit = Math.max(
         selectionBudget,
@@ -124,7 +124,7 @@ export class SearchService {
 
       // Limit vector scoring to BM25-selected candidates when available
       let bm25PrefilterResults: Array<{ id: string; score: number }> | undefined;
-      let vectorCandidates = scopedChunks;
+      let vectorCandidates: DatabaseChunk[] = scopedChunks;
       if (hybridEnabled && bm25Enabled) {
         const prefilter = this.fusion.prefilterCandidates({
           hybridEnabled,
@@ -277,7 +277,7 @@ export class SearchService {
           boosted:
             symbolBoostEnabled &&
             results.some(
-              (result: any) =>
+              (result: SearchCandidate) =>
                 typeof result.symbolBoost === 'number' && result.symbolBoost > 0
             )
         },
@@ -337,17 +337,17 @@ export class SearchService {
         return { success: false, error: 'Chunk not found' };
       }
       return { success: true, code: result.code };
-    } catch (error: any) {
-      if (error && error.code === 'ENCRYPTION_KEY_REQUIRED') {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENCRYPTION_KEY_REQUIRED') {
         return { success: false, error: 'Chunk is encrypted. Configure CODEVAULT_ENCRYPTION_KEY.' };
       }
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
   // Helpers
 
-  private createErrorResult(error: string, message: string, provider: string, scope: any, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
+  private createErrorResult(error: string, message: string, provider: string, scope: ScopeFilters, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
     return {
       success: false,
       error,

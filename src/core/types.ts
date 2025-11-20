@@ -1,4 +1,6 @@
 import type { EmbeddingProvider } from '../providers/base.js';
+import type { TokenCountStats } from '../chunking/token-counter.js';
+import type { ScopeFilters } from '../types/search.js';
 
 export interface IndexProjectOptions {
   repoPath?: string;
@@ -18,7 +20,7 @@ export interface IndexProjectResult {
   provider: string;
   errors: IndexError[];
   chunkingStats?: ChunkingStats;
-  tokenStats?: any;
+  tokenStats?: TokenCountStats;
 }
 
 export interface ProgressEvent {
@@ -87,7 +89,7 @@ export interface SearchCodeResult {
   intentionResults?: number;
   vectorResults?: number;
   provider: string;
-  scope?: any;
+  scope?: ScopeFilters;
   reranker?: string;
   hybrid?: {
     enabled: boolean;

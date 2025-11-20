@@ -3,15 +3,23 @@ import type { EmbeddingProvider } from '../providers/base.js';
 import type { Database } from '../database/db.js';
 import { Mutex } from '../utils/mutex.js';
 import { log } from '../utils/logger.js';
+import type { CodevaultMetadata, ImportantVariable } from './metadata.js';
 
 const MAX_BATCH_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 
-function isRateLimitError(error: any): boolean {
-  const message = error?.message || String(error);
+interface ApiError {
+  status?: number;
+  statusCode?: number;
+  message?: string;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const apiError = error as ApiError;
+  const message = apiError?.message ?? String(error);
   return (
-    error?.status === 429 ||
-    error?.statusCode === 429 ||
+    apiError?.status === 429 ||
+    apiError?.statusCode === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -19,10 +27,11 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-function isBatchSizeError(error: any): boolean {
-  const message = error?.message || String(error);
+function isBatchSizeError(error: unknown): boolean {
+  const apiError = error as ApiError;
+  const message = apiError?.message ?? String(error);
   return (
-    error?.status === 413 ||
+    apiError?.status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -40,10 +49,10 @@ interface ChunkToEmbed {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: CodevaultMetadata;
+    importantVariables: ImportantVariable[];
     docComments: string | null;
-    contextInfo: any;
+    contextInfo: Record<string, unknown>;
   };
 }
 
@@ -173,7 +182,7 @@ export class BatchEmbeddingProcessor {
         codevault_intent: chunk.params.codevaultMetadata.intent,
         codevault_description: chunk.params.codevaultMetadata.description,
         doc_comments: chunk.params.docComments,
-        variables_used: chunk.params.importantVariables,
+        variables_used: chunk.params.importantVariables.map(v => v.name),
         context_info: chunk.params.contextInfo
       }))
     );
@@ -204,7 +213,7 @@ export class BatchEmbeddingProcessor {
           codevault_intent: chunk.params.codevaultMetadata.intent,
           codevault_description: chunk.params.codevaultMetadata.description,
           doc_comments: chunk.params.docComments,
-          variables_used: chunk.params.importantVariables,
+          variables_used: chunk.params.importantVariables.map(v => v.name),
           context_info: chunk.params.contextInfo
         });
       } catch (individualError) {
