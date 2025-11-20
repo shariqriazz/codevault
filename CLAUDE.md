@@ -4,7 +4,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 
 ## Project Overview
 
-This is a TypeScript/Node.js project (v1.7.3, requires Node.js >=18.0.0) that provides:
+This is a TypeScript/Node.js project (v1.7.3) that provides:
 - **Semantic code search** using vector embeddings with 25+ languages
 - **MCP (Model Context Protocol)** integration for AI assistants
 - **Symbol-aware ranking** for better code understanding
@@ -13,6 +13,7 @@ This is a TypeScript/Node.js project (v1.7.3, requires Node.js >=18.0.0) that pr
 - **Incremental indexing** with Merkle tree-based change detection
 - **LRU caching** for performance optimization
 - **Batch processing** with retry logic and fallbacks
+- **Integration tests** covering index → search → encryption → watch flows
 
 ## Architecture
 
@@ -27,19 +28,19 @@ This is a TypeScript/Node.js project (v1.7.3, requires Node.js >=18.0.0) that pr
   - `types.ts` - Core type definitions
 
 - `src/database/` - SQLite storage layer
-  - `db.ts` - Database operations for chunks, embeddings, metadata
+  - `db.ts` - Database operations for chunks, embeddings, metadata; binary embeddings, PRAGMAs configurable
 
 - `src/indexer/` - Incremental indexing system
-  - `merkle.ts` - Merkle tree for detecting file changes and deletions
+  - `merkle.ts` - Merkle tree for detecting file changes and deletions (path-safe)
   - `update.ts` - Partial re-indexing for changed/deleted files
-  - `watch.ts` - File watching with debounced change detection
+  - `watch.ts` - File watching with debounced change detection and provider reuse
 
 - `src/mcp/` - Model Context Protocol server
   - `tools/ask-codebase.ts` - LLM-synthesized Q&A with Zod validation
   - `tools/use-context-pack.ts` - Context management for saved scopes
 
 - `src/synthesis/` - LLM answer generation
-  - `synthesizer.ts` - Generate natural language answers with multi-query support
+  - `synthesizer.ts` - Generate natural language answers with multi-query support and prompt-injection hardening
   - `prompt-builder.ts` - Build context-aware prompts with code citations
   - `markdown-formatter.ts` - Format responses with file references
 
@@ -50,6 +51,7 @@ This is a TypeScript/Node.js project (v1.7.3, requires Node.js >=18.0.0) that pr
 
 - `src/providers/` - LLM provider integrations
   - `openai.ts` - OpenAI-compatible API with dynamic batching and token estimation
+  - `mock.ts` - Deterministic embedding provider for tests
   - `chat-llm.ts` - Chat model abstraction for synthesis
   - `base.ts` - Base provider interface
   - `index.ts` - Provider factory and configuration
