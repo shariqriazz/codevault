@@ -53,6 +53,9 @@ export const SEARCH_CONSTANTS = {
   /** Maximum search results limit */
   MAX_SEARCH_LIMIT: 200,
 
+  /** Maximum BM25 candidates to score with vectors */
+  BM25_PREFILTER_LIMIT: parseInt(process.env.CODEVAULT_BM25_PREFILTER_LIMIT || '500', 10),
+
   /** Selection budget multiplier for hybrid search */
   SELECTION_BUDGET_MULTIPLIER: 60,
 
