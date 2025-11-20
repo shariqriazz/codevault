@@ -112,12 +112,12 @@ function extractReturnType(snippet: string, closeIndex: number): string | null {
   }
 
   const after = snippet.slice(closeIndex + 1, closeIndex + CHUNKING_CONSTANTS.MAX_RETURN_TYPE_SNIPPET);
-  const colonMatch = after.match(/:\s*([A-Za-z0-9_\\\[\]<>|?]+)/);
+  const colonMatch = after.match(/:\s*([A-Za-z0-9_\\[\]<>|?]+)/);
   if (colonMatch) {
     return colonMatch[1];
   }
 
-  const arrowMatch = after.match(/->\s*([A-Za-z0-9_\\\[\]<>|?]+)/);
+  const arrowMatch = after.match(/->\s*([A-Za-z0-9_\\[\]<>|?]+)/);
   if (arrowMatch) {
     return arrowMatch[1];
   }

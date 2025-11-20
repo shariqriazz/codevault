@@ -58,7 +58,7 @@ export class IndexerUI {
     
     if (this.totalFiles > 0) {
       this.progressBar = new cliProgress.SingleBar({
-        format: chalk.cyan('   [{bar}]') + ' {percentage}% | {value}/{total} files | ETA {eta_formatted}',
+        format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_formatted}`,
         barCompleteChar: '█',
         barIncompleteChar: '░',
         hideCursor: true,

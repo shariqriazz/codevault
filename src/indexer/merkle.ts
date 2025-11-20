@@ -9,6 +9,7 @@ let hasherPromise: Promise<XXHashAPI['h64']> | null = null;
 
 async function getHasher(): Promise<XXHashAPI['h64']> {
   if (!hasherPromise) {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     hasherPromise = xxhashFactory().then(factory => factory.h64);
   }
   return hasherPromise;

@@ -78,7 +78,7 @@ class Logger {
     console.warn(this.formatMessage('WARN', message, meta));
   }
 
-  error(message: string, error?: Error | any, meta?: LogMetadata): void {
+  error(message: string, error?: unknown, meta?: LogMetadata): void {
     if (!this.shouldLog(LogLevel.ERROR)) return;
 
     const errorMeta = {
@@ -135,7 +135,7 @@ export const log = {
   debug: (message: string, meta?: LogMetadata) => logger.debug(message, meta),
   info: (message: string, meta?: LogMetadata) => logger.info(message, meta),
   warn: (message: string, meta?: LogMetadata) => logger.warn(message, meta),
-  error: (message: string, error?: Error | any, meta?: LogMetadata) =>
+  error: (message: string, error?: unknown, meta?: LogMetadata) =>
     logger.error(message, error, meta),
   isQuiet: () => logger.isQuiet(),
   setQuiet: (quiet: boolean) => logger.setQuiet(quiet),

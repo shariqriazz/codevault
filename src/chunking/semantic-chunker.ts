@@ -45,7 +45,7 @@ export function findLastCompleteBoundary(code: string, maxSize: number): number 
     const matches = [...code.substring(0, maxSize).matchAll(boundary.pattern)];
     if (matches.length > 0) {
       const lastMatch = matches[matches.length - 1];
-      return lastMatch.index! + lastMatch[0].length;
+      return lastMatch.index + lastMatch[0].length;
     }
   }
   
@@ -56,7 +56,7 @@ export function extractSignature(node: TreeSitterNode, source: string): string {
   const code = source.slice(node.startIndex, node.endIndex);
   const firstBrace = code.indexOf('{');
   if (firstBrace !== -1) {
-    return code.substring(0, firstBrace).trim() + ' {';
+    return `${code.substring(0, firstBrace).trim()  } {`;
   }
   return code.split('\n')[0];
 }

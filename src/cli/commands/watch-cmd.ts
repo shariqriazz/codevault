@@ -33,12 +33,13 @@ export function registerWatchCommand(program: Command): void {
         console.log('✅ Watcher active. Press Ctrl+C to stop.');
 
         await new Promise<void>(resolve => {
-          const shutdown = async () => {
+          const shutdown = () => {
             console.log('\nStopping watcher...');
-            await controller.close();
-            process.off('SIGINT', shutdown);
-            process.off('SIGTERM', shutdown);
-            resolve();
+            void controller.close().then(() => {
+              process.off('SIGINT', shutdown);
+              process.off('SIGTERM', shutdown);
+              resolve();
+            });
           };
 
           process.on('SIGINT', shutdown);

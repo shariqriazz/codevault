@@ -214,7 +214,7 @@ export async function getModelProfile(providerName: string, modelName: string | 
     }
   }
   
-  return profile as ModelProfile;
+  return profile;
 }
 
 export function getSizeLimits(profile: ModelProfile): {

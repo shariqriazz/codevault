@@ -141,7 +141,7 @@ export class RateLimiter {
       try {
         const result = await fn();
         
-        const tokensUsed = estimatedTokens || (result as any)?.usage?.total_tokens || 0;
+        const tokensUsed = estimatedTokens || (result)?.usage?.total_tokens || 0;
         this.recordRequest(tokensUsed);
         
         resolve(result);
@@ -192,7 +192,7 @@ export class RateLimiter {
       tpm: this.tpm,
       queueLength: this.queue.length,
       maxQueueSize: this.maxQueueSize,
-      queueUtilization: ((this.queue.length / this.maxQueueSize) * 100).toFixed(1) + '%',
+      queueUtilization: `${((this.queue.length / this.maxQueueSize) * 100).toFixed(1)  }%`,
       requestsInLastMinute: this.requestTimes.filter(t => t > oneMinuteAgo).length,
       tokensInLastMinute,
       isRpmLimited: this.rpm !== null,

@@ -88,7 +88,7 @@ export async function synthesizeAnswer(
       await chatLLM.init();
     }
 
-    let allResults: SearchResult[] = [];
+    const allResults: SearchResult[] = [];
     let queriesUsed: string[] = [query];
     let usedMultiQuery = false;
 

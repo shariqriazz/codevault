@@ -414,7 +414,7 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
       const genericError: any = new Error(
         `Failed to decrypt chunk ${sha}: ${(lastError as Error)?.message || 'unknown error'}`
       );
-      genericError.code = (lastError as any)?.code || 'ENCRYPTION_DECRYPT_FAILED';
+      genericError.code = (lastError)?.code || 'ENCRYPTION_DECRYPT_FAILED';
       genericError.cause = lastError;
       throw genericError;
     }

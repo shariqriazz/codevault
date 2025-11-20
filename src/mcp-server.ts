@@ -365,14 +365,12 @@ export class McpServer {
       clearTokenCache();
     };
     
-    process.on('SIGINT', async () => {
-      await cleanup();
-      process.exit(0);
+    process.on('SIGINT', () => {
+      void cleanup().then(() => process.exit(0));
     });
-    
-    process.on('SIGTERM', async () => {
-      await cleanup();
-      process.exit(0);
+
+    process.on('SIGTERM', () => {
+      void cleanup().then(() => process.exit(0));
     });
   }
 }

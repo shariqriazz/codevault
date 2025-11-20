@@ -63,7 +63,7 @@ class InteractivePrompt {
       throw new Error('Choices required for select prompt');
     }
 
-    console.log(chalk.cyan('?') + ' ' + options.message);
+    console.log(`${chalk.cyan('?')  } ${  options.message}`);
     
     options.choices.forEach((choice, index) => {
       const number = chalk.gray(`${index + 1}.`);

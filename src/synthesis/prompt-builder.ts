@@ -17,6 +17,7 @@ export interface PromptOptions {
   citationStyle?: 'inline' | 'footnote';
 }
 
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARACTERS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 const DEFAULT_QUERY_LIMIT = 2000;
 const DEFAULT_CODE_LIMIT = 4000;
@@ -69,7 +70,7 @@ export function buildUserPrompt(context: CodeContext, options: PromptOptions = {
         result.meta.description ? `description=${sanitizeUserInput(result.meta.description, 800)}` : '',
         result.meta.intent ? `intent=${sanitizeUserInput(result.meta.intent, 400)}` : '',
         '',
-        '```' + (result.lang || '') ,
+        `\`\`\`${  result.lang || ''}` ,
         safeCode,
         '```',
         '</chunk>'

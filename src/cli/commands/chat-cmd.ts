@@ -205,12 +205,12 @@ async function handleCommand(
       }
       break;
 
-    case '/stats':
+    case '/stats': {
       const summary = getConversationSummary(context);
       const uniqueFiles = new Set(
         Array.from(context.allChunks.values()).map(chunk => chunk.result.path)
       );
-      
+
       console.log(chalk.bold('\n📊 Conversation Statistics:\n'));
       console.log(chalk.gray(`   Turns: ${context.turns.length}`));
       console.log(chalk.gray(`   Code chunks referenced: ${context.allChunks.size}`));
@@ -229,6 +229,7 @@ async function handleCommand(
         }
       }
       break;
+    }
 
     case '/help':
     case '/?':

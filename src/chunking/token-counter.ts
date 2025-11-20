@@ -223,13 +223,13 @@ export function getTokenCountStats(): TokenCountStats {
   return {
     ...stats,
     cacheHitRate: stats.totalRequests > 0 
-      ? (stats.cacheHits / stats.totalRequests * 100).toFixed(1) + '%'
+      ? `${(stats.cacheHits / stats.totalRequests * 100).toFixed(1)  }%`
       : '0%',
     charFilterRate: stats.totalRequests > 0
-      ? (stats.charFilterSkips / stats.totalRequests * 100).toFixed(1) + '%'
+      ? `${(stats.charFilterSkips / stats.totalRequests * 100).toFixed(1)  }%`
       : '0%',
     tokenizationRate: stats.totalRequests > 0
-      ? (stats.actualTokenizations / stats.totalRequests * 100).toFixed(1) + '%'
+      ? `${(stats.actualTokenizations / stats.totalRequests * 100).toFixed(1)  }%`
       : '0%'
   };
 }

@@ -20,7 +20,7 @@ function displayConfig(config: CodevaultConfig | null, title: string): void {
   }
 
   console.log(chalk.bold(`  ${title}:`));
-  console.log('  ' + JSON.stringify(config, null, 2).split('\n').join('\n  '));
+  console.log(`  ${  JSON.stringify(config, null, 2).split('\n').join('\n  ')}`);
 }
 
 export function registerConfigCommands(program: Command): void {
@@ -47,7 +47,7 @@ export function registerConfigCommands(program: Command): void {
         console.log(chalk.cyan(`   ${getGlobalConfigPath()}`));
         console.log('');
         console.log('Use --force to overwrite, or edit the file directly.');
-        console.log('Run: ' + chalk.cyan('codevault config show --global'));
+        console.log(`Run: ${  chalk.cyan('codevault config show --global')}`);
         return;
       }
 
@@ -191,7 +191,7 @@ export function registerConfigCommands(program: Command): void {
         if (!config || Object.keys(config).length === 0) {
           console.log(chalk.gray('  (empty)'));
           console.log('');
-          console.log('Initialize with: ' + chalk.cyan('codevault config init'));
+          console.log(`Initialize with: ${  chalk.cyan('codevault config init')}`);
         } else {
           console.log(JSON.stringify(config, null, 2));
         }
@@ -272,6 +272,6 @@ export function registerConfigCommands(program: Command): void {
     .action(() => {
       console.log(chalk.bold('Configuration Paths:\n'));
       console.log(chalk.cyan('Global:  ') + getGlobalConfigPath());
-      console.log(chalk.cyan('Project: ') + '.codevault/config.json');
+      console.log(`${chalk.cyan('Project: ')  }.codevault/config.json`);
     });
 }

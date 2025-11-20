@@ -8,7 +8,7 @@ export interface ChangeQueueOptions {
   debounceMs: number;
   encrypt?: string;
   logger?: Console;
-  onBatch?: ((event: { changed: string[]; deleted: string[] }) => void) | null;
+  onBatch?: ((event: { changed: string[]; deleted: string[] }) => void | Promise<void>) | null;
   providerGetter?: () => Promise<EmbeddingProvider | null>;
 }
 

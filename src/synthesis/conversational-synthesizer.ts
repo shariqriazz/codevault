@@ -304,7 +304,7 @@ function buildConversationalUserPrompt(
         ? `description=${sanitizeUserInput(chunkData.result.meta.description, 800)}`
         : '',
       '',
-      '```' + (result.lang || ''),
+      `\`\`\`${  result.lang || ''}`,
       safeCode,
       '```',
       '</chunk>'
@@ -346,7 +346,7 @@ function buildConversationalUserPrompt(
     ...chunkSections,
     '</code_context>',
     '',
-    previouslySeenChunks ? '# Previously Discussed Code\n' + previouslySeenChunks + '\n' : '',
+    previouslySeenChunks ? `# Previously Discussed Code\n${  previouslySeenChunks  }\n` : '',
     '# Response Instructions',
     ...instructions
   ]

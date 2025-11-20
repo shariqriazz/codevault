@@ -117,7 +117,7 @@ export function extractImportantVariables(node: TreeSitterNode, source: string, 
         variables.push({
           type: n.type,
           name: extractVariableName(n, source),
-          value: varText.length > 100 ? varText.substring(0, 100) + '...' : varText
+          value: varText.length > 100 ? `${varText.substring(0, 100)  }...` : varText
         });
       }
     }
@@ -189,7 +189,7 @@ export function generateEnhancedEmbeddingText(
   let enhancedText = code;
 
   if (docComments) {
-    enhancedText = docComments + '\n\n' + enhancedText;
+    enhancedText = `${docComments  }\n\n${  enhancedText}`;
   }
 
   if (metadata.intent) {
