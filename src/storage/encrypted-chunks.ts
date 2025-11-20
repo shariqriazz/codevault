@@ -3,17 +3,26 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { log } from '../utils/logger.js';
+import { ENCRYPTION_CONSTANTS } from '../config/constants.js';
+
+const {
+  MAGIC_HEADER,
+  SALT_LENGTH,
+  IV_LENGTH,
+  TAG_LENGTH,
+  HKDF_INFO,
+  REQUIRED_KEY_LENGTH
+} = ENCRYPTION_CONSTANTS;
+const MAGIC_HEADER_BUFFER = Buffer.from(MAGIC_HEADER, 'utf8');
+const HKDF_INFO_BUFFER = Buffer.from(HKDF_INFO, 'utf8');
 
 const KEY_ENV_VAR = 'CODEVAULT_ENCRYPTION_KEY';
-const MAGIC_HEADER = Buffer.from('CVAULTE1', 'utf8');
-const SALT_LENGTH = 16;
-const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
-const HKDF_INFO = Buffer.from('codevault-chunk-v1', 'utf8');
+const DEPRECATED_KEYS_ENV_VAR = 'CODEVAULT_ENCRYPTION_DEPRECATED_KEYS';
+const CURRENT_ENCRYPTION_VERSION = 1;
 
-let cachedNormalizedKey: string | null = null;
-let cachedKeyBuffer: Buffer | null = null;
-let cachedKeyError: Error | null = null;
+type KeyDecodeResult =
+  | { key: Buffer; error: null }
+  | { key: null; error: Error | null };
 
 function decodeKey(raw: string): Buffer | null {
   if (typeof raw !== 'string') {
@@ -27,7 +36,7 @@ function decodeKey(raw: string): Buffer | null {
 
   try {
     const base64 = Buffer.from(trimmed, 'base64');
-    if (base64.length === 32) {
+    if (base64.length === REQUIRED_KEY_LENGTH) {
       return base64;
     }
   } catch (error) {
@@ -36,7 +45,7 @@ function decodeKey(raw: string): Buffer | null {
 
   try {
     const hex = Buffer.from(trimmed, 'hex');
-    if (hex.length === 32) {
+    if (hex.length === REQUIRED_KEY_LENGTH) {
       return hex;
     }
   } catch (error) {
@@ -46,42 +55,125 @@ function decodeKey(raw: string): Buffer | null {
   return null;
 }
 
+export interface EncryptionKeySet {
+  primary: Buffer | null;
+  deprecated: Buffer[];
+}
+
+class EncryptionKeyManager {
+  private static instance: EncryptionKeyManager | null = null;
+  private primaryKey: Buffer | null = null;
+  private deprecatedKeys: Buffer[] = [];
+  private primaryError: Error | null = null;
+  private lastEnvSignature: string | null = null;
+  private lastChecked = 0;
+  private readonly refreshIntervalMs = 5000;
+
+  static getInstance(): EncryptionKeyManager {
+    if (!this.instance) {
+      this.instance = new EncryptionKeyManager();
+    }
+    return this.instance;
+  }
+
+  static resetForTests(): void {
+    this.instance = new EncryptionKeyManager();
+  }
+
+  getKeySet(): EncryptionKeySet {
+    this.refreshKeysIfNeeded();
+    return {
+      primary: this.primaryKey,
+      deprecated: this.deprecatedKeys
+    };
+  }
+
+  getPrimaryKey(): Buffer | null {
+    return this.getKeySet().primary;
+  }
+
+  getPrimaryError(): Error | null {
+    this.refreshKeysIfNeeded();
+    return this.primaryError;
+  }
+
+  private refreshKeysIfNeeded(): void {
+    const now = Date.now();
+    const signature = this.getEnvSignature();
+    const shouldRefresh =
+      !this.lastEnvSignature ||
+      signature !== this.lastEnvSignature ||
+      now - this.lastChecked > this.refreshIntervalMs;
+
+    if (!shouldRefresh) {
+      return;
+    }
+
+    this.lastEnvSignature = signature;
+    this.lastChecked = now;
+    this.loadKeys();
+  }
+
+  private loadKeys(): void {
+    const primary = this.decodeWithError(process.env[KEY_ENV_VAR] || '');
+    const deprecatedRaw = (process.env[DEPRECATED_KEYS_ENV_VAR] || '')
+      .split(',')
+      .map(key => key.trim())
+      .filter(Boolean);
+
+    this.primaryKey = primary.key;
+    this.primaryError = primary.error;
+
+    const decodedDeprecated: Buffer[] = [];
+    for (const candidate of deprecatedRaw) {
+      const decoded = decodeKey(candidate);
+      if (decoded) {
+        decodedDeprecated.push(decoded);
+      } else {
+        log.warn('Failed to decode deprecated encryption key; skipping', {
+          env: DEPRECATED_KEYS_ENV_VAR
+        });
+      }
+    }
+    this.deprecatedKeys = decodedDeprecated;
+  }
+
+  private getEnvSignature(): string {
+    return `${process.env[KEY_ENV_VAR] || ''}::${process.env[DEPRECATED_KEYS_ENV_VAR] || ''}`;
+  }
+
+  private decodeWithError(raw: string): KeyDecodeResult {
+    const normalized = typeof raw === 'string' ? raw.trim() : '';
+    if (!normalized) {
+      return { key: null, error: null };
+    }
+    const decoded = decodeKey(normalized);
+    if (!decoded) {
+      return {
+        key: null,
+        error: new Error(
+          `${KEY_ENV_VAR} must be a ${REQUIRED_KEY_LENGTH}-byte key encoded as base64 or hex.`
+        )
+      };
+    }
+    return { key: decoded, error: null };
+  }
+}
+
 export function resetEncryptionCacheForTests(): void {
-  cachedNormalizedKey = null;
-  cachedKeyBuffer = null;
-  cachedKeyError = null;
+  EncryptionKeyManager.resetForTests();
 }
 
 export function getActiveEncryptionKey(): Buffer | null {
-  const raw = process.env[KEY_ENV_VAR];
-  const normalized = typeof raw === 'string' ? raw.trim() : '';
-
-  // FIX: Always check if env var changed to support runtime updates
-  if (normalized === cachedNormalizedKey && cachedKeyBuffer) {
-    return cachedKeyBuffer;
-  }
-
-  // Invalidate cache when environment variable changes
-  cachedNormalizedKey = normalized;
-  cachedKeyError = null;
-  cachedKeyBuffer = null;
-
-  if (!normalized) {
-    return null;
-  }
-
-  const decoded = decodeKey(normalized);
-  if (!decoded) {
-    cachedKeyError = new Error(`${KEY_ENV_VAR} must be a 32-byte key encoded as base64 or hex.`);
-    return null;
-  }
-
-  cachedKeyBuffer = decoded;
-  return cachedKeyBuffer;
+  return EncryptionKeyManager.getInstance().getPrimaryKey();
 }
 
 export function getEncryptionKeyError(): Error | null {
-  return cachedKeyError;
+  return EncryptionKeyManager.getInstance().getPrimaryError();
+}
+
+export function getEncryptionKeySet(): EncryptionKeySet {
+  return EncryptionKeyManager.getInstance().getKeySet();
 }
 
 const warnedInvalidMode = new Set<string>();
@@ -135,7 +227,9 @@ export function resolveEncryptionPreference({ mode, logger = console }: { mode?:
 }
 
 function deriveChunkKey(masterKey: Buffer, salt: Buffer): Buffer {
-  return Buffer.from(crypto.hkdfSync('sha256', masterKey, salt, HKDF_INFO, 32));
+  return Buffer.from(
+    crypto.hkdfSync('sha256', masterKey, salt, HKDF_INFO_BUFFER, REQUIRED_KEY_LENGTH)
+  );
 }
 
 function encryptBuffer(plaintext: Buffer, masterKey: Buffer): { payload: Buffer; salt: Buffer; iv: Buffer; tag: Buffer } {
@@ -147,47 +241,80 @@ function encryptBuffer(plaintext: Buffer, masterKey: Buffer): { payload: Buffer;
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
 
-  const payload = Buffer.concat([MAGIC_HEADER, salt, iv, encrypted, tag]);
+  const versionByte = Buffer.from([CURRENT_ENCRYPTION_VERSION]);
+  const payload = Buffer.concat([MAGIC_HEADER_BUFFER, versionByte, salt, iv, encrypted, tag]);
   return { payload, salt, iv, tag };
 }
 
-function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
-  const minimumLength = MAGIC_HEADER.length + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1;
-  if (!payload || payload.length < minimumLength) {
-    const error: any = new Error('Encrypted chunk payload is truncated.');
-    error.code = 'ENCRYPTION_PAYLOAD_INVALID';
-    throw error;
+function buildDecryptionAttempts(payload: Buffer): Array<{ version: number; offset: number }> {
+  const attempts: Array<{ version: number; offset: number }> = [];
+  const versionCandidate = payload[MAGIC_HEADER_BUFFER.length];
+  if (versionCandidate >= 1 && versionCandidate <= CURRENT_ENCRYPTION_VERSION) {
+    attempts.push({ version: versionCandidate, offset: MAGIC_HEADER_BUFFER.length + 1 });
   }
+  // Always include legacy offset (no version byte) for backward compatibility
+  attempts.push({ version: 1, offset: MAGIC_HEADER_BUFFER.length });
+  return attempts;
+}
 
-  const header = payload.subarray(0, MAGIC_HEADER.length);
-  if (!header.equals(MAGIC_HEADER)) {
+function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
+  const header = payload.subarray(0, MAGIC_HEADER_BUFFER.length);
+  if (!header.equals(MAGIC_HEADER_BUFFER)) {
     const error: any = new Error('Encrypted chunk payload has an unknown header.');
     error.code = 'ENCRYPTION_FORMAT_UNRECOGNIZED';
     throw error;
   }
 
-  const saltStart = MAGIC_HEADER.length;
-  const ivStart = saltStart + SALT_LENGTH;
-  const cipherStart = ivStart + IV_LENGTH;
-  const cipherEnd = payload.length - TAG_LENGTH;
+  const attempts = buildDecryptionAttempts(payload);
+  const errors: any[] = [];
 
-  const salt = payload.subarray(saltStart, saltStart + SALT_LENGTH);
-  const iv = payload.subarray(ivStart, ivStart + IV_LENGTH);
-  const ciphertext = payload.subarray(cipherStart, cipherEnd);
-  const tag = payload.subarray(cipherEnd);
+  for (const attempt of attempts) {
+    const { version, offset } = attempt;
+    if (version > CURRENT_ENCRYPTION_VERSION) {
+      errors.push(
+        Object.assign(new Error(`Unsupported encryption version ${version}`), {
+          code: 'ENCRYPTION_VERSION_UNSUPPORTED'
+        })
+      );
+      continue;
+    }
 
-  const derivedKey = deriveChunkKey(masterKey, salt);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey, iv);
-  decipher.setAuthTag(tag);
+    const minimumLength = offset + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1;
+    if (!payload || payload.length < minimumLength) {
+      errors.push(
+        Object.assign(new Error('Encrypted chunk payload is truncated.'), {
+          code: 'ENCRYPTION_PAYLOAD_INVALID'
+        })
+      );
+      continue;
+    }
 
-  try {
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  } catch (error) {
-    const authError: any = new Error('authentication failed');
-    authError.code = 'ENCRYPTION_AUTH_FAILED';
-    authError.cause = error;
-    throw authError;
+    const saltStart = offset;
+    const ivStart = saltStart + SALT_LENGTH;
+    const cipherStart = ivStart + IV_LENGTH;
+    const cipherEnd = payload.length - TAG_LENGTH;
+
+    const salt = payload.subarray(saltStart, saltStart + SALT_LENGTH);
+    const iv = payload.subarray(ivStart, ivStart + IV_LENGTH);
+    const ciphertext = payload.subarray(cipherStart, cipherEnd);
+    const tag = payload.subarray(cipherEnd);
+
+    const derivedKey = deriveChunkKey(masterKey, salt);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey, iv);
+    decipher.setAuthTag(tag);
+
+    try {
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (error) {
+      const authError: any = new Error('authentication failed');
+      authError.code = 'ENCRYPTION_AUTH_FAILED';
+      authError.cause = error;
+      errors.push(authError);
+    }
   }
+
+  const finalError = errors[errors.length - 1] || new Error('Decryption failed');
+  throw finalError;
 }
 
 function getChunkPaths(chunkDir: string, sha: string): { plainPath: string; encryptedPath: string } {
@@ -233,6 +360,7 @@ export interface ReadChunkOptions {
   chunkDir: string;
   sha: string;
   key?: Buffer | null;
+  keySet?: EncryptionKeySet;
 }
 
 export interface ReadChunkResult {
@@ -240,29 +368,51 @@ export interface ReadChunkResult {
   encrypted: boolean;
 }
 
-export function readChunkFromDisk({ chunkDir, sha, key = getActiveEncryptionKey() }: ReadChunkOptions): ReadChunkResult | null {
+export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptions): ReadChunkResult | null {
   const { plainPath, encryptedPath } = getChunkPaths(chunkDir, sha);
+  const keys = keySet || getEncryptionKeySet();
+  const primaryKey = key ?? keys.primary;
 
   if (fs.existsSync(encryptedPath)) {
-    if (!key) {
+    const candidateKeys: Buffer[] = [];
+    if (primaryKey) candidateKeys.push(primaryKey);
+    if (keys.deprecated.length > 0) {
+      candidateKeys.push(...keys.deprecated);
+    }
+
+    if (candidateKeys.length === 0) {
       const error: any = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`);
       error.code = 'ENCRYPTION_KEY_REQUIRED';
       throw error;
     }
 
     const payload = fs.readFileSync(encryptedPath);
-    let decrypted: Buffer;
-    try {
-      decrypted = decryptBuffer(payload, key);
-    } catch (error: any) {
-      if (error.code === 'ENCRYPTION_AUTH_FAILED') {
+    let decrypted: Buffer | null = null;
+    const errors: any[] = [];
+    for (const candidate of candidateKeys) {
+      try {
+        decrypted = decryptBuffer(payload, candidate);
+        break;
+      } catch (error: any) {
+        errors.push(error);
+        continue;
+      }
+    }
+
+    if (!decrypted) {
+      const lastError = errors[errors.length - 1];
+      if (lastError && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
         const authError: any = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`);
         authError.code = 'ENCRYPTION_AUTH_FAILED';
-        authError.cause = error;
+        authError.cause = lastError;
         throw authError;
       }
-      error.message = `Failed to decrypt chunk ${sha}: ${error.message}`;
-      throw error;
+      const genericError: any = new Error(
+        `Failed to decrypt chunk ${sha}: ${(lastError as Error)?.message || 'unknown error'}`
+      );
+      genericError.code = (lastError as any)?.code || 'ENCRYPTION_DECRYPT_FAILED';
+      genericError.cause = lastError;
+      throw genericError;
     }
 
     try {
