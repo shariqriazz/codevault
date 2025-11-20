@@ -26,6 +26,79 @@ import { CACHE_CONSTANTS } from './config/constants.js';
 import { clearSearchCaches } from './core/search.js';
 import { clearTokenCache } from './chunking/token-counter.js';
 import { logger } from './utils/logger.js';
+import { ZodError } from 'zod';
+
+type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
+
+interface MCPErrorPayload {
+  code: string;
+  type: MCPErrorType;
+  message: string;
+  details?: Record<string, unknown>;
+  suggestion?: string;
+}
+
+function formatMcpError(error: unknown): MCPErrorPayload {
+  if (error instanceof ZodError) {
+    return {
+      code: 'VALIDATION_ERROR',
+      type: 'validation',
+      message: 'Invalid input parameters',
+      details: { issues: error.issues },
+      suggestion: 'Check parameter types and required fields'
+    };
+  }
+
+  const normalizedError = error instanceof Error ? error : new Error(String(error));
+  const code = (error as any)?.code;
+
+  if (code === 'ENCRYPTION_KEY_REQUIRED') {
+    return {
+      code,
+      type: 'configuration',
+      message: normalizedError.message,
+      suggestion: 'Set CODEVAULT_ENCRYPTION_KEY to decrypt encrypted chunks'
+    };
+  }
+
+  if (code === 'ENCRYPTION_AUTH_FAILED') {
+    return {
+      code,
+      type: 'permission',
+      message: normalizedError.message,
+      suggestion: 'Verify encryption key or re-index encrypted chunks'
+    };
+  }
+
+  if (code === 'PATH_VALIDATION_FAILED') {
+    return {
+      code,
+      type: 'validation',
+      message: normalizedError.message,
+      suggestion: 'Ensure the requested path is inside the project root'
+    };
+  }
+
+  return {
+    code: code || 'RUNTIME_ERROR',
+    type: 'runtime',
+    message: normalizedError.message,
+    details: normalizedError.stack ? { stack: normalizedError.stack } : undefined
+  };
+}
+
+function buildMcpErrorResponse(error: unknown) {
+  const payload = formatMcpError(error);
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(payload, null, 2)
+      }
+    ],
+    isError: true
+  };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -241,8 +314,7 @@ export class McpServer {
         }
 
         return {
-          content: [{ type: 'text', text: `ERROR: ${(error as Error).message}` }],
-          isError: true,
+          ...buildMcpErrorResponse(error)
         };
       }
     });

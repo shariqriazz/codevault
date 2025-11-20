@@ -75,20 +75,50 @@ export function toPosixPath(relativePath: string | null): string | null {
   return relativePath.split(path.sep).join('/');
 }
 
+export function validatePathSafety(
+  basePath: string,
+  targetPath: string
+): { safe: boolean; normalized: string | null; reason?: string } {
+  try {
+    const absBase = fs.realpathSync(basePath);
+    const absTarget = path.resolve(basePath, targetPath);
+    const relative = path.relative(absBase, absTarget);
+
+    if (relative === '') {
+      return { safe: true, normalized: toPosixPath(relative) };
+    }
+
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return { safe: false, normalized: null, reason: 'path_outside_base' };
+    }
+
+    try {
+      const realTarget = fs.realpathSync(absTarget);
+      const realRelative = path.relative(absBase, realTarget);
+      if (realRelative.startsWith('..') || path.isAbsolute(realRelative)) {
+        return { safe: false, normalized: null, reason: 'symlink_escape' };
+      }
+      return { safe: true, normalized: toPosixPath(realRelative) };
+    } catch {
+      // Target may not exist yet; rely on original relative path
+      return { safe: true, normalized: toPosixPath(relative) };
+    }
+  } catch (error) {
+    return {
+      safe: false,
+      normalized: null,
+      reason: (error as Error).message
+    };
+  }
+}
+
 export function normalizeToProjectPath(basePath = '.', filePath?: string): string | null {
   if (typeof filePath !== 'string' || filePath.length === 0) {
     return null;
   }
 
-  const absoluteBase = path.resolve(basePath);
-  const absoluteFile = path.isAbsolute(filePath) ? filePath : path.join(absoluteBase, filePath);
-  const relative = path.relative(absoluteBase, absoluteFile);
-
-  if (!relative || relative.startsWith('..')) {
-    return null;
-  }
-
-  return toPosixPath(relative);
+  const result = validatePathSafety(basePath, filePath);
+  return result.safe ? result.normalized : null;
 }
 
 export function removeMerkleEntry(merkle: MerkleTree, relativePath: string): boolean {
