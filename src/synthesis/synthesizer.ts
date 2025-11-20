@@ -10,6 +10,7 @@ import {
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchResult } from '../core/types.js';
 import { resolveProviderContext } from '../config/resolver.js';
+import { logger } from '../utils/logger.js';
 
 export interface SynthesisOptions {
   provider?: string;
@@ -36,7 +37,23 @@ export interface SynthesisResult {
     searchType?: string;
     totalResults?: number;
     multiQuery?: boolean;
+    injectionWarnings?: string[];
   };
+}
+
+function validateLLMResponse(response: string): { safe: boolean; issues: string[] } {
+  const issues: string[] = [];
+  if (!response || !response.trim()) {
+    issues.push('empty_response');
+  }
+  if (/<\/?code_context>/i.test(response) || /<\/?user_query>/i.test(response)) {
+    issues.push('prompt_structure_leak');
+  }
+  if (/system prompt|ignore previous instructions/i.test(response)) {
+    issues.push('injection_acknowledgment');
+  }
+
+  return { safe: issues.length === 0, issues };
 }
 
 export async function synthesizeAnswer(
@@ -193,6 +210,12 @@ export async function synthesizeAnswer(
       temperature,
       maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10)
     });
+    const validation = validateLLMResponse(answer);
+    if (!validation.safe) {
+      logger.warn('Potential prompt-injection indicators detected in LLM response', {
+        issues: validation.issues
+      });
+    }
 
     return {
       success: true,
@@ -205,7 +228,8 @@ export async function synthesizeAnswer(
       metadata: {
         searchType: deduplicatedResults[0]?.meta?.searchType,
         totalResults: deduplicatedResults.length,
-        multiQuery: usedMultiQuery
+        multiQuery: usedMultiQuery,
+        injectionWarnings: validation.safe ? undefined : validation.issues
       }
     };
 
