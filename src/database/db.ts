@@ -118,6 +118,12 @@ export interface InsertChunkParams {
   context_info: Record<string, unknown>;
 }
 
+/**
+ * Thin wrapper around better-sqlite3 with prepared statements tuned for CodeVault.
+ *
+ * Provides chunk CRUD, intention tracking, query pattern stats, and ensures schema
+ * creation/migrations. Call `close()` when finished to avoid leaking file handles.
+ */
 export class CodeVaultDatabase {
   private db: Database.Database;
   private insertChunkStmt!: Database.Statement;
