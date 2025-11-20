@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { normalizeCodemapRecord, type Codemap } from '../types/codemap.js';
 
+export type { Codemap } from '../types/codemap.js';
+
 export function resolveCodemapPath(basePath = '.'): string {
   return path.resolve(basePath, 'codevault.codemap.json');
 }
