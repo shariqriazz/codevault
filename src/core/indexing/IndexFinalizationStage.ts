@@ -81,7 +81,7 @@ export class IndexFinalizationStage {
   private logStatistics(): void {
     if (!process.env.CODEVAULT_QUIET) {
       logger.info('Chunking Statistics', {
-        stats: this.state.chunkingStats,
+        stats: { ...this.state.chunkingStats },
         processedChunks: this.state.processedChunks,
         totalChunks: Object.keys(this.state.codemap).length
       });

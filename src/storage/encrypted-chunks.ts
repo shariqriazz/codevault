@@ -40,7 +40,9 @@ function decodeKey(raw: string): Buffer | null {
       return base64;
     }
   } catch (error) {
-    log.debug('Failed to decode key as base64, will try hex', { error });
+    log.debug('Failed to decode key as base64, will try hex', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 
   try {
@@ -49,7 +51,9 @@ function decodeKey(raw: string): Buffer | null {
       return hex;
     }
   } catch (error) {
-    log.debug('Failed to decode key as hex', { error });
+    log.debug('Failed to decode key as hex', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 
   return null;
