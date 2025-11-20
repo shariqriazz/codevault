@@ -8,7 +8,7 @@ interface SymbolCandidate {
   symbol: string;
 }
 
-function toLower(value: any): string {
+function toLower(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
@@ -38,7 +38,10 @@ function buildSymbolIndex(codemap: Codemap): Map<string, SymbolCandidate[]> {
   return index;
 }
 
-function selectCandidate(candidates: SymbolCandidate[], entry: any): SymbolCandidate | null {
+function selectCandidate(
+  candidates: SymbolCandidate[],
+  entry: { file?: string } | null | undefined
+): SymbolCandidate | null {
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return null;
   }

@@ -2,6 +2,7 @@ import path from 'path';
 import { normalizeToProjectPath } from './merkle.js';
 import { indexProject } from '../core/indexer.js';
 import type { EmbeddingProvider } from '../providers/base.js';
+import type { ProgressEvent, IndexError } from '../core/types.js';
 
 function normalizeList(basePath: string, values: string[] = []): string[] {
   const normalized = new Set<string>();
@@ -25,7 +26,7 @@ export interface UpdateIndexOptions {
   provider?: string;
   changedFiles?: string[];
   deletedFiles?: string[];
-  onProgress?: ((event: any) => void) | null;
+  onProgress?: ((event: ProgressEvent) => void) | null;
   embeddingProvider?: EmbeddingProvider | null;
   encrypt?: string;
 }
@@ -35,7 +36,7 @@ export interface UpdateIndexResult {
   processedChunks: number;
   totalChunks: number;
   provider: string;
-  errors: any[];
+  errors: IndexError[];
 }
 
 export async function updateIndex({

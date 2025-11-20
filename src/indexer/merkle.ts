@@ -1,24 +1,21 @@
 import fs from 'fs';
 import path from 'path';
-import xxhashFactory from 'xxhash-wasm';
+import xxhashFactory, { type XXHashAPI } from 'xxhash-wasm';
 
 const MERKLE_DIR = '.codevault';
 const MERKLE_FILENAME = 'merkle.json';
 
-let hasherPromise: Promise<any> | null = null;
+let hasherPromise: Promise<XXHashAPI['h64']> | null = null;
 
-async function getHasher() {
+async function getHasher(): Promise<XXHashAPI['h64']> {
   if (!hasherPromise) {
     hasherPromise = xxhashFactory().then(factory => factory.h64);
   }
   return hasherPromise;
 }
 
-function ensureObject(value: any): Record<string, any> {
-  if (!value || typeof value !== 'object') {
-    return {};
-  }
-  return value;
+function ensureObject<T extends object>(value: unknown, fallback: T = {} as T): T {
+  return value && typeof value === 'object' ? (value as T) : fallback;
 }
 
 export async function computeFastHash(input: string | Buffer): Promise<string> {

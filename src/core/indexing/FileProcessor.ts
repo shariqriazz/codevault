@@ -23,7 +23,7 @@ export class FileProcessor {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null
+    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string }) => void) | null
   ) {}
 
   /**
@@ -110,13 +110,17 @@ export class FileProcessor {
   private async tryFallbackProcessing(
     rel: string,
     abs: string,
-    rule: any,
+    rule: { lang: string } | null | undefined,
     existingChunks: Map<string, any>,
     staleChunkIds: Set<string>,
     chunkMerkleHashes: string[]
   ): Promise<void> {
     try {
       if (!fs.existsSync(abs)) {
+        return;
+      }
+
+      if (!rule) {
         return;
       }
 
