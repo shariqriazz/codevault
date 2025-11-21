@@ -95,8 +95,8 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    async (params: any) => {
-      const result = await handler(params);
+    (params: any) => {
+      const result = handler(params);
       return {
         content: [
           {
