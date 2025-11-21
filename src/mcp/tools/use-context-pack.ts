@@ -27,7 +27,7 @@ interface CreateHandlerOptions {
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
   const { getWorkingPath, setSessionPack, clearSessionPack, errorLogger } = options;
 
-  return async ({ name, path: explicitPath }: { name: string; path?: string }) => {
+  return ({ name, path: explicitPath }: { name: string; path?: string }) => {
     const basePath = explicitPath && explicitPath.trim().length > 0
       ? explicitPath.trim()
       : (typeof getWorkingPath === 'function' ? getWorkingPath() : '.');
@@ -86,7 +86,7 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions): (params: any) => Promise<{ success: boolean; message: string }> {
+export function registerUseContextPackTool(server: any, options: CreateHandlerOptions): ReturnType<typeof createUseContextPackHandler> {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -96,8 +96,10 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
     async (params: any) => {
-      const result = await handler(params);
+      const result = await Promise.resolve(handler(params));
       return {
+        success: result.success,
+        message: result.message,
         content: [
           {
             type: 'text',

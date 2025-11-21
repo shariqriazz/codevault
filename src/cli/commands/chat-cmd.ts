@@ -96,7 +96,7 @@ export function registerChatCommand(program: Command): void {
 
             // Handle commands
             if (trimmedQuestion.startsWith('/')) {
-              const handled = await handleCommand(trimmedQuestion, conversationContext);
+              const handled = handleCommand(trimmedQuestion, conversationContext);
               if (handled === 'exit') {
                 isRunning = false;
                 break;
@@ -176,10 +176,10 @@ export function registerChatCommand(program: Command): void {
 /**
  * Handle special commands in chat mode
  */
-async function handleCommand(
+function handleCommand(
   command: string,
   context: ConversationContext
-): Promise<string | void> {
+): string | void {
   const cmd = command.toLowerCase().trim();
 
   switch (cmd) {

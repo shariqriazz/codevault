@@ -146,7 +146,7 @@ export class BatchEmbeddingProcessor {
   async addChunk(chunk: ChunkToEmbed): Promise<void> {
     let batchToProcess: ChunkToEmbed[] | null = null;
 
-    await this.mutex.runExclusive(async () => {
+    await this.mutex.runExclusive(() => {
       this.batch.push(chunk);
 
       // Snapshot the batch when it reaches the threshold; process it outside the lock
@@ -154,6 +154,7 @@ export class BatchEmbeddingProcessor {
         batchToProcess = this.batch;
         this.batch = [];
       }
+      return Promise.resolve();
     });
 
     if (batchToProcess) {
@@ -167,11 +168,12 @@ export class BatchEmbeddingProcessor {
   async flush(): Promise<void> {
     let batchToProcess: ChunkToEmbed[] | null = null;
 
-    await this.mutex.runExclusive(async () => {
+    await this.mutex.runExclusive(() => {
       if (this.batch.length > 0) {
         batchToProcess = this.batch;
         this.batch = [];
       }
+      return Promise.resolve();
     });
 
     if (batchToProcess) {

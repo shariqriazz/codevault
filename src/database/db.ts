@@ -196,7 +196,7 @@ export class CodeVaultDatabase {
     `);
   }
 
-  async initialize(_dimensions: number): Promise<void> {
+  initialize(_dimensions: number): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS intention_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -368,7 +368,7 @@ export class CodeVaultDatabase {
     return this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
   }
 
-  async deleteChunks(chunkIds: string[]): Promise<void> {
+  deleteChunks(chunkIds: string[]): void {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       return;
     }
@@ -383,7 +383,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async getChunks(providerName: string, dimensions: number): Promise<DatabaseChunk[]> {
+  getChunks(providerName: string, dimensions: number): DatabaseChunk[] {
     try {
       return this.getChunksStmt.all(providerName, dimensions) as DatabaseChunk[];
     } catch (error) {
@@ -392,7 +392,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async getExistingDimensions(): Promise<Array<{ embedding_provider: string; embedding_dimensions: number }>> {
+  getExistingDimensions(): Array<{ embedding_provider: string; embedding_dimensions: number }> {
     try {
       const stmt = this.db.prepare(`
         SELECT DISTINCT embedding_provider, embedding_dimensions
@@ -406,7 +406,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async recordIntention(normalizedQuery: string, originalQuery: string, targetSha: string, confidence: number): Promise<void> {
+  recordIntention(normalizedQuery: string, originalQuery: string, targetSha: string, confidence: number): void {
     try {
       const existing = this.db.prepare(`
         SELECT id, usage_count FROM intention_cache
@@ -434,7 +434,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async searchByIntention(normalizedQuery: string): Promise<any> {
+  searchByIntention(normalizedQuery: string): any {
     try {
       return this.db.prepare(`
         SELECT
@@ -458,7 +458,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async recordQueryPattern(pattern: string): Promise<void> {
+  recordQueryPattern(pattern: string): void {
     try {
       const existing = this.db.prepare(`
         SELECT id, frequency FROM query_patterns WHERE pattern = ?
@@ -481,7 +481,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async getOverviewChunks(limit: number): Promise<Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }>> {
+  getOverviewChunks(limit: number): Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }> {
     try {
       return this.db.prepare(`
         SELECT id, file_path, symbol, sha, lang
@@ -498,21 +498,21 @@ export class CodeVaultDatabase {
   /**
    * Begin a database transaction
    */
-  async beginTransaction(): Promise<void> {
+  beginTransaction(): void {
     this.db.prepare('BEGIN TRANSACTION').run();
   }
 
   /**
    * Commit the current transaction
    */
-  async commit(): Promise<void> {
+  commit(): void {
     this.db.prepare('COMMIT').run();
   }
 
   /**
    * Rollback the current transaction
    */
-  async rollback(): Promise<void> {
+  rollback(): void {
     this.db.prepare('ROLLBACK').run();
   }
 
@@ -584,7 +584,7 @@ export class CodeVaultDatabase {
   }
 }
 
-export async function initDatabase(dimensions: number, basePath = '.'): Promise<void> {
+export function initDatabase(dimensions: number, basePath = '.'): void {
   const dbPath = path.join(path.resolve(basePath), '.codevault', 'codevault.db');
   const dbDir = path.dirname(dbPath);
 
@@ -593,7 +593,7 @@ export async function initDatabase(dimensions: number, basePath = '.'): Promise<
   }
 
   const db = new CodeVaultDatabase(dbPath);
-  await db.initialize(dimensions);
+  db.initialize(dimensions);
   db.close();
 }
 

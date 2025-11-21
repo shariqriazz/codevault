@@ -39,20 +39,21 @@ export class OpenAIProvider extends EmbeddingProvider {
     }
   }
 
-  async init(): Promise<void> {
+  init(): Promise<void> {
     if (!this.openai) {
       const config: any = {};
-      
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
+    return Promise.resolve();
   }
 
   async generateEmbedding(text: string): Promise<number[]> {

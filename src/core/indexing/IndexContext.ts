@@ -85,7 +85,7 @@ export class IndexContext {
     }
 
     // Initialize database
-    await initDatabase(providerInstance.getDimensions(), repo);
+    initDatabase(providerInstance.getDimensions(), repo);
 
     // Setup paths
     const codemapPath = path.join(repo, 'codevault.codemap.json');
@@ -151,7 +151,7 @@ export class IndexContext {
 
     const db = new Database(dbPath);
     try {
-      const existingDimensions = await db.getExistingDimensions();
+      const existingDimensions = db.getExistingDimensions();
 
       if (existingDimensions.length > 0) {
         const currentProvider = embeddingProvider.getName();

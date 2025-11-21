@@ -96,14 +96,14 @@ export class SearchContextManager {
   async warmup(providerName: string = 'auto'): Promise<SearchContext> {
     const context = await this.getContext(providerName);
     await this.refreshCodemapIfNeeded(context);
-    await this.getChunks(context);
+    this.getChunks(context);
     return context;
   }
 
   /**
    * Get chunks for the current provider/dimensions with caching
    */
-  async getChunks(context: SearchContext): Promise<DatabaseChunk[]> {
+  getChunks(context: SearchContext): DatabaseChunk[] {
     const dbMtime = this.getFileMtime(context.dbPath);
     const hasCachedChunks = Boolean(context.chunksCache);
     const cacheFresh =
@@ -114,7 +114,7 @@ export class SearchContextManager {
       return context.chunksCache.chunks;
     }
 
-    const chunks = await context.db.getChunks(
+    const chunks = context.db.getChunks(
       context.provider.getName(),
       context.provider.getDimensions()
     );

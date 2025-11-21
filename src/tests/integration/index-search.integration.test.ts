@@ -99,7 +99,7 @@ test('indexes and searches end-to-end with the mock provider', async () => {
   assert.ok(chunk.code && chunk.code.includes('helloWorld'));
 
   const db = new Database(path.join(repoUnderTest.root, '.codevault/codevault.db'));
-  const storedChunks = await db.getChunks(provider.getName(), provider.getDimensions());
+  const storedChunks = db.getChunks(provider.getName(), provider.getDimensions());
   db.close();
   assert.ok(storedChunks.length >= indexResult.totalChunks);
 });
@@ -171,9 +171,10 @@ test('change queue batches rapid edits without racing flushes', async () => {
     repoPath: repoUnderTest.root,
     provider: provider.getName(),
     debounceMs: 20,
-    providerGetter: async () => provider,
-    onBatch: async event => {
+    providerGetter: () => Promise.resolve(provider),
+    onBatch: event => {
       batches.push(event);
+      return Promise.resolve();
     },
     encrypt: 'off'
   });
@@ -190,7 +191,7 @@ test('change queue batches rapid edits without racing flushes', async () => {
   changeQueue.cancel();
 
   const db = new Database(path.join(repoUnderTest.root, '.codevault/codevault.db'));
-  const chunks = await db.getChunks(provider.getName(), provider.getDimensions());
+  const chunks = db.getChunks(provider.getName(), provider.getDimensions());
   db.close();
 
   assert.ok(chunks.length >= 3);

@@ -100,7 +100,7 @@ export class SearchService {
       const context = await contextManager.warmup(effectiveProvider);
 
       // Fetch chunks from database
-      const chunks = await contextManager.getChunks(context);
+      const chunks = contextManager.getChunks(context);
 
       if (chunks.length === 0) {
         return this.createErrorResult(
@@ -241,7 +241,7 @@ export class SearchService {
         sortedResults.length > 0 &&
         sortedResults[0].meta.score > 0.8
       ) {
-        await context.db.recordIntention(
+        context.db.recordIntention(
           normalizedQuery,
           query,
           sortedResults[0].sha,
@@ -256,7 +256,7 @@ export class SearchService {
         .replace(/\b\w+Controller\b/gi, '[CONTROLLER]')
         .trim();
 
-      await context.db.recordQueryPattern(pattern);
+      context.db.recordQueryPattern(pattern);
 
       return {
         success: true,
@@ -309,7 +309,7 @@ export class SearchService {
       }
 
       const db = new Database(dbPath);
-      const chunks = await db.getOverviewChunks(limit);
+      const chunks = db.getOverviewChunks(limit);
       db.close();
 
       const results: SearchResult[] = chunks.map(chunk => ({

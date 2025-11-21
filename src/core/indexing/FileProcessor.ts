@@ -62,7 +62,7 @@ export class FileProcessor {
       }
 
       // Collect and group nodes
-      const collectedNodes = await this.chunkPipeline.collectNodesForFile(source, rule);
+      const collectedNodes = this.chunkPipeline.collectNodesForFile(source, rule);
       const nodeGroups = await this.chunkPipeline.groupNodes(
         collectedNodes,
         source,
@@ -305,7 +305,7 @@ export class FileProcessor {
     }
 
     if (this.context.db) {
-      await this.context.db.deleteChunks(chunkIds);
+      this.context.db.deleteChunks(chunkIds);
     }
 
     for (const chunkId of chunkIds) {
