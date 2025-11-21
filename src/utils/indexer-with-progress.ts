@@ -8,7 +8,14 @@ import type { IndexProjectOptions, IndexProjectResult } from '../core/types.js';
 
 export interface IndexWithProgressCallbacks {
   onScanComplete?: (fileCount: number) => void;
-  onFileProgress?: (current: number, total: number, fileName: string, etaMs: number | null, avgPerFileMs: number | null) => void;
+  onFileProgress?: (
+    current: number,
+    total: number,
+    fileName: string,
+    etaMs: number | null,
+    avgPerFileMs: number | null,
+    countFile?: boolean
+  ) => void;
   onFinalizing?: () => void;
 }
 
@@ -41,16 +48,17 @@ export async function indexProjectWithProgress(
     ...indexOptions,
     onProgress: (event) => {
       if (event.type === 'chunk_processed' && event.file && callbacks?.onFileProgress) {
-        // Only count each file once (not per chunk)
-        if (!processedFiles.has(event.file)) {
+        const isNewFile = !processedFiles.has(event.file);
+        if (isNewFile) {
           processedFiles.add(event.file);
           processedCount++;
-          const elapsedMs = Date.now() - startTime;
-          const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
-          const remaining = Math.max(files.length - processedCount, 0);
-          const etaMs = avgPerFile !== null ? avgPerFile * remaining : null;
-          callbacks.onFileProgress(processedCount, files.length, event.file, etaMs, avgPerFile);
         }
+
+        const elapsedMs = Date.now() - startTime;
+        const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
+        const remaining = Math.max(files.length - processedCount, 0);
+        const etaMs = avgPerFile !== null ? avgPerFile * remaining : null;
+        callbacks.onFileProgress(processedCount, files.length, event.file, etaMs, avgPerFile, isNewFile);
       }
       if (event.type === 'finalizing' && callbacks?.onFinalizing) {
         callbacks.onFinalizing();

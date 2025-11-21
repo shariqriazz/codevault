@@ -86,10 +86,12 @@ export class IndexerUI {
     }
   }
 
-  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null) {
-    this.processedFiles++;
-    if (this.progressBar) {
-      this.progressBar.update(this.processedFiles);
+  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true) {
+    if (countFile) {
+      this.processedFiles++;
+      if (this.progressBar) {
+        this.progressBar.update(this.processedFiles);
+      }
     }
     if (this.spinner && etaMs !== undefined) {
       const etaText = formatEta(etaMs ?? null);
