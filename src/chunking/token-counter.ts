@@ -1,4 +1,5 @@
 import { SimpleLRU } from '../utils/simple-lru.js';
+import { computeFastHash } from '../indexer/merkle.js';
 
 interface TokenCountStats {
   totalRequests: number;
@@ -62,7 +63,8 @@ function preFilterByChars(code: string, limits: SizeLimits): PreFilterResult {
 async function countTokensWithCache(code: string, tokenCounter: (text: string) => number | Promise<number>): Promise<number> {
   stats.totalRequests++;
   
-  const cached = tokenCountCache.get(code);
+  const cacheKey = await computeFastHash(code);
+  const cached = tokenCountCache.get(cacheKey);
   if (cached !== undefined) {
     stats.cacheHits++;
     return cached;
@@ -72,7 +74,7 @@ async function countTokensWithCache(code: string, tokenCounter: (text: string) =
   const result = tokenCounter(code);
   const count = result instanceof Promise ? await result : result;
   
-  tokenCountCache.set(code, count);
+  tokenCountCache.set(cacheKey, count);
   
   return count;
 }
@@ -81,19 +83,18 @@ async function batchCountTokens(codeSnippets: string[], tokenCounter: (text: str
   stats.batchTokenizations++;
   
   const results: number[] = [];
-  const uncached: string[] = [];
-  const uncachedIndices: number[] = [];
+  const cacheKeys = await Promise.all(codeSnippets.map(code => computeFastHash(code)));
+  const uncached: Array<{ code: string; key: string; index: number }> = [];
   
   for (let i = 0; i < codeSnippets.length; i++) {
-    const code = codeSnippets[i];
-    const cached = tokenCountCache.get(code);
+    const key = cacheKeys[i];
+    const cached = tokenCountCache.get(key);
     
     if (cached !== undefined) {
       stats.cacheHits++;
       results[i] = cached;
     } else {
-      uncached.push(code);
-      uncachedIndices.push(i);
+      uncached.push({ code: codeSnippets[i], key, index: i });
     }
   }
   
@@ -101,17 +102,17 @@ async function batchCountTokens(codeSnippets: string[], tokenCounter: (text: str
     stats.actualTokenizations += uncached.length;
     
     const counts = await Promise.all(
-      uncached.map(async (code) => {
+      uncached.map(async ({ code }) => {
         const result = tokenCounter(code);
         return result instanceof Promise ? await result : result;
       })
     );
     
     for (let i = 0; i < counts.length; i++) {
-      const code = uncached[i];
+      const { key, index } = uncached[i];
       const count = counts[i];
-      tokenCountCache.set(code, count);
-      results[uncachedIndices[i]] = count;
+      tokenCountCache.set(key, count);
+      results[index] = count;
     }
   }
   
