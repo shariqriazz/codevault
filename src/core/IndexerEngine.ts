@@ -1,4 +1,5 @@
 import path from 'path';
+import os from 'node:os';
 import { normalizeToProjectPath } from '../indexer/merkle.js';
 import type { IndexProjectOptions, IndexProjectResult } from './types.js';
 import { FileScanner } from './indexing/file-scanner.js';
@@ -88,13 +89,28 @@ export class IndexerEngine {
   }
 
   private resolveConcurrency(): number {
+    const { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } = INDEXING_CONSTANTS;
     const requested = this.options.concurrency;
-    const parsedEnv = INDEXING_CONSTANTS.DEFAULT_CONCURRENCY;
-    const value = typeof requested === 'number' && !Number.isNaN(requested)
+    const envValue = process.env.CODEVAULT_INDEXING_CONCURRENCY;
+    const parsedEnv = envValue ? Number.parseInt(envValue, 10) : null;
+
+    const optionValue = typeof requested === 'number' && Number.isFinite(requested)
       ? requested
-      : parsedEnv;
-    const safeValue = Number.isFinite(value) ? value : 1;
-    return Math.max(1, Math.floor(safeValue));
+      : null;
+
+    const dynamicDefault = this.computeDynamicDefault(MAX_CONCURRENCY);
+    const fallbackDefault = Number.isFinite(DEFAULT_CONCURRENCY) ? DEFAULT_CONCURRENCY : dynamicDefault;
+
+    const rawValue = optionValue ?? parsedEnv ?? dynamicDefault ?? fallbackDefault;
+    const safeValue = Number.isFinite(rawValue) ? rawValue : 1;
+    const bounded = Math.min(MAX_CONCURRENCY, Math.max(1, Math.floor(safeValue)));
+    return bounded;
+  }
+
+  private computeDynamicDefault(maxConcurrency: number): number {
+    const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : 1;
+    const calculated = Math.max(1, cpuCount * 2);
+    return Math.min(calculated, maxConcurrency);
   }
 
   private async runWithConcurrency<T>(
