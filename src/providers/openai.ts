@@ -78,6 +78,12 @@ export class OpenAIProvider extends EmbeddingProvider {
 
       // Validate response structure
       if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        const meta = {
+          topLevelKeys: response ? Object.keys(response as any) : [],
+          dataType: typeof response?.data,
+          dataLength: Array.isArray(response?.data) ? response.data.length : undefined
+        };
+        console.debug('[codevault] Invalid API response (single)', meta);
         throw new Error(`Invalid API response: expected data array with at least one item, got ${typeof response?.data}`);
       }
 
@@ -186,6 +192,12 @@ export class OpenAIProvider extends EmbeddingProvider {
 
           // Validate response structure
           if (!response || !response.data || !Array.isArray(response.data)) {
+            const meta = {
+              topLevelKeys: response ? Object.keys(response as any) : [],
+              dataType: typeof response?.data,
+              dataLength: Array.isArray(response?.data) ? response.data.length : undefined
+            };
+            console.debug('[codevault] Invalid API response (batch)', meta);
             throw new Error(`Invalid API response: expected data array, got ${typeof response?.data}`);
           }
 

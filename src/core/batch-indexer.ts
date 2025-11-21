@@ -2,7 +2,7 @@ import { BATCH_SIZE } from '../providers/base.js';
 import type { EmbeddingProvider } from '../providers/base.js';
 import type { Database } from '../database/db.js';
 import { Mutex } from '../utils/mutex.js';
-import { log } from '../utils/logger.js';
+import { log, type LogValue } from '../utils/logger.js';
 
 const MAX_BATCH_RETRIES = 3;
 const MAX_TRANSIENT_RETRIES = 3;
@@ -10,6 +10,7 @@ const INITIAL_RETRY_DELAY_MS = 1000;
 const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
 const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
 const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
+const MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
 
 function isRateLimitError(error: any): boolean {
   const message = error?.message || String(error);
@@ -56,6 +57,29 @@ const withJitter = (base: number): number => {
   const factor = 1 + (Math.random() * 2 - 1) * JITTER_FACTOR; // 0.8–1.2
   return Math.max(0, Math.floor(base * factor));
 };
+
+function serializeErrorForLog(error: any): { [key: string]: LogValue } {
+  const info: { [key: string]: LogValue } = {};
+  if (!error) return { message: 'unknown error' };
+
+  const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
+  for (const key of candidates) {
+    if (error[key] !== undefined) info[key] = String(error[key]);
+  }
+
+  // OpenAI SDK sometimes nests response data on error.response or error.error
+  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  if (responseData !== undefined) {
+    try {
+      const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+      info.responseData = json.slice(0, 500); // cap to avoid huge logs
+    } catch {
+      info.responseData = '[unserializable responseData]';
+    }
+  }
+
+  return info;
+}
 
 interface ChunkToEmbed {
   chunkId: string;
@@ -125,13 +149,27 @@ export class BatchEmbeddingProcessor {
   private async processBatchWithRetry(
     currentBatch: ChunkToEmbed[],
     retryState: RetryState = { rate: 0, transient: 0 },
-    depth: number = 0
+    depth: number = 0,
+    fatalSeen: boolean = false
   ): Promise<void> {
     try {
       await this.processBatchInternal(currentBatch);
     } catch (error) {
+      log.debug('Batch processing error', {
+        batchSize: currentBatch.length,
+        depth,
+        retryRate: retryState.rate,
+        retryTransient: retryState.transient,
+        fatalSeen,
+        provider: this.embeddingProvider.getName?.() ?? 'unknown',
+        error: serializeErrorForLog(error),
+        sampleChunks: currentBatch.slice(0, 3).map(c => c.chunkId)
+      });
+
+      const fatalApi = isFatalApiResponse(error);
+
       // Smart error handling based on error type
-      if (isBatchSizeError(error) && currentBatch.length > 1) {
+      if (!fatalApi && isBatchSizeError(error) && currentBatch.length > 1) {
         // Batch too large - split in half and retry
         log.warn(`Batch size too large (${currentBatch.length} chunks), splitting and retrying`);
         const mid = Math.floor(currentBatch.length / 2);
@@ -139,10 +177,10 @@ export class BatchEmbeddingProcessor {
         const secondHalf = currentBatch.slice(mid);
 
         // Process both halves recursively
-        await this.processBatchWithRetry(firstHalf, retryState, depth + 1);
-        await this.processBatchWithRetry(secondHalf, retryState, depth + 1);
+        await this.processBatchWithRetry(firstHalf, retryState, depth + 1, fatalSeen);
+        await this.processBatchWithRetry(secondHalf, retryState, depth + 1, fatalSeen);
         return;
-      } else if (isRateLimitError(error) && retryState.rate < MAX_BATCH_RETRIES) {
+      } else if (!fatalApi && isRateLimitError(error) && retryState.rate < MAX_BATCH_RETRIES) {
         // Rate limit error - exponential backoff
         const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryState.rate);
         log.warn(`Rate limit hit, retrying batch in ${delay}ms (attempt ${retryState.rate + 1}/${MAX_BATCH_RETRIES})`);
@@ -151,10 +189,11 @@ export class BatchEmbeddingProcessor {
         await this.processBatchWithRetry(
           currentBatch,
           { ...retryState, rate: retryState.rate + 1 },
-          depth
+          depth,
+          fatalSeen
         );
         return;
-      } else if (isTransientApiError(error) && retryState.transient < MAX_TRANSIENT_RETRIES) {
+      } else if (!fatalApi && isTransientApiError(error) && retryState.transient < MAX_TRANSIENT_RETRIES) {
         const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryState.transient);
         const delay = withJitter(baseDelay);
         log.warn(
@@ -165,13 +204,17 @@ export class BatchEmbeddingProcessor {
         await this.processBatchWithRetry(
           currentBatch,
           { ...retryState, transient: retryState.transient + 1 },
-          depth
+          depth,
+          fatalSeen
         );
         return;
       } else if (currentBatch.length > 1) {
-        if (depth >= MAX_SUBDIVISION_DEPTH || currentBatch.length <= MIN_BATCH_BEFORE_FALLBACK) {
+        const nextDepth = depth + 1;
+        const depthLimit = fatalApi || fatalSeen ? MAX_FATAL_SUBDIVISION_DEPTH : MAX_SUBDIVISION_DEPTH;
+
+        if (depth >= depthLimit || currentBatch.length <= MIN_BATCH_BEFORE_FALLBACK) {
           log.warn(
-            `Reached subdivision limit (depth=${depth}, size=${currentBatch.length}), falling back to individual processing`
+            `Reached subdivision limit (depth=${depth}, size=${currentBatch.length}, fatalSeen=${fatalApi || fatalSeen}), falling back to individual processing`
           );
           await this.fallbackToIndividualProcessing(currentBatch);
           return;
@@ -182,8 +225,8 @@ export class BatchEmbeddingProcessor {
         const firstHalf = currentBatch.slice(0, mid);
         const secondHalf = currentBatch.slice(mid);
 
-        await this.processBatchWithRetry(firstHalf, retryState, depth + 1);
-        await this.processBatchWithRetry(secondHalf, retryState, depth + 1);
+        await this.processBatchWithRetry(firstHalf, retryState, nextDepth, fatalApi || fatalSeen);
+        await this.processBatchWithRetry(secondHalf, retryState, nextDepth, fatalApi || fatalSeen);
         return;
       }
 
@@ -310,4 +353,21 @@ export class BatchEmbeddingProcessor {
 interface RetryState {
   rate: number;
   transient: number;
+}
+
+/**
+ * Treat responses that return an error without data as fatal (deterministic) so we don't waste
+ * transient retries on them.
+ */
+function isFatalApiResponse(error: any): boolean {
+  if (!error) return false;
+  const msg = error?.message || '';
+  const status = error?.status || error?.statusCode;
+  const hasErrorKey = Array.isArray((error as any)?.topLevelKeys) && (error as any).topLevelKeys.includes('error');
+  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+
+  const invalidApi = msg.includes('Invalid API response');
+  const clientError = status === 400 || status === 422;
+
+  return invalidApi || hasErrorKey || clientError || !!responseData;
 }
