@@ -11,6 +11,12 @@ const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
 const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
 const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
 const MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
+const MAX_ANY_RETRIES = 12; // Upper cap for repeated full-batch retries on fatal/provider errors
+
+const backoffWithCap = (attempt: number): number => {
+  const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+  return Math.min(base, 30000); // cap at 30s
+};
 
 function isRateLimitError(error: any): boolean {
   const message = error?.message || String(error);
@@ -181,12 +187,6 @@ export class BatchEmbeddingProcessor {
       const fatalApi = isFatalApiResponse(error);
 
       // Smart error handling based on error type
-      if (fatalApi) {
-        log.warn(`Fatal API response for batch of ${currentBatch.length}, falling back to individual processing`);
-        await this.fallbackToIndividualProcessing(currentBatch);
-        return;
-      }
-
       if (!fatalApi && isBatchSizeError(error) && currentBatch.length > 1) {
         // Batch too large - split in half and retry
         log.warn(`Batch size too large (${currentBatch.length} chunks), splitting and retrying`);
@@ -226,25 +226,30 @@ export class BatchEmbeddingProcessor {
           fatalSeen
         );
         return;
-      } else if (currentBatch.length > 1) {
-        const nextDepth = depth + 1;
-        const depthLimit = fatalApi || fatalSeen ? MAX_FATAL_SUBDIVISION_DEPTH : MAX_SUBDIVISION_DEPTH;
+      } else {
+        // Do not subdivide or per-chunk on provider/fatal errors; retry the full batch with capped backoff
+        const attempt = retryState.any ?? 0;
+        const delay = backoffWithCap(attempt);
+        const nextAttempt = attempt + 1;
 
-        if (depth >= depthLimit || currentBatch.length <= MIN_BATCH_BEFORE_FALLBACK) {
+        if (nextAttempt > MAX_ANY_RETRIES) {
           log.warn(
-            `Reached subdivision limit (depth=${depth}, size=${currentBatch.length}, fatalSeen=${fatalApi || fatalSeen}), falling back to individual processing`
+            `Batch retry cap reached (${nextAttempt - 1}). Continuing to retry with capped backoff; investigate provider errors.`,
+            { batchSize: currentBatch.length }
           );
-          await this.fallbackToIndividualProcessing(currentBatch);
-          return;
+        } else {
+          log.warn(
+            `Batch will be retried after backoff (${delay}ms) (attempt ${nextAttempt}/${MAX_ANY_RETRIES})`
+          );
         }
 
-        log.warn(`Batch failed after retries, subdividing to isolate issue (${currentBatch.length} chunks)`);
-        const mid = Math.floor(currentBatch.length / 2);
-        const firstHalf = currentBatch.slice(0, mid);
-        const secondHalf = currentBatch.slice(mid);
-
-        await this.processBatchWithRetry(firstHalf, retryState, nextDepth, fatalApi || fatalSeen);
-        await this.processBatchWithRetry(secondHalf, retryState, nextDepth, fatalApi || fatalSeen);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        await this.processBatchWithRetry(
+          currentBatch,
+          { ...retryState, any: nextAttempt },
+          depth,
+          fatalApi || fatalSeen
+        );
         return;
       }
 
@@ -371,6 +376,7 @@ export class BatchEmbeddingProcessor {
 interface RetryState {
   rate: number;
   transient: number;
+  any?: number;
 }
 
 /**
