@@ -1,4 +1,4 @@
-import { analyzeCodeSize, batchAnalyzeCodeSize, type CodeSizeAnalysis } from './token-counter.js';
+import { batchAnalyzeCodeSize } from './token-counter.js';
 import type { ModelProfile } from '../providers/base.js';
 import { getSizeLimits } from '../providers/base.js';
 import type { TreeSitterNode } from '../types/ast.js';
@@ -48,7 +48,7 @@ async function batchAnalyzeNodesInternal(nodes: TreeSitterNode[], source: string
   }));
 }
 
-function isContainerNode(node: TreeSitterNode, rule: LanguageRule): boolean {
+function isContainerNode(node: TreeSitterNode, _rule: LanguageRule): boolean {
   const containerTypes = [
     'class_declaration',
     'class_definition',
@@ -58,7 +58,7 @@ function isContainerNode(node: TreeSitterNode, rule: LanguageRule): boolean {
     'trait_declaration',
     'enum_declaration'
   ];
-  
+
   return containerTypes.includes(node.type);
 }
 

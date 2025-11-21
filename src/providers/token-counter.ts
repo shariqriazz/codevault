@@ -10,7 +10,7 @@ export async function getTokenCounter(modelName: string): Promise<((text: string
       try {
         const tiktoken = await import('tiktoken');
         tiktokenEncoder = tiktoken.encoding_for_model('text-embedding-3-large') as unknown as TiktokenEncoder;
-      } catch (error) {
+      } catch {
         console.warn('tiktoken not available, falling back to character estimation');
         return null;
       }

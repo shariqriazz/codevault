@@ -1,5 +1,5 @@
 import { searchCode, getChunk } from '../core/search.js';
-import { createChatLLMProvider, type ChatLLMProvider, type ChatMessage } from '../providers/chat-llm.js';
+import { createChatLLMProvider, type ChatMessage } from '../providers/chat-llm.js';
 import { 
   buildSystemPrompt, 
   buildUserPrompt, 
@@ -113,7 +113,7 @@ export async function synthesizeAnswer(
             log.info('');
           }
         }
-      } catch (error) {
+      } catch {
         // Fall back to single query if multi-query fails
         if (!process.env.CODEVAULT_QUIET) {
           logger.warn('Multi-query breakdown failed, using original query');

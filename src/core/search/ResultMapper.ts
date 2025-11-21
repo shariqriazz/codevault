@@ -135,7 +135,7 @@ export class ResultMapper {
     try {
       const result = await readChunkFromDisk({ chunkDir, sha });
       return result ? result.code : null;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

@@ -109,7 +109,7 @@ export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): D
         }
 
         return tags.some(tag => typeof tag === 'string' && tagSet.has(tag.toLowerCase()));
-      } catch (error) {
+      } catch {
         return false;
       }
     });

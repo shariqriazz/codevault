@@ -161,7 +161,7 @@ export class SearchContextManager {
     if (this.context?.db) {
       try {
         this.context.db.close();
-      } catch (error) {
+      } catch {
         // Ignore close errors
       }
     }

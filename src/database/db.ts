@@ -196,7 +196,7 @@ export class CodeVaultDatabase {
     `);
   }
 
-  async initialize(dimensions: number): Promise<void> {
+  async initialize(_dimensions: number): Promise<void> {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS intention_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

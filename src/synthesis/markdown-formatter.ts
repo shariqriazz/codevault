@@ -9,8 +9,7 @@ export interface FormattingOptions {
 export function formatSynthesisResult(result: SynthesisResult, options: FormattingOptions = {}): string {
   const {
     includeMetadata = true,
-    includeStats = true,
-    colorize = false
+    includeStats = true
   } = options;
 
   let output = '';

@@ -62,7 +62,7 @@ export function attachSymbolGraphToCodemap(codemap: Codemap): Codemap {
   const symbolIndex = buildSymbolIndex(codemap);
   const adjacency = new Map<string, Set<string>>();
 
-  for (const [chunkId, entry] of Object.entries(codemap)) {
+  for (const [_chunkId, entry] of Object.entries(codemap)) {
     if (!entry || typeof entry !== 'object' || typeof entry.sha !== 'string') {
       continue;
     }

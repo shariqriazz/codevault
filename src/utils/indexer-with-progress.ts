@@ -1,6 +1,3 @@
-import fg from 'fast-glob';
-import path from 'path';
-import fs from 'fs';
 import { indexProject } from '../core/indexer.js';
 import type { IndexProjectOptions, IndexProjectResult } from '../core/types.js';
 
@@ -22,15 +19,12 @@ export async function indexProjectWithProgress(
   options: IndexProjectOptions & { callbacks?: IndexWithProgressCallbacks }
 ): Promise<IndexProjectResult> {
   const { callbacks, ...indexOptions } = options;
-  const repo = path.resolve(options.repoPath || '.');
 
   // Progress tracking
   let totalFiles = 0;
   let processedCount = 0;
   const processedFiles = new Set<string>();
   const startTime = Date.now();
-  let lastFileCompletion = startTime;
-  let lastChunkBeat = startTime;
   const pendingByFile = new Map<string, number>();
   let totalPendingChunks = 0;
   let lastEtaMs: number | null = null;
@@ -75,7 +69,6 @@ export async function indexProjectWithProgress(
             if (isNewFile) {
               processedFiles.add(event.file);
               processedCount++;
-              lastFileCompletion = Date.now();
             }
 
             const elapsedMs = Date.now() - startTime;
@@ -89,7 +82,6 @@ export async function indexProjectWithProgress(
       }
 
       if (event.type === 'chunk_processed' && callbacks?.onChunkHeartbeat) {
-        lastChunkBeat = Date.now();
         callbacks.onChunkHeartbeat(lastEtaMs);
       }
       if (event.type === 'finalizing' && callbacks?.onFinalizing) {

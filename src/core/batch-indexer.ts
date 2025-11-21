@@ -8,13 +8,13 @@ const MAX_BATCH_RETRIES = 3;
 const MAX_TRANSIENT_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
-const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
-const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
-const MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
+const _MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
+const _MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
+const _MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
 const MAX_FATAL_RETRIES = 1; // Try fatal batch once more, then per-chunk
 const MAX_ANY_RETRIES = 6; // Upper cap for repeated full-batch retries on transient/provider errors
 
-const backoffWithCap = (attempt: number): number => {
+const _backoffWithCap = (attempt: number): number => {
   const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
   return Math.min(base, 30000); // cap at 30s
 };
