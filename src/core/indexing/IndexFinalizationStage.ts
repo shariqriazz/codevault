@@ -1,7 +1,8 @@
 import { saveMerkleAsync } from '../../indexer/merkle.js';
 import { writeCodemapAsync } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
-import { getTokenCountStats } from '../../chunking/token-counter.js';
+import { getTokenCountStats, type TokenCountStats } from '../../chunking/token-counter.js';
+type TokenStats = TokenCountStats;
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
@@ -65,7 +66,7 @@ export class IndexFinalizationStage {
       }
 
       // Get token statistics
-      const tokenStats = getTokenCountStats();
+      const tokenStats: TokenStats = getTokenCountStats();
 
       // Log statistics
       this.logStatistics();
@@ -110,7 +111,7 @@ export class IndexFinalizationStage {
   /**
    * Build the final result object
    */
-  private buildResult(tokenStats: unknown): IndexProjectResult {
+  private buildResult(tokenStats: TokenStats | undefined): IndexProjectResult {
     return {
       success: true,
       processedChunks: this.state.processedChunks,
@@ -118,7 +119,7 @@ export class IndexFinalizationStage {
       provider: this.context.providerInstance.getName(),
       errors: this.state.errors as Array<{ type: string; file?: string; chunkId?: string; error: string }>,
       chunkingStats: this.state.chunkingStats,
-      tokenStats: this.context.modelProfile.useTokens ? tokenStats : undefined
+      tokenStats: this.context.modelProfile.useTokens ? (tokenStats as any) : undefined
     };
   }
 

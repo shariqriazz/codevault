@@ -1,4 +1,5 @@
 import { OpenAI } from 'openai';
+import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions';
 import { createRateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
@@ -76,10 +77,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     return await this.rateLimiter.execute(async () => {
-      const requestBody = {
+      const requestBody: ChatCompletionCreateParamsNonStreaming & { provider?: ProviderRoutingConfig } = {
         model: this.model,
         messages: messages.map(msg => ({
-          role: msg.role as 'system' | 'user' | 'assistant',
+          role: msg.role,
           content: msg.content
         })),
         temperature,
@@ -106,10 +107,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     // Apply rate limiting to streaming requests to prevent overwhelming the provider
     await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
 
-    const requestBody = {
+    const requestBody: ChatCompletionCreateParamsStreaming & { provider?: ProviderRoutingConfig } = {
       model: this.model,
       messages: messages.map(msg => ({
-        role: msg.role as 'system' | 'user' | 'assistant',
+        role: msg.role,
         content: msg.content
       })),
       temperature,

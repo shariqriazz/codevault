@@ -55,6 +55,24 @@ interface RerankResult {
   logit?: number;
 }
 
+function isResultsResponse(data: unknown): data is { results: RerankResult[] } {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    'results' in data &&
+    Array.isArray((data as { results?: unknown }).results)
+  );
+}
+
+function hasDataArray(data: unknown): data is { data: RerankResult[] } {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    'data' in data &&
+    Array.isArray((data as { data?: unknown }).data)
+  );
+}
+
 async function callRerankAPI(query: string, documents: string[], config: RerankAPIConfig = {}): Promise<RerankResult[]> {
   const apiUrl = config.apiUrl || getAPIUrl();
   const apiKey = config.apiKey || getAPIKey();
@@ -90,16 +108,16 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error(`Rerank API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as unknown;
+  const data = await response.json();
 
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
-  if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
+  if (isResultsResponse(data)) {
     return data.results;
   }
 
   // Alternative response format (some providers use data array)
-  if (data.data && Array.isArray(data.data)) {
+  if (hasDataArray(data)) {
     return data.data;
   }
 

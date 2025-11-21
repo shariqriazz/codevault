@@ -5,7 +5,7 @@ interface TokenUsageEntry {
 
 interface QueueItem<T> {
   fn: () => Promise<T>;
-  resolve: (value: T) => void;
+  resolve: (value: T | PromiseLike<T>) => void;
   reject: (error: Error) => void;
   retryCount: number;
   estimatedTokens: number;
@@ -14,7 +14,7 @@ interface QueueItem<T> {
 export class RateLimiter {
   private rpm: number | null;
   private tpm: number | null;
-  private queue: QueueItem<unknown>[] = [];
+  private queue: QueueItem<any>[] = [];
   private processing = false;
   private requestTimes: number[] = [];
   private tokenUsage: TokenUsageEntry[] = [];

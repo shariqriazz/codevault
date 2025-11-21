@@ -15,7 +15,7 @@ export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPac
       lang: args.lang,
       reranker: args.reranker,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack }
+    { basePath: cleanPath, sessionPack: sessionContextPack as any }
   );
 
   try {

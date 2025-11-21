@@ -24,6 +24,15 @@ import type { ModelProfile } from '../../providers/base.js';
 export class FileProcessor {
   private chunkPipeline = new ChunkPipeline();
 
+  private isCodemapChunk(value: unknown): value is CodemapChunk {
+    return Boolean(
+      value &&
+      typeof value === 'object' &&
+      'file' in (value as Record<string, unknown>) &&
+      typeof (value as Record<string, unknown>).file === 'string'
+    );
+  }
+
   constructor(
     private context: IndexContextData,
     private state: IndexState,
@@ -41,16 +50,21 @@ export class FileProcessor {
 
     if (!rule) return;
 
-    const existingChunksOriginal = new Map(
-      Object.entries(this.state.codemap)
-        .filter(([, metadata]) => metadata && metadata.file === rel) as [string, CodemapChunk][]
-    );
+    const existingChunksOriginal = new Map<string, CodemapChunk>();
+    for (const [id, metadata] of Object.entries(this.state.codemap)) {
+        if (this.isCodemapChunk(metadata) && metadata.file === rel) {
+          existingChunksOriginal.set(id, metadata);
+        }
+      }
     const existingChunks = new Map(
-      Array.from(existingChunksOriginal.entries()).map(([id, metadata]) => [id, {
+      Array.from(existingChunksOriginal.entries()).map(([id, metadata]) => [
         id,
-        file_path: metadata.file,
-        symbol: metadata.symbol || ''
-      }] as [string, { id: string; file_path: string; symbol: string }])
+        {
+          id,
+          file_path: metadata.file,
+          symbol: metadata.symbol || ''
+        }
+      ])
     );
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
@@ -77,7 +91,7 @@ export class FileProcessor {
       const nodeGroups = await this.chunkPipeline.groupNodes(
         collectedNodes,
         source,
-        this.context.modelProfile as ModelProfile,
+        this.context.modelProfile,
         rule
       );
 
@@ -86,8 +100,8 @@ export class FileProcessor {
         nodeGroups,
         source,
         rule,
-        this.context.limits as { min: number; max: number; optimal: number; overlap: number; unit: string },
-        this.context.modelProfile as ModelProfile,
+        this.context.limits,
+        this.context.modelProfile,
         rel,
         { staleChunkIds, existingChunks },
         chunkMerkleHashes,
@@ -337,11 +351,15 @@ export class FileProcessor {
    * Remove all artifacts for a deleted file
    */
   async removeFileArtifacts(fileRel: string): Promise<void> {
-    const entries = Object.entries(this.state.codemap)
-      .filter(([, metadata]) => metadata && metadata.file === fileRel);
+    const entries: Array<[string, CodemapChunk]> = [];
+    for (const [chunkId, metadata] of Object.entries(this.state.codemap)) {
+      if (this.isCodemapChunk(metadata) && metadata.file === fileRel) {
+        entries.push([chunkId, metadata]);
+      }
+    }
 
     if (entries.length > 0) {
-      const metadataLookup = new Map(entries as [string, CodemapChunk][]);
+      const metadataLookup = new Map(entries);
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
       this.persistManager.scheduleCodemapSave();

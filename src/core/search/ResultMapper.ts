@@ -81,7 +81,7 @@ export class ResultMapper {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
         getTextAsync: async candidate => {
           const codeText = (await this.readChunkText(candidate.sha as string, chunkDir)) || '';
-          return this.buildBm25Document(candidate, codeText);
+          return this.buildBm25Document(candidate as SearchCandidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
         apiKey: providerContext.reranker.apiKey,

@@ -95,7 +95,13 @@ function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const errorLike = error as ErrorLike & Record<string, unknown>;
   const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'] as const;
   for (const key of candidates) {
-    if (errorLike[key] !== undefined) info[key] = String(errorLike[key]);
+    if (errorLike[key] !== undefined) {
+      const value = errorLike[key];
+      info[key] =
+        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+          ? value
+          : JSON.stringify(value);
+    }
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
@@ -299,11 +305,11 @@ export class BatchEmbeddingProcessor {
           depth,
           fatalApi || fatalSeen
         );
-        return;
       }
 
       // Other errors or max retries reached - fall back to individual processing
       // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
+      // eslint-disable-next-line no-unreachable
       log.debug(
         `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
         {
@@ -314,6 +320,7 @@ export class BatchEmbeddingProcessor {
       log.info('Falling back to individual processing (this will be slower)');
 
       await this.fallbackToIndividualProcessing(currentBatch);
+      return;
     }
   }
 

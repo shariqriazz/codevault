@@ -166,7 +166,7 @@ export function registerAskCodebaseTool(server: MCPServer, options: CreateHandle
       temperature: z.number().min(0).max(2).optional().describe('LLM temperature (default: 0.7)')
     },
     async (params: unknown) => {
-      const result = await handler(params);
+      const result = await handler(params as Parameters<typeof handler>[0]);
       return {
         content: [
           {

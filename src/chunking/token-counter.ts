@@ -1,7 +1,7 @@
 import { SimpleLRU } from '../utils/simple-lru.js';
 import { computeFastHash } from '../indexer/merkle.js';
 
-interface TokenCountStats {
+export interface TokenCountStats {
   totalRequests: number;
   cacheHits: number;
   charFilterSkips: number;

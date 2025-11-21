@@ -384,7 +384,7 @@ export class HybridFusion {
 
       logger.warn(`Failed to load chunk ${sha}`, {
         error: error instanceof Error ? error.message : String(error),
-        code: error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        code: error && typeof error === 'object' && 'code' in error ? String((error as { code?: unknown }).code) : undefined
       });
 
       this.chunkCache.set(cacheKey, null);

@@ -100,7 +100,7 @@ export class SearchService {
       const context = await contextManager.warmup(effectiveProvider);
 
       // Fetch chunks from database
-      const chunks = await contextManager.getChunks(context);
+      const chunks = contextManager.getChunks(context);
 
       if (chunks.length === 0) {
         return this.createErrorResult(

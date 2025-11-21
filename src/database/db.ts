@@ -383,7 +383,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  async getChunks(providerName: string, dimensions: number): Promise<DatabaseChunk[]> {
+  getChunks(providerName: string, dimensions: number): DatabaseChunk[] {
     try {
       return this.getChunksStmt.all(providerName, dimensions) as DatabaseChunk[];
     } catch (error) {

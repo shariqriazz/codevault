@@ -16,7 +16,7 @@ export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack:
       bm25: args.bm25,
       symbol_boost: args.symbol_boost,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack }
+    { basePath: cleanPath, sessionPack: sessionContextPack as any }
   );
 
   const results = await searchCode(
@@ -69,7 +69,7 @@ export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs,
       bm25: args.bm25,
       symbol_boost: args.symbol_boost,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack }
+    { basePath: cleanPath, sessionPack: sessionContextPack as any }
   );
 
   const searchResults = await searchCode(

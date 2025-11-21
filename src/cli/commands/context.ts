@@ -66,7 +66,11 @@ export function registerContextCommands(program: Command): void {
       packs
         .sort((a, b) => a.key.localeCompare(b.key))
         .forEach(pack => {
-          console.log(`  ${formatPackLine(pack, activeKey)}`);
+          const normalizedPack: ContextPackWithKey = {
+            ...pack,
+            description: pack.description ?? undefined
+          };
+          console.log(`  ${formatPackLine(normalizedPack, activeKey)}`);
         });
 
       if (active) {
@@ -81,7 +85,11 @@ export function registerContextCommands(program: Command): void {
       const resolvedPath = resolveProjectPath(projectPath);
       try {
         const pack = loadContextPack(name, resolvedPath);
-        printPackDetails(pack);
+        const normalizedPack: ContextPackWithKey = {
+          ...pack,
+          description: pack.description ?? undefined
+        };
+        printPackDetails(normalizedPack);
       } catch (error) {
         console.error(`Failed to load context pack "${name}": ${(error as Error).message}`);
         process.exitCode = 1;
@@ -105,7 +113,8 @@ export function registerContextCommands(program: Command): void {
         if (pack.scope && Object.keys(pack.scope).length > 0) {
           console.log('Default scope:');
           for (const [key, value] of Object.entries(pack.scope)) {
-            console.log(`  ${key}: ${Array.isArray(value) ? value.join(', ') : value}`);
+            const valueStr = Array.isArray(value) ? value.join(', ') : String(value);
+            console.log(`  ${key}: ${valueStr}`);
           }
         }
       } catch (error) {

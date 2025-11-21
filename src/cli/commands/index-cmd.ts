@@ -53,9 +53,13 @@ export function registerIndexCommand(program: Command): void {
               max: limits.max,
               optimal: limits.optimal
             },
-            rateLimit: embeddingProvider.rateLimiter && typeof embeddingProvider.rateLimiter === 'object' && 'getStats' in embeddingProvider.rateLimiter ? {
-              rpm: (embeddingProvider.rateLimiter.getStats() as { rpm?: number }).rpm || 0
-            } : undefined
+            rateLimit: (() => {
+              if (embeddingProvider.rateLimiter && typeof embeddingProvider.rateLimiter === 'object' && 'getStats' in embeddingProvider.rateLimiter) {
+                const stats = (embeddingProvider.rateLimiter as { getStats: () => { rpm?: number | null } }).getStats();
+                return { rpm: stats.rpm ?? 0 };
+              }
+              return undefined;
+            })()
           });
 
           ui.startScanning();

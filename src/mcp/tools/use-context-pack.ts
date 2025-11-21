@@ -105,7 +105,7 @@ export function registerUseContextPackTool(server: MCPServer, options: CreateHan
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
     async (params: unknown) => {
-      const result = await handler(params);
+      const result = await handler(params as { name: string; path?: string });
       return {
         content: [
           {
