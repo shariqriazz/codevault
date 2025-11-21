@@ -156,7 +156,19 @@ export function registerAskCodebaseTool(server: any, options: CreateHandlerOptio
       multi_query: z.boolean().optional().describe('Break complex questions into sub-queries'),
       temperature: z.number().min(0).max(2).optional().describe('LLM temperature (default: 0.7)')
     },
-    async (params: any) => {
+    async (params: {
+      question: string;
+      provider?: string;
+      chat_provider?: string;
+      path?: string;
+      max_chunks?: number;
+      path_glob?: string | string[];
+      tags?: string | string[];
+      lang?: string | string[];
+      reranker?: 'on' | 'off';
+      multi_query?: boolean;
+      temperature?: number;
+    }) => {
       const result = await handler(params);
       return {
         content: [

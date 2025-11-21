@@ -24,12 +24,18 @@ export function registerSearchWithCodeCommand(program: Command): void {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath = options.project || options.directory || projectPath || '.';
-        const limit = parseInt(options.limit);
-        const maxCodeSize = parseInt(options.maxCodeSize || '100000');
+        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
+                                      (typeof options.directory === 'string' ? options.directory : null) ||
+                                      (typeof projectPath === 'string' ? projectPath : null) ||
+                                      '.';
+        const limit = parseInt(String(options.limit || '5'));
+        const maxCodeSize = parseInt(String(options.maxCodeSize || '100000'));
+        const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
+        const providerOptionTyped: string = providerOption;
 
         const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
+        const scopeFiltersTyped: import('../../types/search.js').ScopeFilters = scopeFilters;
+        const results = await searchCode(query, limit, providerOptionTyped, resolvedPath, scopeFiltersTyped);
 
         if (!results.success) {
           print(chalk.yellow(`\nNo results found for "${query}"`));

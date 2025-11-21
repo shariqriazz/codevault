@@ -34,12 +34,17 @@ export function registerAskCommand(program: Command): void {
       try {
         // Suppress verbose logs
         process.env.CODEVAULT_QUIET = 'true';
-        
-        const resolvedPath = options.project || options.directory || options.path || '.';
-        const maxChunks = parseInt(options.maxChunks, 10);
-        const temperature = parseFloat(options.temperature);
+
+        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
+                                      (typeof options.directory === 'string' ? options.directory : null) ||
+                                      (typeof options.path === 'string' ? options.path : null) ||
+                                      '.';
+        const maxChunksStr: string = typeof options.maxChunks === 'string' ? options.maxChunks : '10';
+        const maxChunks = parseInt(maxChunksStr, 10);
+        const temperatureStr: string = typeof options.temperature === 'string' ? options.temperature : '0.7';
+        const temperature = parseFloat(temperatureStr);
         const useReranking = options.reranker !== 'off';
-        
+
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
             path_glob: options.path_glob,
@@ -48,6 +53,9 @@ export function registerAskCommand(program: Command): void {
           },
           { basePath: resolvedPath }
         );
+        const scopeFiltersTyped: import('../../types/search.js').ScopeFilters = scopeFilters;
+        const providerStr: string = typeof options.provider === 'string' ? options.provider : 'auto';
+        const chatProviderStr: string = typeof options.chatProvider === 'string' ? options.chatProvider : 'auto';
 
         // Streaming mode
         if (options.stream) {
@@ -57,13 +65,13 @@ export function registerAskCommand(program: Command): void {
           }).start();
 
           let firstChunk = true;
-          
+
           try {
             for await (const chunk of synthesizeAnswerStreaming(question, {
-              provider: options.provider,
-              chatProvider: options.chatProvider,
+              provider: providerStr,
+              chatProvider: chatProviderStr,
               workingPath: resolvedPath,
-              scope: scopeFilters,
+              scope: scopeFiltersTyped,
               maxChunks,
               useReranking,
               temperature
@@ -96,10 +104,10 @@ export function registerAskCommand(program: Command): void {
         }).start();
 
         const result = await synthesizeAnswer(question, {
-          provider: options.provider,
-          chatProvider: options.chatProvider,
+          provider: providerStr,
+          chatProvider: chatProviderStr,
           workingPath: resolvedPath,
-          scope: scopeFilters,
+          scope: scopeFiltersTyped,
           maxChunks,
           useReranking,
           useMultiQuery: options.multiQuery,

@@ -63,17 +63,16 @@ function splitSymbolWords(symbol: string): string[] {
     .filter(word => word.length > 0);
 }
 
-function computeSignatureMatchStrength(query: string, entry: any): number {
-  if (!entry) {
+function computeSignatureMatchStrength(query: string, entry: unknown): number {
+  if (!entry || typeof entry !== 'object') {
     return 0;
   }
 
+  const entryObj = entry as Record<string, unknown>;
   const queryLower = query.toLowerCase();
-  const symbolRaw = entry.symbol;
-  const rawSymbol = typeof symbolRaw === 'string' ? symbolRaw : '';
+  const rawSymbol = typeof entryObj.symbol === 'string' ? entryObj.symbol : '';
   const symbol = rawSymbol.toLowerCase();
-  const signatureRaw = entry.symbol_signature;
-  const signature = typeof signatureRaw === 'string' ? signatureRaw.toLowerCase() : '';
+  const signature = typeof entryObj.symbol_signature === 'string' ? entryObj.symbol_signature.toLowerCase() : '';
 
   let weight = 0;
   const matchedTokens = new Set<string>();
@@ -108,8 +107,8 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   }
 
   let parameterMatches = 0;
-  if (Array.isArray(entry.symbol_parameters)) {
-    for (const param of entry.symbol_parameters) {
+  if (Array.isArray(entryObj.symbol_parameters)) {
+    for (const param of entryObj.symbol_parameters) {
       if (typeof param !== 'string') {
         continue;
       }
@@ -146,14 +145,14 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   return Math.max(0, Math.min(weight / 4, 1));
 }
 
-function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: any }> {
-  const index = new Map<string, { chunkId: string; entry: any }>();
+function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: unknown }> {
+  const index = new Map<string, { chunkId: string; entry: unknown }>();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }
 
   for (const [chunkId, entry] of Object.entries(codemap)) {
-    if (!entry || typeof entry.sha !== 'string') {
+    if (!entry || typeof entry !== 'object' || !('sha' in entry) || typeof entry.sha !== 'string') {
       continue;
     }
     index.set(entry.sha, { chunkId, entry });

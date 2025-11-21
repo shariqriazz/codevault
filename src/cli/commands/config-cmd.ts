@@ -38,7 +38,8 @@ export function registerConfigCommands(program: Command): void {
     .action(async (options) => {
       // Use interactive mode by default
       if (options.interactive !== false) {
-        await runInteractiveConfig(options.force);
+        const force: boolean = typeof options.force === 'boolean' ? options.force : false;
+        await runInteractiveConfig(force);
         return;
       }
 
@@ -80,7 +81,7 @@ export function registerConfigCommands(program: Command): void {
     .option('-l, --local [path]', 'Save to project config instead of global')
     .action((key, value, options) => {
       const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+      const basePath: string = typeof options.local === 'string' ? options.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -131,11 +132,11 @@ export function registerConfigCommands(program: Command): void {
     .option('-l, --local [path]', 'Get from project config only')
     .action((key, options) => {
       let config: CodevaultConfig;
-      
+
       if (options.global) {
         config = readGlobalConfig() || {};
       } else if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath: string = typeof options.local === 'string' ? options.local : '.';
         config = readProjectConfig(basePath) || {};
       } else {
         config = loadConfig();
@@ -174,7 +175,7 @@ export function registerConfigCommands(program: Command): void {
     .option('-s, --sources', 'Show all configuration sources')
     .action((options) => {
       if (options.sources) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath: string = typeof options.local === 'string' ? options.local : '.';
         const sources = getConfigSources(basePath);
 
         print(chalk.bold('Configuration Sources:\n'));
@@ -202,7 +203,7 @@ export function registerConfigCommands(program: Command): void {
       }
 
       if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+        const basePath: string = typeof options.local === 'string' ? options.local : '.';
         const config = readProjectConfig(basePath);
         print(chalk.bold('Project Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
@@ -228,7 +229,7 @@ export function registerConfigCommands(program: Command): void {
     .option('-l, --local [path]', 'Remove from project config instead of global')
     .action((key, options) => {
       const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+      const basePath: string = typeof options.local === 'string' ? options.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -241,7 +242,7 @@ export function registerConfigCommands(program: Command): void {
       const keyStr = String(key);
       const keyPath = keyStr.split('.');
       let current: any = config;
-      
+
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
         if (!current[part]) {

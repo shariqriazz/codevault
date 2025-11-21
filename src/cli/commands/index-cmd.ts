@@ -19,7 +19,10 @@ export function registerIndexCommand(program: Command): void {
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
     .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
+      const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
+                                    (typeof options.directory === 'string' ? options.directory : null) ||
+                                    (typeof projectPath === 'string' ? projectPath : null) ||
+                                    '.';
       const ui = new IndexerUI();
 
       try {
@@ -31,7 +34,8 @@ export function registerIndexCommand(program: Command): void {
           ui.showHeader();
 
           const providerContext = resolveProviderContext(resolvedPath);
-          const embeddingProvider = createEmbeddingProvider(options.provider, providerContext.embedding);
+          const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
+          const embeddingProvider = createEmbeddingProvider(providerOption, providerContext.embedding);
           if (embeddingProvider.init) {
             await embeddingProvider.init();
           }
@@ -57,17 +61,21 @@ export function registerIndexCommand(program: Command): void {
           ui.startScanning();
         } else {
           print('Starting project indexing...');
-          print(`Provider: ${options.provider}`);
+          print(`Provider: ${typeof options.provider === 'string' ? options.provider : 'auto'}`);
         }
 
         let result;
 
+        const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
+        const encryptMode: string | undefined = typeof options.encrypt === 'string' ? options.encrypt : undefined;
+        const concurrency = options.concurrency ? parseInt(String(options.concurrency), 10) : undefined;
+
         if (!options.verbose) {
           result = await indexProjectWithProgress({
             repoPath: resolvedPath,
-            provider: options.provider,
-            encryptMode: options.encrypt,
-            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
+            provider: providerOption,
+            encryptMode,
+            concurrency,
             callbacks: {
             onScanComplete: (fileCount) => {
               ui.finishScanning(fileCount, 25);
@@ -114,9 +122,9 @@ export function registerIndexCommand(program: Command): void {
         } else {
           result = await indexProject({
             repoPath: resolvedPath,
-            provider: options.provider,
-            encryptMode: options.encrypt,
-            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
+            provider: providerOption,
+            encryptMode,
+            concurrency
           });
           print('Indexing completed successfully');
         }

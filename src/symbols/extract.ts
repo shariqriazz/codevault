@@ -260,10 +260,11 @@ export function queryMatchesSignature(
 
   if (Array.isArray(metadata.keywords) && metadata.keywords.length > 0) {
     for (const word of metadata.keywords) {
-      if (!word || word.length < SYMBOL_BOOST_CONSTANTS.MIN_TOKEN_LENGTH) {
+      if (!word || typeof word !== 'string' || word.length < SYMBOL_BOOST_CONSTANTS.MIN_TOKEN_LENGTH) {
         continue;
       }
-      const pattern = buildMemoizedRegex(escapeRegex(word));
+      const escapedWord: string = escapeRegex(word);
+      const pattern = buildMemoizedRegex(escapedWord);
       if (pattern.test(query)) {
         return true;
       }

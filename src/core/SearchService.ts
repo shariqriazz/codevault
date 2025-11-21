@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Database } from '../database/db.js';
+import type { DatabaseChunk } from '../database/db.js';
 import { normalizeScopeFilters, applyScope } from '../search/scope.js';
 import { applySymbolBoost } from '../ranking/symbol-boost.js';
 import { logger } from '../utils/logger.js';
@@ -115,7 +116,7 @@ export class SearchService {
       }
 
       // Apply scope filtering
-      const scopedChunks = applyScope(chunks, normalizedScope) as any[];
+      const scopedChunks: any[] = applyScope(chunks, normalizedScope) as any[];
       const selectionBudget = Math.max(limit, RRF_K);
       const bm25CandidateLimit = Math.max(
         selectionBudget,
@@ -140,9 +141,10 @@ export class SearchService {
 
         bm25PrefilterResults = prefilter.bm25Results;
         if (prefilter.candidateIds.size > 0) {
-          const filtered = scopedChunks.filter(chunk =>
-            prefilter.candidateIds.has(chunk.id)
-          );
+          const filtered = scopedChunks.filter(chunk => {
+            const chunkId: string = typeof chunk.id === 'string' ? chunk.id : String(chunk.id);
+            return prefilter.candidateIds.has(chunkId);
+          });
           if (filtered.length > 0) {
             vectorCandidates = filtered;
           }
@@ -151,7 +153,7 @@ export class SearchService {
 
       // Build vector pool
       const { chunkInfoById, vectorPool } = await this.retriever.buildVectorPool(
-        vectorCandidates,
+        vectorCandidates as DatabaseChunk[],
         context.provider,
         normalizedQuery
       );
@@ -215,9 +217,10 @@ export class SearchService {
       results = this.mapper.enforceScoreBounds(results);
 
       // Map to search results
+      const searchType: string = bm25Fused ? 'hybrid' : 'vector';
       const mappedResults = this.mapper.mapResults(
         results,
-        bm25Fused ? 'hybrid' : 'vector'
+        searchType
       );
 
       // Sort by score

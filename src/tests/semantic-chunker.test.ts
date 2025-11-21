@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { findSemanticSubdivisions, yieldStatementChunks } from '../chunking/semantic-chunker.js';
 import type { ModelProfile } from '../providers/base.js';
+import type { TreeSitterNode } from '../types/ast.js';
+import type { LanguageRule } from '../languages/rules.js';
 
 const dummyProfile: ModelProfile = {
   maxTokens: 100,
@@ -31,9 +33,9 @@ function makeNode(type: string, children: any[] = [], startIndex = 0, endIndex =
 test('findSemanticSubdivisions returns direct subdivision types', () => {
   const child = makeNode('child');
   const parent = makeNode('root', [child]);
-  const rule = { subdivisionTypes: { root: ['child'] } };
+  const rule = { subdivisionTypes: { root: ['child'] } } as unknown as LanguageRule;
 
-  const subs = findSemanticSubdivisions(parent as any, rule as any);
+  const subs = findSemanticSubdivisions(parent as TreeSitterNode, rule);
   assert.equal(subs.length, 1);
   assert.equal(subs[0], child);
 });
@@ -45,7 +47,7 @@ test('yieldStatementChunks preserves configured overlap', async () => {
   const maxSize = 20; // characters
   const overlapSize = 4; // characters to overlap
 
-  const chunks = await yieldStatementChunks(node as any, source, maxSize, overlapSize, dummyProfile);
+  const chunks = await yieldStatementChunks(node as TreeSitterNode, source, maxSize, overlapSize, dummyProfile);
   assert.ok(chunks.length > 1, 'should split into multiple chunks');
 
   // Verify overlap by checking that the last line of first chunk appears at start of second chunk
@@ -74,7 +76,7 @@ test('yieldStatementChunks batches token counting once per line', async () => {
   const maxSize = 5; // forces multiple chunks when using token sizes
   const overlapSize = 2;
 
-  await yieldStatementChunks(node as any, source, maxSize, overlapSize, tokenProfile);
+  await yieldStatementChunks(node as TreeSitterNode, source, maxSize, overlapSize, tokenProfile);
 
   assert.equal(tokenCounterCalls, source.split('\n').length);
 });

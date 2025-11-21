@@ -140,10 +140,19 @@ export class RateLimiter {
 
       try {
         const result = await fn();
-        
-        const tokensUsed = estimatedTokens || (result)?.usage?.total_tokens || 0;
+
+        let tokensUsed = estimatedTokens || 0;
+        if (!tokensUsed && result && typeof result === 'object' && 'usage' in result) {
+          const usage = result.usage;
+          if (usage && typeof usage === 'object' && 'total_tokens' in usage) {
+            const totalTokens = (usage as Record<string, unknown>).total_tokens;
+            if (typeof totalTokens === 'number') {
+              tokensUsed = totalTokens;
+            }
+          }
+        }
         this.recordRequest(tokensUsed);
-        
+
         resolve(result);
       } catch (error) {
         if (this.isRateLimitError(error)) {

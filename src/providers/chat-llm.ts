@@ -1,4 +1,6 @@
 import { OpenAI } from 'openai';
+import type { ClientOptions } from 'openai';
+import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import { createRateLimiter, type RateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
@@ -51,7 +53,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
+      const config: ClientOptions = {};
 
       if (this.apiKey) {
         config.apiKey = this.apiKey;
@@ -82,7 +84,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     return await this.rateLimiter.execute(async (): Promise<string> => {
-      const requestBody: any = {
+      const requestBody: ChatCompletionCreateParamsNonStreaming = {
         model: this.model,
         messages: messages.map(msg => ({
           role: msg.role,
@@ -94,7 +96,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
       // Add provider routing for OpenRouter if configured
       if (this.routingConfig && this.isOpenRouter()) {
-        requestBody.provider = this.routingConfig;
+        (requestBody as any).provider = this.routingConfig;
       }
 
       const completion = await openai.chat.completions.create(requestBody);
@@ -137,7 +139,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       requestBody.provider = this.routingConfig;
     }
 
-    const stream = await (openai.chat.completions.create as any)(requestBody);
+    const stream = await openai.chat.completions.create(requestBody);
 
     for await (const chunk of stream as any) {
       const content = chunk.choices[0]?.delta?.content;
