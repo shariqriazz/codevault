@@ -109,12 +109,12 @@ function identifySemanticGroups(nodes: TreeSitterNode[], source: string, nodeAna
   return groups;
 }
 
-async function combineGroupsToOptimalSize(
+function combineGroupsToOptimalSize(
   semanticGroups: SemanticGroup[],
   source: string,
   profile: ModelProfile,
   limits: ReturnType<typeof getSizeLimits>
-): Promise<NodeGroup[]> {
+): NodeGroup[] {
   const optimalGroups: NodeGroup[] = [];
   let currentCombinedGroup: NodeGroup = {
     nodes: [],
@@ -198,8 +198,8 @@ export async function groupNodesForChunking(
   
   const nodeAnalyses = await batchAnalyzeNodesInternal(nodes, source, profile);
   const semanticGroups = identifySemanticGroups(nodes, source, nodeAnalyses, rule);
-  const optimalGroups = await combineGroupsToOptimalSize(semanticGroups, source, profile, limits);
-  
+  const optimalGroups = combineGroupsToOptimalSize(semanticGroups, source, profile, limits);
+
   return optimalGroups;
 }
 

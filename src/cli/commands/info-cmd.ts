@@ -7,7 +7,7 @@ export function registerInfoCommand(program: Command): void {
   program
     .command('info')
     .description('Show project information')
-    .action(async () => {
+    .action(() => {
       try {
         const codemapPath = 'codevault.codemap.json';
 

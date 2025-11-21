@@ -44,7 +44,7 @@ export class IndexFinalizationStage {
       attachSymbolGraphToCodemap(this.state.codemap);
       this.state.markIndexMutated();
 
-      await this.cleanupOrphanedChunks();
+      this.cleanupOrphanedChunks();
 
       // Persist any pending data (debounced during processing)
       await this.persistManager.flush();
@@ -69,7 +69,7 @@ export class IndexFinalizationStage {
       return this.buildResult(tokenStats);
     } finally {
       // Clean up resources
-      await this.cleanup();
+      this.cleanup();
     }
   }
 
@@ -120,7 +120,7 @@ export class IndexFinalizationStage {
   /**
    * Remove orphaned chunks whose source files no longer exist
    */
-  private async cleanupOrphanedChunks(): Promise<void> {
+  private cleanupOrphanedChunks(): void {
     if (!this.context.db) return;
 
     const paths = this.context.db.getAllFilePaths();
@@ -161,7 +161,7 @@ export class IndexFinalizationStage {
   /**
    * Clean up resources
    */
-  private async cleanup(): Promise<void> {
+  private cleanup(): void {
     // Close database connection
     try {
       if (this.context.db) {

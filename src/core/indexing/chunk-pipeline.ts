@@ -176,7 +176,7 @@ export class ChunkPipeline {
     this.overlapStrategy = deps.overlapStrategy ?? new StatementOverlapStrategy();
   }
 
-  async collectNodesForFile(source: string, rule: LanguageRule): Promise<TreeSitterNode[]> {
+  collectNodesForFile(source: string, rule: LanguageRule): TreeSitterNode[] {
     return this.traverser.collectNodesForFile(source, rule);
   }
 

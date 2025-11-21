@@ -85,7 +85,7 @@ export class IndexContext {
     }
 
     // Initialize database
-    await initDatabase(providerInstance.getDimensions(), repo);
+    initDatabase(providerInstance.getDimensions(), repo);
 
     // Setup paths
     const codemapPath = path.join(repo, 'codevault.codemap.json');

@@ -27,7 +27,7 @@ interface CreateHandlerOptions {
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
   const { getWorkingPath, setSessionPack, clearSessionPack, errorLogger } = options;
 
-  return async ({ name, path: explicitPath }: { name: string; path?: string }) => {
+  return ({ name, path: explicitPath }: { name: string; path?: string }) => {
     const basePath = explicitPath && explicitPath.trim().length > 0
       ? explicitPath.trim()
       : (typeof getWorkingPath === 'function' ? getWorkingPath() : '.');

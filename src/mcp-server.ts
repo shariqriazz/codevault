@@ -133,7 +133,7 @@ export class McpServer {
   }
 
   private setupHandlers(): void {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       const tools: Tool[] = [
         {
           name: 'search_code',
@@ -362,7 +362,7 @@ export class McpServer {
   }
 
   private setupShutdownHandlers(): void {
-    const cleanup = async (): Promise<void> => {
+    const cleanup = () => {
       if (this.cacheCleanupTimer) {
         clearInterval(this.cacheCleanupTimer);
         this.cacheCleanupTimer = null;
@@ -372,13 +372,15 @@ export class McpServer {
       clearSearchCaches();
       clearTokenCache();
     };
-    
+
     process.on('SIGINT', () => {
-      void cleanup().then(() => process.exit(0));
+      cleanup();
+      process.exit(0);
     });
 
     process.on('SIGTERM', () => {
-      void cleanup().then(() => process.exit(0));
+      cleanup();
+      process.exit(0);
     });
   }
 }

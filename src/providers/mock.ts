@@ -40,15 +40,16 @@ export class MockEmbeddingProvider extends EmbeddingProvider {
     return 'mock';
   }
 
-  async init(): Promise<void> {
+  init(): Promise<void> {
     // No-op for mock provider
+    return Promise.resolve();
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
-    return buildDeterministicVector(text, this.dimensions);
+  generateEmbedding(text: string): Promise<number[]> {
+    return Promise.resolve(buildDeterministicVector(text, this.dimensions));
   }
 
-  async generateEmbeddings(texts: string[]): Promise<number[][]> {
-    return texts.map(text => buildDeterministicVector(text, this.dimensions));
+  generateEmbeddings(texts: string[]): Promise<number[][]> {
+    return Promise.resolve(texts.map(text => buildDeterministicVector(text, this.dimensions)));
   }
 }
