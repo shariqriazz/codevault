@@ -12,15 +12,16 @@ import {
 } from '../../config/loader.js';
 import { runInteractiveConfig } from './interactive-config.js';
 import type { CodevaultConfig } from '../../config/types.js';
+import { print } from '../../utils/logger.js';
 
 function displayConfig(config: CodevaultConfig | null, title: string): void {
   if (!config || Object.keys(config).length === 0) {
-    console.log(chalk.gray(`  ${title}: (empty)`));
+    print(chalk.gray(`  ${title}: (empty)`));
     return;
   }
 
-  console.log(chalk.bold(`  ${title}:`));
-  console.log(`  ${  JSON.stringify(config, null, 2).split('\n').join('\n  ')}`);
+  print(chalk.bold(`  ${title}:`));
+  print(`  ${  JSON.stringify(config, null, 2).split('\n').join('\n  ')}`);
 }
 
 export function registerConfigCommands(program: Command): void {
@@ -43,33 +44,33 @@ export function registerConfigCommands(program: Command): void {
 
       // Non-interactive mode (legacy)
       if (hasGlobalConfig() && !options.force) {
-        console.log(chalk.yellow('⚠️  Global configuration already exists at:'));
-        console.log(chalk.cyan(`   ${getGlobalConfigPath()}`));
-        console.log('');
-        console.log('Use --force to overwrite, or edit the file directly.');
-        console.log(`Run: ${  chalk.cyan('codevault config show --global')}`);
+        print(chalk.yellow('⚠️  Global configuration already exists at:'));
+        print(chalk.cyan(`   ${getGlobalConfigPath()}`));
+        print('');
+        print('Use --force to overwrite, or edit the file directly.');
+        print(`Run: ${  chalk.cyan('codevault config show --global')}`);
         return;
       }
 
-      console.log(chalk.bold('🚀 CodeVault Configuration Setup\n'));
+      print(chalk.bold('🚀 CodeVault Configuration Setup\n'));
 
       const config: CodevaultConfig = {
         defaultProvider: 'auto',
         providers: {}
       };
 
-      console.log('Configuration will be saved to:');
-      console.log(chalk.cyan(`  ${getGlobalConfigPath()}\n`));
+      print('Configuration will be saved to:');
+      print(chalk.cyan(`  ${getGlobalConfigPath()}\n`));
 
-      console.log(chalk.gray('You can configure providers now or later using:'));
-      console.log(chalk.cyan('  codevault config set <key> <value>\n'));
+      print(chalk.gray('You can configure providers now or later using:'));
+      print(chalk.cyan('  codevault config set <key> <value>\n'));
 
       saveGlobalConfig(config);
-      console.log(chalk.green('✓ Global configuration initialized!'));
-      console.log('');
-      console.log('Next steps:');
-      console.log(chalk.cyan('  codevault config set providers.openai.apiKey YOUR_API_KEY'));
-      console.log(chalk.cyan('  codevault config set providers.openai.model text-embedding-3-large'));
+      print(chalk.green('✓ Global configuration initialized!'));
+      print('');
+      print('Next steps:');
+      print(chalk.cyan('  codevault config set providers.openai.apiKey YOUR_API_KEY'));
+      print(chalk.cyan('  codevault config set providers.openai.model text-embedding-3-large'));
     });
 
   // config set - Set configuration value
@@ -114,10 +115,10 @@ export function registerConfigCommands(program: Command): void {
       // Save config
       if (isLocal) {
         saveProjectConfig(config, basePath);
-        console.log(chalk.green(`✓ Set ${key} in project config`));
+        print(chalk.green(`✓ Set ${key} in project config`));
       } else {
         saveGlobalConfig(config);
-        console.log(chalk.green(`✓ Set ${key} in global config`));
+        print(chalk.green(`✓ Set ${key} in global config`));
       }
     });
 
@@ -153,11 +154,11 @@ export function registerConfigCommands(program: Command): void {
       }
 
       if (value === undefined) {
-        console.log(chalk.yellow(`Key '${key}' not found`));
+        print(chalk.yellow(`Key '${key}' not found`));
       } else if (typeof value === 'object') {
-        console.log(JSON.stringify(value, null, 2));
+        print(JSON.stringify(value, null, 2));
       } else {
-        console.log(value);
+        print(value);
       }
     });
 
@@ -173,27 +174,27 @@ export function registerConfigCommands(program: Command): void {
       if (options.sources) {
         const basePath = typeof options.local === 'string' ? options.local : '.';
         const sources = getConfigSources(basePath);
-        
-        console.log(chalk.bold('Configuration Sources:\n'));
+
+        print(chalk.bold('Configuration Sources:\n'));
         displayConfig(sources.global, 'Global (~/.codevault/config.json)');
-        console.log('');
+        print('');
         displayConfig(sources.project, 'Project (.codevault/config.json)');
-        console.log('');
+        print('');
         displayConfig(sources.env, 'Environment Variables');
-        console.log('');
-        console.log(chalk.gray('Priority: Environment > Project > Global'));
+        print('');
+        print(chalk.gray('Priority: Environment > Project > Global'));
         return;
       }
 
       if (options.global) {
         const config = readGlobalConfig();
-        console.log(chalk.bold('Global Configuration:\n'));
+        print(chalk.bold('Global Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
-          console.log(chalk.gray('  (empty)'));
-          console.log('');
-          console.log(`Initialize with: ${  chalk.cyan('codevault config init')}`);
+          print(chalk.gray('  (empty)'));
+          print('');
+          print(`Initialize with: ${  chalk.cyan('codevault config init')}`);
         } else {
-          console.log(JSON.stringify(config, null, 2));
+          print(JSON.stringify(config, null, 2));
         }
         return;
       }
@@ -201,21 +202,21 @@ export function registerConfigCommands(program: Command): void {
       if (options.local !== undefined) {
         const basePath = typeof options.local === 'string' ? options.local : '.';
         const config = readProjectConfig(basePath);
-        console.log(chalk.bold('Project Configuration:\n'));
+        print(chalk.bold('Project Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
-          console.log(chalk.gray('  (empty)'));
+          print(chalk.gray('  (empty)'));
         } else {
-          console.log(JSON.stringify(config, null, 2));
+          print(JSON.stringify(config, null, 2));
         }
         return;
       }
 
       // Show merged config
       const config = loadConfig();
-      console.log(chalk.bold('Merged Configuration:\n'));
-      console.log(JSON.stringify(config, null, 2));
-      console.log('');
-      console.log(chalk.gray('Tip: Use --sources to see individual config sources'));
+      print(chalk.bold('Merged Configuration:\n'));
+      print(JSON.stringify(config, null, 2));
+      print('');
+      print(chalk.gray('Tip: Use --sources to see individual config sources'));
     });
 
   // config unset - Remove configuration value
@@ -241,7 +242,7 @@ export function registerConfigCommands(program: Command): void {
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
         if (!current[part]) {
-          console.log(chalk.yellow(`Key '${key}' not found`));
+          print(chalk.yellow(`Key '${key}' not found`));
           return;
         }
         current = current[part];
@@ -249,7 +250,7 @@ export function registerConfigCommands(program: Command): void {
 
       const lastKey = keyPath[keyPath.length - 1];
       if (!(lastKey in current)) {
-        console.log(chalk.yellow(`Key '${key}' not found`));
+        print(chalk.yellow(`Key '${key}' not found`));
         return;
       }
 
@@ -258,10 +259,10 @@ export function registerConfigCommands(program: Command): void {
       // Save config
       if (isLocal) {
         saveProjectConfig(config, basePath);
-        console.log(chalk.green(`✓ Removed ${key} from project config`));
+        print(chalk.green(`✓ Removed ${key} from project config`));
       } else {
         saveGlobalConfig(config);
-        console.log(chalk.green(`✓ Removed ${key} from global config`));
+        print(chalk.green(`✓ Removed ${key} from global config`));
       }
     });
 
@@ -270,8 +271,8 @@ export function registerConfigCommands(program: Command): void {
     .command('path')
     .description('Show configuration file paths')
     .action(() => {
-      console.log(chalk.bold('Configuration Paths:\n'));
-      console.log(chalk.cyan('Global:  ') + getGlobalConfigPath());
-      console.log(`${chalk.cyan('Project: ')  }.codevault/config.json`);
+      print(chalk.bold('Configuration Paths:\n'));
+      print(chalk.cyan('Global:  ') + getGlobalConfigPath());
+      print(`${chalk.cyan('Project: ')  }.codevault/config.json`);
     });
 }

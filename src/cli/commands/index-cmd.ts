@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { indexProject } from '../../core/indexer.js';
 import { IndexerUI } from '../../utils/cli-ui.js';
 import { indexProjectWithProgress } from '../../utils/indexer-with-progress.js';
-import { log } from '../../utils/logger.js';
+import { log, print } from '../../utils/logger.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from '../../providers/index.js';
 import { resolveProviderContext } from '../../config/resolver.js';
 
@@ -56,8 +56,8 @@ export function registerIndexCommand(program: Command): void {
 
           ui.startScanning();
         } else {
-          console.log('Starting project indexing...');
-          console.log(`Provider: ${options.provider}`);
+          print('Starting project indexing...');
+          print(`Provider: ${options.provider}`);
         }
 
         let result;
@@ -118,7 +118,7 @@ export function registerIndexCommand(program: Command): void {
             encryptMode: options.encrypt,
             concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
           });
-          console.log('Indexing completed successfully');
+          print('Indexing completed successfully');
         }
       } catch (error) {
         if (!options.verbose) {

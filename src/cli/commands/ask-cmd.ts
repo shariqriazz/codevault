@@ -2,13 +2,14 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { synthesizeAnswer, synthesizeAnswerStreaming } from '../../synthesis/synthesizer.js';
-import { 
-  formatSynthesisResult, 
-  formatErrorMessage, 
+import {
+  formatSynthesisResult,
+  formatErrorMessage,
   formatNoResultsMessage,
-  addCitationFooter 
+  addCitationFooter
 } from '../../synthesis/markdown-formatter.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
+import { print } from '../../utils/logger.js';
 
 export function registerAskCommand(program: Command): void {
   program
@@ -69,15 +70,15 @@ export function registerAskCommand(program: Command): void {
             })) {
               if (firstChunk) {
                 spinner.succeed(chalk.cyan('🔍 Searching...  ✓'));
-                console.log(chalk.cyan('🤖 Generating answer...\n'));
-                console.log(chalk.gray('━'.repeat(80)));
-                console.log();
+                print(chalk.cyan('🤖 Generating answer...\n'));
+                print(chalk.gray('━'.repeat(80)));
+                print('');
                 firstChunk = false;
               }
               process.stdout.write(chunk);
             }
-            
-            console.log('\n');
+
+            print('\n');
           } catch (error) {
             spinner.fail(chalk.red('Error generating answer'));
             console.error(chalk.red(`\n${(error as Error).message}\n`));
@@ -116,16 +117,16 @@ export function registerAskCommand(program: Command): void {
 
         if (!result.success) {
           if (result.error === 'no_results') {
-            console.log(formatNoResultsMessage(result.query, result.queriesUsed));
+            print(formatNoResultsMessage(result.query, result.queriesUsed));
           } else {
-            console.log(formatErrorMessage(result.error || 'Unknown error', result.query));
+            print(formatErrorMessage(result.error || 'Unknown error', result.query));
           }
           process.exit(1);
         }
 
-        console.log();
-        console.log(chalk.gray('━'.repeat(80)));
-        console.log();
+        print('');
+        print(chalk.gray('━'.repeat(80)));
+        print('');
 
         let output = formatSynthesisResult(result, {
           includeMetadata: false,  // Hide verbose metadata by default
@@ -136,15 +137,15 @@ export function registerAskCommand(program: Command): void {
           output = addCitationFooter(output);
         }
 
-        console.log(output);
-        
+        print(output);
+
         // Show concise footer
-        console.log();
-        console.log(chalk.gray('━'.repeat(80)));
+        print('');
+        print(chalk.gray('━'.repeat(80)));
         const searchType = result.metadata?.searchType || 'hybrid';
         const provider = result.chatProvider || 'auto';
-        console.log(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
-        console.log();
+        print(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
+        print('');
 
         delete process.env.CODEVAULT_QUIET;
 

@@ -12,6 +12,7 @@ import {
   type ConversationTurn
 } from '../../synthesis/conversational-synthesizer.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
+import { print } from '../../utils/logger.js';
 
 interface ChatOptions {
   provider: string;
@@ -68,9 +69,9 @@ export function registerChatCommand(program: Command): void {
         const conversationContext: ConversationContext = createConversationContext();
 
         // Display welcome message
-        console.log(chalk.cyan.bold('\n💬 CodeVault Interactive Chat'));
-        console.log(chalk.gray('━'.repeat(80)));
-        console.log(chalk.white('Ask questions about your codebase. Type ') + chalk.cyan('/help') + chalk.white(' for commands.\n'));
+        print(chalk.cyan.bold('\n💬 CodeVault Interactive Chat'));
+        print(chalk.gray('━'.repeat(80)));
+        print(chalk.white('Ask questions about your codebase. Type ') + chalk.cyan('/help') + chalk.white(' for commands.\n'));
 
         // Create readline interface
         const rl = readline.createInterface({ input, output });
@@ -82,7 +83,7 @@ export function registerChatCommand(program: Command): void {
             // Show conversation summary if there's history
             if (conversationContext.turns.length > 0) {
               const summary = getConversationSummary(conversationContext);
-              console.log(chalk.gray(`[${summary}]`));
+              print(chalk.gray(`[${summary}]`));
             }
 
             // Prompt for user input
@@ -104,7 +105,7 @@ export function registerChatCommand(program: Command): void {
             }
 
             // Show thinking indicator
-            console.log(chalk.gray('🤔 Thinking...\n'));
+            print(chalk.gray('🤔 Thinking...\n'));
 
             // Generate answer with streaming
             let fullAnswer = '';
@@ -128,14 +129,14 @@ export function registerChatCommand(program: Command): void {
                 }
               )) {
                 if (firstChunk) {
-                  console.log(chalk.green('Assistant: '));
+                  print(chalk.green('Assistant: '));
                   firstChunk = false;
                 }
                 process.stdout.write(chunk);
                 fullAnswer += chunk;
               }
 
-              console.log('\n');
+              print('\n');
 
               // Add to conversation history
               const turn: ConversationTurn = {
@@ -162,7 +163,7 @@ export function registerChatCommand(program: Command): void {
 
         // Cleanup
         rl.close();
-        console.log(chalk.cyan('\n👋 Goodbye!\n'));
+        print(chalk.cyan('\n👋 Goodbye!\n'));
         delete process.env.CODEVAULT_QUIET;
 
       } catch (error) {
@@ -189,18 +190,18 @@ async function handleCommand(
 
     case '/clear':
       clearConversationHistory(context);
-      console.log(chalk.yellow('🗑️  Conversation history cleared\n'));
+      print(chalk.yellow('🗑️  Conversation history cleared\n'));
       break;
 
     case '/history':
       if (context.turns.length === 0) {
-        console.log(chalk.gray('No conversation history yet.\n'));
+        print(chalk.gray('No conversation history yet.\n'));
       } else {
-        console.log(chalk.bold('\n📜 Conversation History:\n'));
+        print(chalk.bold('\n📜 Conversation History:\n'));
         context.turns.forEach((turn, index) => {
-          console.log(chalk.cyan(`${index + 1}. Q: `) + turn.question);
-          console.log(chalk.gray(`   A: ${turn.answer.substring(0, 100)}...`));
-          console.log(chalk.gray(`   Time: ${turn.timestamp.toLocaleString()}\n`));
+          print(chalk.cyan(`${index + 1}. Q: `) + turn.question);
+          print(chalk.gray(`   A: ${turn.answer.substring(0, 100)}...`));
+          print(chalk.gray(`   Time: ${turn.timestamp.toLocaleString()}\n`));
         });
       }
       break;
@@ -211,21 +212,21 @@ async function handleCommand(
         Array.from(context.allChunks.values()).map(chunk => chunk.result.path)
       );
 
-      console.log(chalk.bold('\n📊 Conversation Statistics:\n'));
-      console.log(chalk.gray(`   Turns: ${context.turns.length}`));
-      console.log(chalk.gray(`   Code chunks referenced: ${context.allChunks.size}`));
-      console.log(chalk.gray(`   Files explored: ${uniqueFiles.size}`));
-      console.log(chalk.gray(`   Languages: ${new Set(Array.from(context.allChunks.values()).map(c => c.result.lang)).size}\n`));
-      
+      print(chalk.bold('\n📊 Conversation Statistics:\n'));
+      print(chalk.gray(`   Turns: ${context.turns.length}`));
+      print(chalk.gray(`   Code chunks referenced: ${context.allChunks.size}`));
+      print(chalk.gray(`   Files explored: ${uniqueFiles.size}`));
+      print(chalk.gray(`   Languages: ${new Set(Array.from(context.allChunks.values()).map(c => c.result.lang)).size}\n`));
+
       if (uniqueFiles.size > 0) {
-        console.log(chalk.bold('   Files in context:'));
+        print(chalk.bold('   Files in context:'));
         Array.from(uniqueFiles).slice(0, 10).forEach(file => {
-          console.log(chalk.gray(`   - ${file}`));
+          print(chalk.gray(`   - ${file}`));
         });
         if (uniqueFiles.size > 10) {
-          console.log(chalk.gray(`   ... and ${uniqueFiles.size - 10} more\n`));
+          print(chalk.gray(`   ... and ${uniqueFiles.size - 10} more\n`));
         } else {
-          console.log('');
+          print('');
         }
       }
       break;
@@ -233,22 +234,22 @@ async function handleCommand(
 
     case '/help':
     case '/?':
-      console.log(chalk.bold('\n📖 Available Commands:\n'));
-      console.log(chalk.cyan('  /help') + chalk.gray('        - Show this help message'));
-      console.log(chalk.cyan('  /exit') + chalk.gray('        - Exit chat mode (or Ctrl+C)'));
-      console.log(chalk.cyan('  /quit') + chalk.gray('        - Same as /exit'));
-      console.log(chalk.cyan('  /clear') + chalk.gray('       - Clear conversation history'));
-      console.log(chalk.cyan('  /history') + chalk.gray('     - Show conversation history'));
-      console.log(chalk.cyan('  /stats') + chalk.gray('       - Show conversation statistics'));
-      console.log(chalk.gray('\n  Tips:'));
-      console.log(chalk.gray('  - Ask follow-up questions naturally'));
-      console.log(chalk.gray('  - Reference previous answers ("the function you mentioned")'));
-      console.log(chalk.gray('  - Use /clear to start a fresh topic\n'));
+      print(chalk.bold('\n📖 Available Commands:\n'));
+      print(chalk.cyan('  /help') + chalk.gray('        - Show this help message'));
+      print(chalk.cyan('  /exit') + chalk.gray('        - Exit chat mode (or Ctrl+C)'));
+      print(chalk.cyan('  /quit') + chalk.gray('        - Same as /exit'));
+      print(chalk.cyan('  /clear') + chalk.gray('       - Clear conversation history'));
+      print(chalk.cyan('  /history') + chalk.gray('     - Show conversation history'));
+      print(chalk.cyan('  /stats') + chalk.gray('       - Show conversation statistics'));
+      print(chalk.gray('\n  Tips:'));
+      print(chalk.gray('  - Ask follow-up questions naturally'));
+      print(chalk.gray('  - Reference previous answers ("the function you mentioned")'));
+      print(chalk.gray('  - Use /clear to start a fresh topic\n'));
       break;
 
     default:
-      console.log(chalk.yellow(`Unknown command: ${cmd}`));
-      console.log(chalk.gray('Type /help for available commands\n'));
+      print(chalk.yellow(`Unknown command: ${cmd}`));
+      print(chalk.gray('Type /help for available commands\n'));
       break;
   }
 }

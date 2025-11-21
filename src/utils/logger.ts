@@ -65,12 +65,12 @@ class Logger {
 
   debug(message: string, meta?: LogMetadata): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
-    console.log(this.formatMessage('DEBUG', message, meta));
+    process.stdout.write(this.formatMessage('DEBUG', message, meta) + '\n');
   }
 
   info(message: string, meta?: LogMetadata): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    console.log(this.formatMessage('INFO', message, meta));
+    process.stdout.write(this.formatMessage('INFO', message, meta) + '\n');
   }
 
   warn(message: string, meta?: LogMetadata): void {
@@ -129,6 +129,14 @@ class Logger {
 
 // Export singleton instance
 export const logger = new Logger();
+
+/**
+ * Print to stdout without logging metadata
+ * Use this for user-facing CLI output
+ */
+export function print(message: string): void {
+  process.stdout.write(message + '\n');
+}
 
 // Export convenience functions
 export const log = {

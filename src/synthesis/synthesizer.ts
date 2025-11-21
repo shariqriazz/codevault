@@ -101,21 +101,22 @@ export async function synthesizeAnswer(
         ], { temperature: 0.3, maxTokens: 500 });
 
         const subQueries = parseMultiQueryResponse(multiQueryResponse);
-        
+
         if (subQueries.length > 0) {
           queriesUsed = subQueries;
           usedMultiQuery = true;
-          
+
           if (!process.env.CODEVAULT_QUIET) {
-            console.log(`📝 Breaking down query into ${subQueries.length} sub-queries:`);
-            subQueries.forEach((q, i) => console.log(`   ${i + 1}. "${q}"`));
-            console.log('');
+            const { log } = await import('../utils/logger.js');
+            log.info(`📝 Breaking down query into ${subQueries.length} sub-queries:`);
+            subQueries.forEach((q, i) => log.info(`   ${i + 1}. "${q}"`));
+            log.info('');
           }
         }
       } catch (error) {
         // Fall back to single query if multi-query fails
         if (!process.env.CODEVAULT_QUIET) {
-          console.warn('Multi-query breakdown failed, using original query');
+          logger.warn('Multi-query breakdown failed, using original query');
         }
       }
     }
@@ -179,9 +180,9 @@ export async function synthesizeAnswer(
 
     // Retrieve code chunks
     const codeChunks = new Map<string, string>();
-    
+
     if (!process.env.CODEVAULT_QUIET) {
-      console.log(`🔍 Retrieved ${deduplicatedResults.length} relevant code chunks`);
+      logger.debug(`🔍 Retrieved ${deduplicatedResults.length} relevant code chunks`);
     }
 
     for (const result of deduplicatedResults) {
@@ -213,7 +214,7 @@ export async function synthesizeAnswer(
     ];
 
     if (!process.env.CODEVAULT_QUIET) {
-      console.log(`🤖 Synthesizing answer with ${chatLLM.getName()}...`);
+      logger.debug(`🤖 Synthesizing answer with ${chatLLM.getName()}...`);
     }
 
     const answer = await chatLLM.generateCompletion(messages, {

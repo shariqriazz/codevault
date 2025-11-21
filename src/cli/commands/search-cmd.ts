@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
+import { print } from '../../utils/logger.js';
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -29,25 +30,25 @@ export function registerSearchCommand(program: Command): void {
         const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
 
         if (!results.success) {
-          console.log(chalk.yellow(`\nNo results found for "${query}"`));
+          print(chalk.yellow(`\nNo results found for "${query}"`));
           if (results.suggestion) {
-            console.log(chalk.gray(`Suggestion: ${results.suggestion}`));
+            print(chalk.gray(`Suggestion: ${results.suggestion}`));
           }
           return;
         }
 
         if (results.results.length === 0) {
-          console.log(chalk.yellow(`\nNo results found for "${query}"`));
+          print(chalk.yellow(`\nNo results found for "${query}"`));
           return;
         }
 
-        console.log(chalk.cyan(`\n🔍 Found ${results.results.length} results for "${query}"\n`));
+        print(chalk.cyan(`\n🔍 Found ${results.results.length} results for "${query}"\n`));
 
         results.results.forEach((result, index) => {
           const score = (result.meta.score * 100).toFixed(0);
-          console.log(chalk.white(`${index + 1}. ${result.path}`));
-          console.log(chalk.gray(`   ${result.meta.symbol}() · ${result.lang}`));
-          console.log(chalk.gray(`   Score: ${score}%\n`));
+          print(chalk.white(`${index + 1}. ${result.path}`));
+          print(chalk.gray(`   ${result.meta.symbol}() · ${result.lang}`));
+          print(chalk.gray(`   Score: ${score}%\n`));
         });
 
         delete process.env.CODEVAULT_QUIET;
