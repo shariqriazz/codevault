@@ -27,6 +27,7 @@ export interface ProgressEvent {
   symbol?: string;
   chunkId?: string;
   fileCount?: number;
+  totalFiles?: number;
   languages?: number;
   stats?: {
     chunks?: number;

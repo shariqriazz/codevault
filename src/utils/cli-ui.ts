@@ -2,8 +2,11 @@ import cliProgress from 'cli-progress';
 import ora from 'ora';
 import chalk from 'chalk';
 
+const STALLED_ETA_SENTINEL = -1;
+
 function formatEta(ms: number | null): string {
   if (ms === null || ms === undefined || ms < 0) return 'estimating…';
+  if (ms === STALLED_ETA_SENTINEL) return 'stalled…';
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;

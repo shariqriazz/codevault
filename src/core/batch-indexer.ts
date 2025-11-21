@@ -120,27 +120,39 @@ export class BatchEmbeddingProcessor {
    * Add a chunk to the batch queue
    */
   async addChunk(chunk: ChunkToEmbed): Promise<void> {
+    let batchToProcess: ChunkToEmbed[] | null = null;
+
     await this.mutex.runExclusive(async () => {
       this.batch.push(chunk);
 
-      // Process batch when it reaches the threshold
+      // Snapshot the batch when it reaches the threshold; process it outside the lock
       if (this.batch.length >= this.batchSize) {
-        await this.processBatchWithRetry(this.batch);
+        batchToProcess = this.batch;
         this.batch = [];
       }
     });
+
+    if (batchToProcess) {
+      await this.processBatchWithRetry(batchToProcess);
+    }
   }
 
   /**
    * Process any remaining chunks in the batch
    */
   async flush(): Promise<void> {
+    let batchToProcess: ChunkToEmbed[] | null = null;
+
     await this.mutex.runExclusive(async () => {
       if (this.batch.length > 0) {
-        await this.processBatchWithRetry(this.batch);
+        batchToProcess = this.batch;
         this.batch = [];
       }
     });
+
+    if (batchToProcess) {
+      await this.processBatchWithRetry(batchToProcess);
+    }
   }
 
   /**
@@ -169,6 +181,12 @@ export class BatchEmbeddingProcessor {
       const fatalApi = isFatalApiResponse(error);
 
       // Smart error handling based on error type
+      if (fatalApi) {
+        log.warn(`Fatal API response for batch of ${currentBatch.length}, falling back to individual processing`);
+        await this.fallbackToIndividualProcessing(currentBatch);
+        return;
+      }
+
       if (!fatalApi && isBatchSizeError(error) && currentBatch.length > 1) {
         // Batch too large - split in half and retry
         log.warn(`Batch size too large (${currentBatch.length} chunks), splitting and retrying`);

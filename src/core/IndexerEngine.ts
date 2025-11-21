@@ -51,6 +51,14 @@ export class IndexerEngine {
     const scanner = new FileScanner();
     const { files, toDelete } = await scanner.scan(repo, normalizedChanged);
 
+    if (onProgress) {
+      onProgress({
+        type: 'scan_complete',
+        fileCount: files.length,
+        totalFiles: files.length
+      });
+    }
+
     for (const file of toDelete) {
       deletedSet.add(file);
     }
