@@ -74,7 +74,7 @@ export class IndexerUI {
     
     if (this.totalFiles > 0) {
       this.progressBar = new cliProgress.SingleBar({
-        format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_formatted}`,
+        format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_manual}`,
         barCompleteChar: '█',
         barIncompleteChar: '░',
         hideCursor: true,
@@ -82,19 +82,23 @@ export class IndexerUI {
         stopOnComplete: true
       });
       
-      this.progressBar.start(this.totalFiles, 0);
+      this.progressBar.start(this.totalFiles, 0, { eta_manual: 'estimating…' });
     }
   }
 
   updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true) {
     if (countFile) {
       this.processedFiles++;
-      if (this.progressBar) {
-        this.progressBar.update(this.processedFiles);
-      }
     }
+
+    const etaText = formatEta(etaMs ?? null);
+
+    if (this.progressBar) {
+      // Refresh ETA even when the file count doesn't change
+      this.progressBar.update(this.processedFiles, { eta_manual: etaText });
+    }
+
     if (this.spinner && etaMs !== undefined) {
-      const etaText = formatEta(etaMs ?? null);
       const totals = current !== undefined && total !== undefined ? ` (${current}/${total})` : '';
       this.spinner.text = chalk.white(`Indexing: ${fileName}${totals} — ETA ${etaText}`);
     }
