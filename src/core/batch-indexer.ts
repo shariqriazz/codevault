@@ -11,7 +11,8 @@ const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
 const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
 const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
 const MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
-const MAX_ANY_RETRIES = 12; // Upper cap for repeated full-batch retries on fatal/provider errors
+const MAX_FATAL_RETRIES = 1; // Try fatal batch once more, then per-chunk
+const MAX_ANY_RETRIES = 6; // Upper cap for repeated full-batch retries on transient/provider errors
 
 const backoffWithCap = (attempt: number): number => {
   const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
@@ -64,6 +65,12 @@ const withJitter = (base: number): number => {
   return Math.max(0, Math.floor(base * factor));
 };
 
+// Backoff helper (unique name to avoid duplicate definitions on reload)
+const backoffWithCapEmbed = (attempt: number): number => {
+  const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+  return Math.min(base, 20000); // cap at 20s
+};
+
 function serializeErrorForLog(error: any): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
@@ -114,6 +121,16 @@ export class BatchEmbeddingProcessor {
   private batchSize: number;
   private mutex = new Mutex();
 
+  private isOpenRouter(): boolean {
+    const baseUrl = (this.embeddingProvider as any)?.baseUrl;
+    return typeof baseUrl === 'string' && baseUrl.includes('openrouter.ai');
+  }
+
+  private currentThreshold(): number {
+    // OpenRouter providers (multi-backend) can be more sensitive to large batches; cap at 50
+    return this.isOpenRouter() ? Math.min(this.batchSize, 50) : this.batchSize;
+  }
+
   constructor(
     private embeddingProvider: EmbeddingProvider,
     private db: Database,
@@ -131,8 +148,10 @@ export class BatchEmbeddingProcessor {
     await this.mutex.runExclusive(async () => {
       this.batch.push(chunk);
 
+      const threshold = this.currentThreshold();
+
       // Snapshot the batch when it reaches the threshold; process it outside the lock
-      if (this.batch.length >= this.batchSize) {
+      if (this.batch.length >= threshold) {
         batchToProcess = this.batch;
         this.batch = [];
       }
@@ -178,6 +197,7 @@ export class BatchEmbeddingProcessor {
         depth,
         retryRate: retryState.rate,
         retryTransient: retryState.transient,
+        retryFatal: retryState.fatal ?? 0,
         fatalSeen,
         provider: this.embeddingProvider.getName?.() ?? 'unknown',
         error: serializeErrorForLog(error),
@@ -226,10 +246,28 @@ export class BatchEmbeddingProcessor {
           fatalSeen
         );
         return;
+      } else if (fatalApi) {
+        const fatalAttempt = retryState.fatal ?? 0;
+        if (fatalAttempt < MAX_FATAL_RETRIES) {
+        const delay = backoffWithCapEmbed(fatalAttempt);
+          log.warn(`Fatal API response. Retrying full batch after ${delay}ms (fatal attempt ${fatalAttempt + 1}/${MAX_FATAL_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          await this.processBatchWithRetry(
+            currentBatch,
+            { ...retryState, fatal: fatalAttempt + 1 },
+            depth,
+            true
+          );
+          return;
+        }
+
+        log.warn(`Fatal API response persisted after ${MAX_FATAL_RETRIES} retry. Falling back to per-chunk.`);
+        await this.fallbackToIndividualProcessing(currentBatch);
+        return;
       } else {
-        // Do not subdivide or per-chunk on provider/fatal errors; retry the full batch with capped backoff
+        // Transient but non-fatal provider errors: retry whole batch with capped backoff
         const attempt = retryState.any ?? 0;
-        const delay = backoffWithCap(attempt);
+        const delay = backoffWithCapEmbed(attempt);
         const nextAttempt = attempt + 1;
 
         if (nextAttempt > MAX_ANY_RETRIES) {
@@ -376,6 +414,7 @@ export class BatchEmbeddingProcessor {
 interface RetryState {
   rate: number;
   transient: number;
+  fatal?: number;
   any?: number;
 }
 
@@ -392,6 +431,7 @@ function isFatalApiResponse(error: any): boolean {
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;
+  const noProvider = msg.includes('No successful provider responses') || status === 404;
 
-  return invalidApi || hasErrorKey || clientError || !!responseData;
+  return invalidApi || hasErrorKey || clientError || noProvider || !!responseData;
 }

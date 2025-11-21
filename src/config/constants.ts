@@ -42,10 +42,10 @@ export const CACHE_CONSTANTS = {
  */
 export const INDEXING_CONSTANTS = {
   /** Number of files to process in parallel during indexing */
-  DEFAULT_CONCURRENCY: parseInt(process.env.CODEVAULT_INDEXING_CONCURRENCY || '16', 10),
+  DEFAULT_CONCURRENCY: parseInt(process.env.CODEVAULT_INDEXING_CONCURRENCY || '32', 10),
 
   /** Safety cap for concurrent file processing */
-  MAX_CONCURRENCY: parseInt(process.env.CODEVAULT_MAX_INDEXING_CONCURRENCY || '32', 10),
+  MAX_CONCURRENCY: parseInt(process.env.CODEVAULT_MAX_INDEXING_CONCURRENCY || '64', 10),
 } as const;
 
 /**

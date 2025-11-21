@@ -195,7 +195,8 @@ export class OpenAIProvider extends EmbeddingProvider {
             const meta = {
               topLevelKeys: response ? Object.keys(response as any) : [],
               dataType: typeof response?.data,
-              dataLength: Array.isArray(response?.data) ? response.data.length : undefined
+              dataLength: Array.isArray(response?.data) ? response.data.length : undefined,
+              errorPayload: (response as any)?.error ? JSON.stringify((response as any).error).slice(0, 500) : undefined
             };
             console.debug('[codevault] Invalid API response (batch)', meta);
             throw new Error(`Invalid API response: expected data array, got ${typeof response?.data}`);
