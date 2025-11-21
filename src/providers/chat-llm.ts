@@ -69,6 +69,11 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   async generateCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): Promise<string> {
     await this.init();
 
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const openai = this.openai;
     const temperature = options.temperature
       ?? this.temperatureOverride
       ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
@@ -92,7 +97,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
         requestBody.provider = this.routingConfig;
       }
 
-      const completion = await this.openai!.chat.completions.create(requestBody);
+      const completion = await openai.chat.completions.create(requestBody);
 
       return completion.choices[0]?.message?.content || '';
     });
@@ -105,6 +110,11 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   async *generateStreamingCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): AsyncGenerator<string> {
     await this.init();
 
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const openai = this.openai;
     const temperature = options.temperature ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
     const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
@@ -127,7 +137,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       requestBody.provider = this.routingConfig;
     }
 
-    const stream = await this.openai!.chat.completions.create(requestBody);
+    const stream = await (openai.chat.completions.create as any)(requestBody);
 
     for await (const chunk of stream as any) {
       const content = chunk.choices[0]?.delta?.content;

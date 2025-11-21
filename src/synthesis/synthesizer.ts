@@ -151,8 +151,8 @@ export async function synthesizeAnswer(
         uniqueResults.set(result.sha, result);
       } else {
         // Keep the one with higher score
-        const existing = uniqueResults.get(result.sha)!;
-        if (result.meta.score > existing.meta.score) {
+        const existing = uniqueResults.get(result.sha);
+        if (existing && result.meta.score > existing.meta.score) {
           uniqueResults.set(result.sha, result);
         }
       }
