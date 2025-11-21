@@ -36,6 +36,17 @@ export function writeCodemap(filePath: string | undefined, codemap: Codemap): Co
   return normalized;
 }
 
+export async function writeCodemapAsync(filePath: string | undefined, codemap: Codemap): Promise<Codemap> {
+  const resolvedPath = filePath ? path.resolve(filePath) : resolveCodemapPath('.');
+  const normalized = normalizeCodemapRecord(codemap || {});
+
+  const directory = path.dirname(resolvedPath);
+  await fs.promises.mkdir(directory, { recursive: true });
+
+  await fs.promises.writeFile(resolvedPath, JSON.stringify(normalized, null, 2));
+  return normalized;
+}
+
 export async function readCodemapAsync(filePath?: string): Promise<Codemap> {
   const resolvedPath = filePath ? path.resolve(filePath) : resolveCodemapPath('.');
 

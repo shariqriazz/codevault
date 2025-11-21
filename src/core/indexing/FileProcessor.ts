@@ -9,6 +9,7 @@ import type { IndexState } from './IndexState.js';
 import type { IndexProjectOptions } from '../types.js';
 import {normalizeChunkMetadata} from '../../types/codemap.js';
 import {writeChunkToDisk, removeChunkArtifacts} from '../../storage/encrypted-chunks.js';
+import { PersistManager } from './PersistManager.js';
 
 /**
  * FileProcessor handles the processing of individual files:
@@ -23,7 +24,8 @@ export class FileProcessor {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string }) => void) | null
+    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string }) => void) | null,
+    private persistManager: PersistManager
   ) {}
 
   /**
@@ -82,6 +84,7 @@ export class FileProcessor {
       if (staleChunkIds.size > 0) {
         await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
         this.state.markIndexMutated();
+        this.persistManager.scheduleCodemapSave();
       }
 
       // Update merkle tree
@@ -91,6 +94,7 @@ export class FileProcessor {
           chunkShas: chunkMerkleHashes
         };
         this.state.markMerkleDirty();
+        this.persistManager.scheduleMerkleSave();
       }
     } catch (error) {
       this.state.addError({
@@ -163,6 +167,7 @@ export class FileProcessor {
 
       this.state.incrementProcessedChunks();
       this.state.markIndexMutated();
+      this.persistManager.scheduleCodemapSave();
 
       if (this.onProgress) {
         this.onProgress({ type: 'chunk_processed', file: rel, symbol: fallbackSymbol, chunkId });
@@ -172,6 +177,7 @@ export class FileProcessor {
       if (staleChunkIds.size > 0) {
         await this.deleteChunks(Array.from(staleChunkIds), existingChunks);
         this.state.markIndexMutated();
+        this.persistManager.scheduleCodemapSave();
       }
 
       chunkMerkleHashes.length = 0;
@@ -182,6 +188,7 @@ export class FileProcessor {
         chunkShas: [...chunkMerkleHashes]
       };
       this.state.markMerkleDirty();
+      this.persistManager.scheduleMerkleSave();
     } catch (fallbackError) {
       this.state.addError({
         type: 'fallback_error',
@@ -232,6 +239,7 @@ export class FileProcessor {
       });
 
       this.state.markIndexMutated();
+      this.persistManager.scheduleCodemapSave();
 
       await fs.promises.mkdir(this.context.chunkDir, { recursive: true });
       const writeResult = await writeChunkToDisk({
@@ -260,6 +268,7 @@ export class FileProcessor {
         symbol_return: params.symbolData && params.symbolData.returnType ? params.symbolData.returnType : undefined,
         symbol_calls: params.symbolData && Array.isArray(params.symbolData.calls) ? params.symbolData.calls : undefined
       }, previousMetadata);
+      this.persistManager.scheduleCodemapSave();
     } catch (error) {
       this.state.addError({
         type: 'indexing_error',
@@ -289,6 +298,10 @@ export class FileProcessor {
       }
       delete this.state.codemap[chunkId];
     }
+
+    if (chunkIds.length > 0) {
+      this.persistManager.scheduleCodemapSave();
+    }
   }
 
   /**
@@ -302,12 +315,14 @@ export class FileProcessor {
       const metadataLookup = new Map(entries as [string, any][]);
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
+      this.persistManager.scheduleCodemapSave();
     }
 
     // Remove from merkle tree
     const { removeMerkleEntry } = await import('../../indexer/merkle.js');
     if (removeMerkleEntry(this.state.updatedMerkle, fileRel)) {
       this.state.markMerkleDirty();
+      this.persistManager.scheduleMerkleSave();
     }
   }
 }

@@ -8,6 +8,7 @@ import { IndexState } from './indexing/IndexState.js';
 import { FileProcessor } from './indexing/FileProcessor.js';
 import { IndexFinalizationStage } from './indexing/IndexFinalizationStage.js';
 import { INDEXING_CONSTANTS } from '../config/constants.js';
+import { PersistManager } from './indexing/PersistManager.js';
 
 /**
  * IndexerEngine orchestrates the code indexing process using a stage-based architecture:
@@ -59,7 +60,8 @@ export class IndexerEngine {
     // Stage 1: Setup and initialization
     const context = await IndexContext.prepare(this.options);
     const state = new IndexState(context.codemap, context.updatedMerkle);
-    const fileProcessor = new FileProcessor(context, state, onProgress);
+    const persistManager = new PersistManager(context, state, 1500);
+    const fileProcessor = new FileProcessor(context, state, onProgress, persistManager);
 
     // Stage 2: Process files
     const concurrency = this.resolveConcurrency();
@@ -84,7 +86,7 @@ export class IndexerEngine {
     }
 
     // Stage 4: Finalization
-    const finalizer = new IndexFinalizationStage(context, state, onProgress);
+    const finalizer = new IndexFinalizationStage(context, state, onProgress, persistManager);
     return await finalizer.finalize();
   }
 

@@ -1,11 +1,12 @@
-import { saveMerkle } from '../../indexer/merkle.js';
-import { writeCodemap } from '../../codemap/io.js';
+import { saveMerkleAsync } from '../../indexer/merkle.js';
+import { writeCodemapAsync } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
 import { getTokenCountStats } from '../../chunking/token-counter.js';
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
 import type { IndexProjectResult } from '../types.js';
+import { PersistManager } from './PersistManager.js';
 
 /**
  * IndexFinalizationStage handles the finalization of the indexing process:
@@ -20,7 +21,8 @@ export class IndexFinalizationStage {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null
+    private onProgress: ((event: any) => void) | null,
+    private persistManager: PersistManager
   ) {}
 
   /**
@@ -36,14 +38,22 @@ export class IndexFinalizationStage {
       // Flush any remaining embeddings
       await this.flushBatchProcessor();
 
-      // Save merkle tree if modified
-      if (this.state.merkleDirty) {
-        saveMerkle(this.context.repo, this.state.updatedMerkle);
-      }
-
       // Build symbol graph and write codemap
       attachSymbolGraphToCodemap(this.state.codemap);
-      this.state.codemap = writeCodemap(this.context.codemapPath, this.state.codemap);
+      this.state.markIndexMutated();
+
+      // Persist any pending data (debounced during processing)
+      await this.persistManager.flush();
+
+      // Final guard: ensure codemap and merkle are written
+      if (this.state.indexMutated) {
+        this.state.codemap = await writeCodemapAsync(this.context.codemapPath, this.state.codemap);
+        this.state.indexMutated = false;
+      }
+      if (this.state.merkleDirty) {
+        await saveMerkleAsync(this.context.repo, this.state.updatedMerkle);
+        this.state.merkleDirty = false;
+      }
 
       // Get token statistics
       const tokenStats = getTokenCountStats();

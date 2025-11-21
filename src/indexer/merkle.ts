@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import xxhashFactory, { type XXHashAPI } from 'xxhash-wasm';
+import fsPromises from 'fs/promises';
 
 const MERKLE_DIR = '.codevault';
 const MERKLE_FILENAME = 'merkle.json';
@@ -64,6 +65,15 @@ export function saveMerkle(basePath = '.', merkle: MerkleTree = {}): void {
 
   fs.mkdirSync(dirPath, { recursive: true });
   fs.writeFileSync(merklePath, JSON.stringify(merkle, null, 2));
+}
+
+export async function saveMerkleAsync(basePath = '.', merkle: MerkleTree = {}): Promise<void> {
+  const absolute = path.resolve(basePath);
+  const dirPath = path.join(absolute, MERKLE_DIR);
+  const merklePath = path.join(dirPath, MERKLE_FILENAME);
+
+  await fsPromises.mkdir(dirPath, { recursive: true });
+  await fsPromises.writeFile(merklePath, JSON.stringify(merkle, null, 2));
 }
 
 export function toPosixPath(relativePath: string | null): string | null {
