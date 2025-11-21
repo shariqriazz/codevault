@@ -24,7 +24,7 @@ export class FileProcessor {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string }) => void) | null,
+    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string; success?: boolean }) => void) | null,
     private persistManager: PersistManager
   ) {}
 
@@ -45,6 +45,7 @@ export class FileProcessor {
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
     let fileHash: string | null = null;
+    let success = false;
 
     try {
       const source = await fs.promises.readFile(abs, 'utf8');
@@ -53,6 +54,7 @@ export class FileProcessor {
       // Skip if file hasn't changed
       const previousMerkle = this.context.merkle[rel];
       if (previousMerkle && previousMerkle.shaFile === fileHash) {
+        success = true;
         return;
       }
 
@@ -96,6 +98,7 @@ export class FileProcessor {
         this.state.markMerkleDirty();
         this.persistManager.scheduleMerkleSave();
       }
+      success = true;
     } catch (error) {
       this.state.addError({
         type: 'processing_error',
@@ -105,6 +108,11 @@ export class FileProcessor {
 
       // Try fallback processing
       await this.tryFallbackProcessing(rel, abs, rule, existingChunks, staleChunkIds, chunkMerkleHashes);
+      success = true;
+    } finally {
+      if (this.onProgress) {
+        this.onProgress({ type: 'file_completed', file: rel, success });
+      }
     }
   }
 

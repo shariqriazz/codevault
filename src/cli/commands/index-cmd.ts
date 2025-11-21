@@ -67,18 +67,21 @@ export function registerIndexCommand(program: Command): void {
             provider: options.provider,
             encryptMode: options.encrypt,
             callbacks: {
-              onScanComplete: (fileCount) => {
-                ui.finishScanning(fileCount, 25);
-                ui.startIndexing();
-              },
-              onFileProgress: (current, total, fileName, etaMs, _avgPerFileMs, countFile = true) => {
-                ui.updateProgress(fileName, current, total, etaMs ?? null, countFile);
-              },
-              onFinalizing: () => {
-                ui.showFinalizing();
-              }
+            onScanComplete: (fileCount) => {
+              ui.finishScanning(fileCount, 25);
+              ui.startIndexing();
+            },
+            onFileProgress: (current, total, fileName, etaMs, _avgPerFileMs, countFile = true) => {
+              ui.updateProgress(fileName, current, total, etaMs ?? null, countFile);
+            },
+            onChunkHeartbeat: (etaMs) => {
+              ui.updateProgress('processing...', undefined, undefined, etaMs ?? null, false);
+            },
+            onFinalizing: () => {
+              ui.showFinalizing();
             }
-          });
+          }
+        });
 
           ui.cleanup();
           ui.finishIndexing();

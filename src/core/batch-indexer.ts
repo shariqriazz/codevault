@@ -121,16 +121,6 @@ export class BatchEmbeddingProcessor {
   private batchSize: number;
   private mutex = new Mutex();
 
-  private isOpenRouter(): boolean {
-    const baseUrl = (this.embeddingProvider as any)?.baseUrl;
-    return typeof baseUrl === 'string' && baseUrl.includes('openrouter.ai');
-  }
-
-  private currentThreshold(): number {
-    // OpenRouter providers (multi-backend) can be more sensitive to large batches; cap at 50
-    return this.isOpenRouter() ? Math.min(this.batchSize, 50) : this.batchSize;
-  }
-
   constructor(
     private embeddingProvider: EmbeddingProvider,
     private db: Database,
@@ -148,10 +138,8 @@ export class BatchEmbeddingProcessor {
     await this.mutex.runExclusive(async () => {
       this.batch.push(chunk);
 
-      const threshold = this.currentThreshold();
-
       // Snapshot the batch when it reaches the threshold; process it outside the lock
-      if (this.batch.length >= threshold) {
+      if (this.batch.length >= this.batchSize) {
         batchToProcess = this.batch;
         this.batch = [];
       }
