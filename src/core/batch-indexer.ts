@@ -82,14 +82,6 @@ export class BatchEmbeddingProcessor {
   private batchSize: number;
   private mutex = new Mutex();
 
-  private createRetryState(overrides?: Partial<RetryState>): RetryState {
-    return {
-      rate: 0,
-      transient: 0,
-      ...overrides
-    };
-  }
-
   constructor(
     private embeddingProvider: EmbeddingProvider,
     private db: Database,
@@ -130,7 +122,7 @@ export class BatchEmbeddingProcessor {
    */
   private async processBatchWithRetry(
     currentBatch: ChunkToEmbed[],
-    retryState: RetryState = this.createRetryState()
+    retryState: RetryState = { rate: 0, transient: 0 }
   ): Promise<void> {
     try {
       await this.processBatchInternal(currentBatch);
@@ -144,8 +136,8 @@ export class BatchEmbeddingProcessor {
         const secondHalf = currentBatch.slice(mid);
 
         // Process both halves recursively
-        await this.processBatchWithRetry(firstHalf, this.createRetryState());
-        await this.processBatchWithRetry(secondHalf, this.createRetryState());
+        await this.processBatchWithRetry(firstHalf, retryState);
+        await this.processBatchWithRetry(secondHalf, retryState);
         return;
       } else if (isRateLimitError(error) && retryState.rate < MAX_BATCH_RETRIES) {
         // Rate limit error - exponential backoff
@@ -155,7 +147,7 @@ export class BatchEmbeddingProcessor {
 
         await this.processBatchWithRetry(
           currentBatch,
-          this.createRetryState({ rate: retryState.rate + 1, transient: retryState.transient })
+          { ...retryState, rate: retryState.rate + 1 }
         );
         return;
       } else if (isTransientApiError(error) && retryState.transient < MAX_TRANSIENT_RETRIES) {
@@ -168,7 +160,7 @@ export class BatchEmbeddingProcessor {
 
         await this.processBatchWithRetry(
           currentBatch,
-          this.createRetryState({ rate: retryState.rate, transient: retryState.transient + 1 })
+          { ...retryState, transient: retryState.transient + 1 }
         );
         return;
       } else if (currentBatch.length > 1) {
@@ -177,8 +169,8 @@ export class BatchEmbeddingProcessor {
         const firstHalf = currentBatch.slice(0, mid);
         const secondHalf = currentBatch.slice(mid);
 
-        await this.processBatchWithRetry(firstHalf, this.createRetryState());
-        await this.processBatchWithRetry(secondHalf, this.createRetryState());
+        await this.processBatchWithRetry(firstHalf, retryState);
+        await this.processBatchWithRetry(secondHalf, retryState);
         return;
       }
 
