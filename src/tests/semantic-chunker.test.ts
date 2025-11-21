@@ -54,3 +54,27 @@ test('yieldStatementChunks preserves configured overlap', async () => {
   const lastLineFirst = firstChunkLines[firstChunkLines.length - 1];
   assert.equal(lastLineFirst, secondChunkLines[0]);
 });
+
+test('yieldStatementChunks batches token counting once per line', async () => {
+  const source = ['a', 'bb', 'ccc', 'dddd', 'ee'].join('\n');
+  const node = makeNode('function', [], 0, source.length);
+
+  let tokenCounterCalls = 0;
+  const tokenCounter = (text: string) => {
+    tokenCounterCalls++;
+    return text.length;
+  };
+
+  const tokenProfile: ModelProfile = {
+    ...dummyProfile,
+    useTokens: true,
+    tokenCounter
+  };
+
+  const maxSize = 5; // forces multiple chunks when using token sizes
+  const overlapSize = 2;
+
+  await yieldStatementChunks(node as any, source, maxSize, overlapSize, tokenProfile);
+
+  assert.equal(tokenCounterCalls, source.split('\n').length);
+});

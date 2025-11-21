@@ -183,21 +183,26 @@ export async function yieldStatementChunks(
 ): Promise<StatementChunk[]> {
   const code = source.slice(node.startIndex, node.endIndex);
   const lines = code.split('\n');
+  const tokenCounter = profile.useTokens && profile.tokenCounter ? profile.tokenCounter : null;
+  const lineSizes = tokenCounter
+    ? await Promise.all(lines.map(async line => tokenCounter(line)))
+    : lines.map(line => line.length);
+  const unit = tokenCounter ? 'tokens' : 'characters';
   
   const chunks: StatementChunk[] = [];
   let currentChunk: string[] = [];
+  let currentChunkSizes: number[] = [];
   let currentSize = 0;
   
-  for (const line of lines) {
-    const lineSize = profile.useTokens && profile.tokenCounter 
-      ? await profile.tokenCounter(line)
-      : line.length;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineSize = lineSizes[i];
     
     if (currentSize + lineSize > maxSize && currentChunk.length > 0) {
       chunks.push({
         code: currentChunk.join('\n'),
         size: currentSize,
-        unit: profile.useTokens ? 'tokens' : 'characters'
+        unit
       });
 
       // Ensure minimum 20% overlap by token/character count, not line count
@@ -213,22 +218,20 @@ export async function yieldStatementChunks(
       let linesToKeep = 0;
 
       // Walk backwards through lines to accumulate target overlap size
-      for (let i = currentChunk.length - 1; i >= 0 && overlapAccumulatedSize < targetOverlapSize; i--) {
-        const lineText = currentChunk[i];
-        const lineSize = profile.useTokens && profile.tokenCounter
-          ? await profile.tokenCounter(lineText)
-          : lineText.length;
-        overlapAccumulatedSize += lineSize;
+      for (let j = currentChunkSizes.length - 1; j >= 0 && overlapAccumulatedSize < targetOverlapSize; j--) {
+        overlapAccumulatedSize += currentChunkSizes[j];
         linesToKeep++;
       }
 
       // Keep at least 1 line for overlap
       linesToKeep = Math.max(1, linesToKeep);
       currentChunk = currentChunk.slice(-linesToKeep);
-      currentSize = overlapAccumulatedSize;
+      currentChunkSizes = currentChunkSizes.slice(-linesToKeep);
+      currentSize = currentChunkSizes.reduce((sum, size) => sum + size, 0);
     }
     
     currentChunk.push(line);
+    currentChunkSizes.push(lineSize);
     currentSize += lineSize;
   }
   
@@ -236,7 +239,7 @@ export async function yieldStatementChunks(
     chunks.push({
       code: currentChunk.join('\n'),
       size: currentSize,
-      unit: profile.useTokens ? 'tokens' : 'characters'
+      unit
     });
   }
   
