@@ -75,7 +75,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? this.maxTokensOverride
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
-    return await this.rateLimiter.execute(async () => {
+    return await this.rateLimiter.execute(async (): Promise<string> => {
       const requestBody: any = {
         model: this.model,
         messages: messages.map(msg => ({
@@ -94,7 +94,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       const completion = await this.openai!.chat.completions.create(requestBody);
 
       return completion.choices[0]?.message?.content || '';
-    });
+    }) as Promise<string>;
   }
 
   private isOpenRouter(): boolean {

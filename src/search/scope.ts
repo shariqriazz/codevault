@@ -6,7 +6,7 @@ function toArray<T>(value: unknown): T[] {
   if (!value) {
     return [];
   }
-  return Array.isArray(value) ? value : [value as T];
+  return Array.isArray(value) ? (value as T[]) : [value as T];
 }
 
 function normalizeList(values: unknown): string[] {

@@ -63,7 +63,7 @@ export class OpenAIProvider extends EmbeddingProvider {
     const limits = getSizeLimits(profile);
     const maxChars = profile.maxChunkChars || 8000;
 
-    return await this.rateLimiter.execute(async () => {
+    return await this.rateLimiter.execute(async (): Promise<number[]> => {
       const requestBody: any = {
         model: this.model,
         input: text.slice(0, maxChars)
@@ -94,7 +94,7 @@ export class OpenAIProvider extends EmbeddingProvider {
       }
 
       return embedding;
-    });
+    }) as Promise<number[]>;
   }
 
   private isOpenRouter(): boolean {

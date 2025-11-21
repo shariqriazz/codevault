@@ -47,7 +47,7 @@ function isTransientApiError(error: unknown): boolean {
   const message = String((error as any)?.message || error);
 
   // Upstream 5xx/gateway and common flaky transport signals
-  return (
+  return Boolean(
     (typeof status === 'number' && status >= 500 && status < 600) ||
     message.includes('Invalid API response') ||
     message.includes('Bad Gateway') ||
@@ -443,5 +443,5 @@ function isFatalApiResponse(error: unknown): boolean {
   const clientError = status === 400 || status === 422;
   const noProvider = msg.includes('No successful provider responses') || status === 404;
 
-  return invalidApi || hasErrorKey || clientError || noProvider || !!responseData;
+  return Boolean(invalidApi || hasErrorKey || clientError || noProvider || !!responseData);
 }

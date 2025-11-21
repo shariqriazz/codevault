@@ -289,10 +289,10 @@ export class ChunkPipeline {
       }
       
       if (smallChunks.length > 0) {
-        const totalSmallSize = smallChunks.reduce((sum: number, c: any) => sum + c.size, 0);
-        
+        const totalSmallSize = smallChunks.reduce((sum: number, c: any): number => sum + (c.size as number), 0);
+
         if (totalSmallSize >= limits.min || smallChunks.length >= 3) {
-          const mergedCode = smallChunks.map((c: any) => c.code).join('\n\n');
+          const mergedCode = smallChunks.map((c: any): string => c.code as string).join('\n\n');
           const mergedNode: TreeSitterNode = {
             ...node,
             type: `${node.type}_merged`,
