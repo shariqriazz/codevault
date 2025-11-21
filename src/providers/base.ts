@@ -41,8 +41,8 @@ export abstract class EmbeddingProvider {
 
 // Batching constants
 export const BATCH_SIZE = 50; // Number of chunks per batch
-export const MAX_BATCH_TOKENS = 100000; // OpenAI limit
-export const MAX_ITEM_TOKENS = 8191; // Per-item limit
+export const MAX_BATCH_TOKENS = 100000; // Total tokens per API batch (OpenAI limit)
+export const MAX_ITEM_TOKENS = 8191; // Default per-item token limit (fallback for models without profiles)
 
 // Estimate tokens from text (4 chars ≈ 1 token)
 export function estimateTokens(text: string): number {

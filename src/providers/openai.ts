@@ -120,10 +120,11 @@ export class OpenAIProvider extends EmbeddingProvider {
   // Batch processing implementation for OpenAI
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     await this.init();
-    
+
     const profile = await getModelProfile(this.getName(), this.model);
     const maxChars = profile.maxChunkChars || 8000;
-    
+    const maxItemTokens = profile.maxTokens || MAX_ITEM_TOKENS;
+
     const allEmbeddings: number[][] = [];
     const remainingTexts = [...texts];
     let batchCount = 0;
@@ -133,17 +134,17 @@ export class OpenAIProvider extends EmbeddingProvider {
       const currentBatch: string[] = [];
       let currentBatchTokens = 0;
       const processedIndices: number[] = [];
-      
+
       // Build batch based on token limits
       for (let i = 0; i < remainingTexts.length; i++) {
         const text = remainingTexts[i];
         const truncatedText = text.slice(0, maxChars);
         const itemTokens = estimateTokens(truncatedText);
-        
-        // Fail if item exceeds single item limit - don't create zero-vector pollution
-        if (itemTokens > MAX_ITEM_TOKENS) {
+
+        // Fail if item exceeds model's maximum token limit - don't create zero-vector pollution
+        if (itemTokens > maxItemTokens) {
           throw new Error(
-            `Text at index ${i} exceeds maximum token limit (${itemTokens} > ${MAX_ITEM_TOKENS}). ` +
+            `Text at index ${i} exceeds maximum token limit for ${this.model} (${itemTokens} > ${maxItemTokens}). ` +
             `This would create corrupted embeddings. Consider reducing chunk size or increasing ` +
             `CODEVAULT_EMBEDDING_MAX_TOKENS. Text preview: ${text.slice(0, 100)}...`
           );
