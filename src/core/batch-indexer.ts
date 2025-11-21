@@ -5,7 +5,9 @@ import { Mutex } from '../utils/mutex.js';
 import { log } from '../utils/logger.js';
 
 const MAX_BATCH_RETRIES = 3;
+const MAX_TRANSIENT_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
+const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
 
 function isRateLimitError(error: any): boolean {
   const message = error?.message || String(error);
@@ -29,6 +31,29 @@ function isBatchSizeError(error: any): boolean {
     message.includes('token limit')
   );
 }
+
+function isTransientApiError(error: any): boolean {
+  const status = error?.status || error?.statusCode;
+  const message = error?.message || String(error);
+
+  // Upstream 5xx/gateway and common flaky transport signals
+  return (
+    (typeof status === 'number' && status >= 500 && status < 600) ||
+    message.includes('Invalid API response') ||
+    message.includes('Bad Gateway') ||
+    message.includes('Service Unavailable') ||
+    message.includes('Gateway Timeout') ||
+    message.includes('socket hang up') ||
+    message.includes('ECONNRESET') ||
+    message.includes('ETIMEDOUT') ||
+    message.includes('EAI_AGAIN')
+  );
+}
+
+const withJitter = (base: number): number => {
+  const factor = 1 + (Math.random() * 2 - 1) * JITTER_FACTOR; // 0.8–1.2
+  return Math.max(0, Math.floor(base * factor));
+};
 
 interface ChunkToEmbed {
   chunkId: string;
@@ -57,6 +82,14 @@ export class BatchEmbeddingProcessor {
   private batchSize: number;
   private mutex = new Mutex();
 
+  private createRetryState(overrides?: Partial<RetryState>): RetryState {
+    return {
+      rate: 0,
+      transient: 0,
+      ...overrides
+    };
+  }
+
   constructor(
     private embeddingProvider: EmbeddingProvider,
     private db: Database,
@@ -74,7 +107,7 @@ export class BatchEmbeddingProcessor {
 
       // Process batch when it reaches the threshold
       if (this.batch.length >= this.batchSize) {
-        await this.processBatchWithRetry(this.batch, 0);
+        await this.processBatchWithRetry(this.batch);
         this.batch = [];
       }
     });
@@ -86,7 +119,7 @@ export class BatchEmbeddingProcessor {
   async flush(): Promise<void> {
     await this.mutex.runExclusive(async () => {
       if (this.batch.length > 0) {
-        await this.processBatchWithRetry(this.batch, 0);
+        await this.processBatchWithRetry(this.batch);
         this.batch = [];
       }
     });
@@ -95,7 +128,10 @@ export class BatchEmbeddingProcessor {
   /**
    * Process a batch with smart error handling and retry logic
    */
-  private async processBatchWithRetry(currentBatch: ChunkToEmbed[], retryCount: number): Promise<void> {
+  private async processBatchWithRetry(
+    currentBatch: ChunkToEmbed[],
+    retryState: RetryState = this.createRetryState()
+  ): Promise<void> {
     try {
       await this.processBatchInternal(currentBatch);
     } catch (error) {
@@ -108,16 +144,41 @@ export class BatchEmbeddingProcessor {
         const secondHalf = currentBatch.slice(mid);
 
         // Process both halves recursively
-        await this.processBatchWithRetry(firstHalf, 0);
-        await this.processBatchWithRetry(secondHalf, 0);
+        await this.processBatchWithRetry(firstHalf, this.createRetryState());
+        await this.processBatchWithRetry(secondHalf, this.createRetryState());
         return;
-      } else if (isRateLimitError(error) && retryCount < MAX_BATCH_RETRIES) {
+      } else if (isRateLimitError(error) && retryState.rate < MAX_BATCH_RETRIES) {
         // Rate limit error - exponential backoff
-        const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryCount);
-        log.warn(`Rate limit hit, retrying batch in ${delay}ms (attempt ${retryCount + 1}/${MAX_BATCH_RETRIES})`);
+        const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryState.rate);
+        log.warn(`Rate limit hit, retrying batch in ${delay}ms (attempt ${retryState.rate + 1}/${MAX_BATCH_RETRIES})`);
         await new Promise(resolve => setTimeout(resolve, delay));
 
-        await this.processBatchWithRetry(currentBatch, retryCount + 1);
+        await this.processBatchWithRetry(
+          currentBatch,
+          this.createRetryState({ rate: retryState.rate + 1, transient: retryState.transient })
+        );
+        return;
+      } else if (isTransientApiError(error) && retryState.transient < MAX_TRANSIENT_RETRIES) {
+        const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryState.transient);
+        const delay = withJitter(baseDelay);
+        log.warn(
+          `Transient API error, retrying batch in ${delay}ms (attempt ${retryState.transient + 1}/${MAX_TRANSIENT_RETRIES})`
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        await this.processBatchWithRetry(
+          currentBatch,
+          this.createRetryState({ rate: retryState.rate, transient: retryState.transient + 1 })
+        );
+        return;
+      } else if (currentBatch.length > 1) {
+        log.warn(`Batch failed after retries, subdividing to isolate issue (${currentBatch.length} chunks)`);
+        const mid = Math.floor(currentBatch.length / 2);
+        const firstHalf = currentBatch.slice(0, mid);
+        const secondHalf = currentBatch.slice(mid);
+
+        await this.processBatchWithRetry(firstHalf, this.createRetryState());
+        await this.processBatchWithRetry(secondHalf, this.createRetryState());
         return;
       }
 
@@ -239,4 +300,9 @@ export class BatchEmbeddingProcessor {
   getBatchCount(): number {
     return this.batch.length;
   }
+}
+
+interface RetryState {
+  rate: number;
+  transient: number;
 }
