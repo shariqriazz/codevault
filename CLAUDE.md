@@ -113,6 +113,7 @@ This is a TypeScript/Node.js project (v1.7.3) that provides:
 - Minimize external dependencies
 - Prefer well-maintained packages
 - Use exact versions for critical dependencies
+- Install via npm with legacy peer resolution (`npm install --legacy-peer-deps`) to avoid peer conflicts
 
 ## GitHub PR Review Guidelines
 
