@@ -87,7 +87,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   };
 }
 
-function buildMcpErrorResponse(error: unknown) {
+function buildMcpErrorResponse(error: unknown): { content: Array<{ type: string; text: string }>; isError: boolean } {
   const payload = formatMcpError(error);
   return {
     content: [
@@ -132,7 +132,7 @@ export class McpServer {
     this.setupHandlers();
   }
 
-  private setupHandlers() {
+  private setupHandlers(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: Tool[] = [
         {
@@ -334,26 +334,26 @@ export class McpServer {
     });
   }
 
-  public async start() {
+  public async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
     logger.info('CodeVault MCP Server started', { version: packageJson.version });
-    
+
     this.scheduleCacheCleanup();
     this.setupShutdownHandlers();
   }
 
-  private scheduleCacheCleanup() {
+  private scheduleCacheCleanup(): void {
     if (this.cacheCleanupTimer) {
       clearInterval(this.cacheCleanupTimer);
     }
-    
+
     this.cacheCleanupTimer = setInterval(() => {
       try {
         clearSearchCaches();
         clearTokenCache();
-        
+
         logger.debug('Cache cleared periodically');
       } catch (error) {
         // Ignore errors during cleanup
@@ -361,13 +361,13 @@ export class McpServer {
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
   }
 
-  private setupShutdownHandlers() {
-    const cleanup = async () => {
+  private setupShutdownHandlers(): void {
+    const cleanup = async (): Promise<void> => {
       if (this.cacheCleanupTimer) {
         clearInterval(this.cacheCleanupTimer);
         this.cacheCleanupTimer = null;
       }
-      
+
       this.sessionContextPack = null;
       clearSearchCaches();
       clearTokenCache();

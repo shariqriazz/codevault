@@ -1,5 +1,6 @@
 import cliProgress from 'cli-progress';
-import ora, { type Ora } from 'ora';
+import ora from 'ora';
+import type { Ora } from 'ora';
 import chalk from 'chalk';
 import { print } from './logger.js';
 
@@ -35,7 +36,7 @@ export class IndexerUI {
     skipped: 0
   };
 
-  showHeader() {
+  showHeader(): void {
     print(chalk.cyan.bold('\n🔍 CodeVault Indexer'));
   }
 
@@ -45,7 +46,7 @@ export class IndexerUI {
     dimensions: number;
     chunkSize: { min: number; max: number; optimal: number };
     rateLimit?: { rpm: number; tpm?: number };
-  }) {
+  }): void {
     print(chalk.white('\n📊 Configuration'));
     print(chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`));
     print(chalk.gray(`   Dimensions:  ${config.dimensions}`));
@@ -55,14 +56,14 @@ export class IndexerUI {
     }
   }
 
-  startScanning() {
+  startScanning(): void {
     this.spinner = ora({
       text: chalk.white('Scanning project...'),
       color: 'cyan'
     }).start();
   }
 
-  finishScanning(fileCount: number, languages: number) {
+  finishScanning(fileCount: number, languages: number): void {
     if (this.spinner) {
       this.spinner.succeed(chalk.white(`Found ${chalk.cyan(fileCount)} files across ${chalk.cyan(languages)}+ languages`));
       this.spinner = null;
@@ -70,7 +71,7 @@ export class IndexerUI {
     this.totalFiles = fileCount;
   }
 
-  startIndexing() {
+  startIndexing(): void {
     this.startTime = Date.now();
     this.processedFiles = 0;
 
@@ -79,18 +80,18 @@ export class IndexerUI {
     if (this.totalFiles > 0) {
       this.progressBar = new cliProgress.SingleBar({
         format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_manual}`,
-        barCompleteChar: '█',
-        barIncompleteChar: '░',
         hideCursor: true,
-        clearOnComplete: false,
-        stopOnComplete: true
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+        clearOnComplete: false
       });
-      
-      this.progressBar.start(this.totalFiles, 0, { eta_manual: 'estimating…' });
+      this.progressBar.start(this.totalFiles, 0, {
+        eta_manual: 'estimating…'
+      });
     }
   }
 
-  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true) {
+  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true): void {
     if (countFile) {
       this.processedFiles++;
     }
@@ -108,14 +109,14 @@ export class IndexerUI {
     }
   }
 
-  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }) {
+  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }): void {
     if (stats.chunks !== undefined) this.stats.chunks = stats.chunks;
     if (stats.merged !== undefined) this.stats.merged = stats.merged;
     if (stats.subdivided !== undefined) this.stats.subdivided = stats.subdivided;
     if (stats.skipped !== undefined) this.stats.skipped = stats.skipped;
   }
 
-  showFinalizing() {
+  showFinalizing(): void {
     if (this.progressBar) {
       this.progressBar.stop();
       this.progressBar = null;
@@ -127,7 +128,7 @@ export class IndexerUI {
     }).start();
   }
 
-  finishIndexing() {
+  finishIndexing(): void {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;
@@ -155,7 +156,7 @@ export class IndexerUI {
     dbSize?: string;
     codemapSize?: string;
     tokenStats?: any;
-  }) {
+  }): void {
     print(chalk.white('\n📊 Summary'));
     print(chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`));
 
@@ -187,11 +188,11 @@ export class IndexerUI {
     print('');
   }
 
-  showError(message: string) {
+  showError(message: string): void {
     console.error(chalk.red(`\n❌ Error: ${message}\n`));
   }
 
-  cleanup() {
+  cleanup(): void {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;

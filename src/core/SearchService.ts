@@ -347,7 +347,7 @@ export class SearchService {
 
   // Helpers
 
-  private createErrorResult(error: string, message: string, provider: string, scope: any, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
+  private createErrorResult(error: string, message: string, provider: string, scope: any, hybrid: boolean, bm25: boolean, symbolBoost: boolean): { success: false; error: string; message: string; provider: string; scope: any; hybrid: { enabled: boolean; bm25Enabled: boolean }; symbolBoost: { enabled: boolean; boosted: false }; reranker: any; results: [] } {
     return {
       success: false,
       error,

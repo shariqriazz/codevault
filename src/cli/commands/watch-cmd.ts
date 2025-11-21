@@ -12,7 +12,7 @@ export function registerWatchCommand(program: Command): void {
     .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
-    .action(async (projectPath = '.', options) => {
+    .action(async (projectPath = '.', options): Promise<void> => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const debounceMs = parseInt(options.debounce, 10);
 
@@ -36,7 +36,7 @@ export function registerWatchCommand(program: Command): void {
         print('✅ Watcher active. Press Ctrl+C to stop.');
 
         await new Promise<void>(resolve => {
-          const shutdown = () => {
+          const shutdown = (): void => {
             print('\nStopping watcher...');
             void controller.close().then(() => {
               process.off('SIGINT', shutdown);

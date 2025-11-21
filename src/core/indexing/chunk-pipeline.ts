@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
-import Parser from 'tree-sitter';
+import Parser, { type Tree } from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
 import { extractSymbolName } from '../symbol-extractor.js';
@@ -72,7 +72,7 @@ export class ASTTraverser {
     }
 
     const collectedNodes: TreeSitterNode[] = [];
-    const collectNodes = (node: TreeSitterNode) => {
+    const collectNodes = (node: TreeSitterNode): void => {
       if (node.type === 'export_statement') {
         let hasDeclaration = false;
         for (let i = 0; i < node.childCount; i++) {
@@ -114,7 +114,7 @@ export class ASTTraverser {
     return collectedNodes;
   }
 
-  private buildTree(source: string) {
+  private buildTree(source: string): Tree | null {
     if (source.length > SIZE_THRESHOLD) {
       return this.parser.parse((index: number) => {
         if (index < source.length) {
@@ -178,11 +178,11 @@ export class ChunkPipeline {
     this.overlapStrategy = deps.overlapStrategy ?? new StatementOverlapStrategy();
   }
 
-  async collectNodesForFile(source: string, rule: LanguageRule) {
+  async collectNodesForFile(source: string, rule: LanguageRule): Promise<TreeSitterNode[]> {
     return this.traverser.collectNodesForFile(source, rule);
   }
 
-  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule) {
+  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule): Promise<NodeGroup[]> {
     return this.chunkGrouper.groupNodes(nodes, source, profile, rule);
   }
 

@@ -4,7 +4,7 @@ import { getOverview } from '../../core/search.js';
 import { resolveProjectRoot } from '../../utils/path-helpers.js';
 import { IndexProjectArgs, UpdateProjectArgs, GetProjectStatsArgs } from '../schemas.js';
 
-export async function handleIndexProject(args: IndexProjectArgs) {
+export async function handleIndexProject(args: IndexProjectArgs): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
 
   if (!fs.existsSync(cleanPath)) {
@@ -48,7 +48,7 @@ export async function handleIndexProject(args: IndexProjectArgs) {
   };
 }
 
-export async function handleUpdateProject(args: UpdateProjectArgs) {
+export async function handleUpdateProject(args: UpdateProjectArgs): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
   const result = await indexProject({ repoPath: cleanPath, provider: args.provider || 'auto' });
 
@@ -71,7 +71,7 @@ export async function handleUpdateProject(args: UpdateProjectArgs) {
   };
 }
 
-export async function handleGetProjectStats(args: GetProjectStatsArgs) {
+export async function handleGetProjectStats(args: GetProjectStatsArgs): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
   const overviewResult = await getOverview(50, cleanPath);
 
