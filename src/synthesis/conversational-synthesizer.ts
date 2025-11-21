@@ -127,7 +127,7 @@ export async function synthesizeConversationalAnswer(
     // Generate answer (non-streaming)
     const answer = await chatLLM.generateCompletion(messages, {
       temperature,
-      maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10)
+      maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10)
     });
 
     return {

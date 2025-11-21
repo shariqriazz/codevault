@@ -216,9 +216,9 @@ export async function synthesizeAnswer(
       console.log(`🤖 Synthesizing answer with ${chatLLM.getName()}...`);
     }
 
-    const answer = await chatLLM.generateCompletion(messages, { 
+    const answer = await chatLLM.generateCompletion(messages, {
       temperature,
-      maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10)
+      maxTokens: parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10)
     });
     const validation = validateLLMResponse(answer);
     if (!validation.safe) {

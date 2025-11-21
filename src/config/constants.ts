@@ -181,8 +181,8 @@ export const LLM_CONSTANTS = {
   /** Maximum tokens for multi-query response */
   MULTI_QUERY_MAX_TOKENS: 500,
 
-  /** Default maximum tokens for chat responses */
-  DEFAULT_CHAT_MAX_TOKENS: 4096,
+  /** Default maximum tokens for chat responses (256K to support OSS models) */
+  DEFAULT_CHAT_MAX_TOKENS: 256000,
 
   /** Maximum context chunks for answer synthesis */
   DEFAULT_MAX_CHUNKS: 10,

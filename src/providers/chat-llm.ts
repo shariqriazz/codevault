@@ -73,7 +73,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
     const maxTokens = options.maxTokens
       ?? this.maxTokensOverride
-      ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
+      ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     return await this.rateLimiter.execute(async () => {
       const requestBody: any = {
@@ -105,7 +105,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     await this.init();
 
     const temperature = options.temperature ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
-    const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
+    const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     // Apply rate limiting to streaming requests to prevent overwhelming the provider
     await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
