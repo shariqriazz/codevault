@@ -86,7 +86,7 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions): (params: any) => Promise<{ success: boolean; message: string }> {
+export function registerUseContextPackTool(server: any, options: CreateHandlerOptions): ReturnType<typeof createUseContextPackHandler> {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -95,9 +95,11 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    (params: any) => {
-      const result = handler(params);
+    async (params: any) => {
+      const result = await Promise.resolve(handler(params));
       return {
+        success: result.success,
+        message: result.message,
         content: [
           {
             type: 'text',
