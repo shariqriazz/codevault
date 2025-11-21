@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { createRateLimiter, RateLimiter } from '../utils/rate-limiter.js';
 import {
   EmbeddingProvider,
   getModelProfile,
@@ -31,7 +31,13 @@ export class OpenAIProvider extends EmbeddingProvider {
     this.baseUrl = options.baseUrl || process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
     this.dimensionsOverride = options.dimensions;
     this.routingConfig = options.routing;
-    this.rateLimiter = createRateLimiter('OpenAI');
+
+    // Use config-provided rate limits if available, otherwise use defaults
+    if (options.rpm !== undefined || options.tpm !== undefined) {
+      this.rateLimiter = new RateLimiter(options.rpm ?? null, options.tpm ?? null);
+    } else {
+      this.rateLimiter = createRateLimiter('OpenAI');
+    }
   }
 
   async init(): Promise<void> {
@@ -68,8 +74,19 @@ export class OpenAIProvider extends EmbeddingProvider {
         requestBody.provider = this.routingConfig;
       }
 
-      const { data } = await this.openai!.embeddings.create(requestBody);
-      return data[0].embedding;
+      const response = await this.openai!.embeddings.create(requestBody);
+
+      // Validate response structure
+      if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error(`Invalid API response: expected data array with at least one item, got ${typeof response?.data}`);
+      }
+
+      const embedding = response.data[0].embedding;
+      if (!embedding || !Array.isArray(embedding)) {
+        throw new Error(`Invalid embedding: expected array, got ${typeof embedding}`);
+      }
+
+      return embedding;
     });
   }
 
@@ -110,7 +127,7 @@ export class OpenAIProvider extends EmbeddingProvider {
     const allEmbeddings: number[][] = [];
     const remainingTexts = [...texts];
     let batchCount = 0;
-    
+
     while (remainingTexts.length > 0) {
       batchCount++;
       const currentBatch: string[] = [];
@@ -152,7 +169,7 @@ export class OpenAIProvider extends EmbeddingProvider {
         if (!process.env.CODEVAULT_QUIET) {
           console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
         }
-        
+
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
           const requestBody: any = {
             model: this.model,
@@ -164,10 +181,29 @@ export class OpenAIProvider extends EmbeddingProvider {
             requestBody.provider = this.routingConfig;
           }
 
-          const { data } = await this.openai!.embeddings.create(requestBody);
-          return data.map(item => item.embedding);
+          const response = await this.openai!.embeddings.create(requestBody);
+
+          // Validate response structure
+          if (!response || !response.data || !Array.isArray(response.data)) {
+            throw new Error(`Invalid API response: expected data array, got ${typeof response?.data}`);
+          }
+
+          // Check if we got the right number of embeddings
+          if (response.data.length !== currentBatch.length) {
+            throw new Error(`API returned ${response.data.length} embeddings but expected ${currentBatch.length}. Response data length mismatch.`);
+          }
+
+          // Validate each embedding
+          const embeddings = response.data.map((item, idx) => {
+            if (!item || !item.embedding || !Array.isArray(item.embedding)) {
+              throw new Error(`Invalid embedding at index ${idx}: expected array, got ${typeof item?.embedding}`);
+            }
+            return item.embedding;
+          });
+
+          return embeddings;
         });
-        
+
         allEmbeddings.push(...batchEmbeddings);
       }
     }
@@ -175,7 +211,7 @@ export class OpenAIProvider extends EmbeddingProvider {
     if (!process.env.CODEVAULT_QUIET) {
       console.log(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
     }
-    
+
     return allEmbeddings;
   }
 }

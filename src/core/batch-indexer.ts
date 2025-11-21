@@ -69,20 +69,11 @@ export class BatchEmbeddingProcessor {
    * Add a chunk to the batch queue
    */
   async addChunk(chunk: ChunkToEmbed): Promise<void> {
-    this.batch.push(chunk);
-
-    // Process batch when it reaches the threshold
-    if (this.batch.length >= this.batchSize) {
-      await this.processBatch();
-    }
-  }
-
-  /**
-   * Process any remaining chunks in the batch
-   */
-  async flush(): Promise<void> {
     await this.mutex.runExclusive(async () => {
-      if (this.batch.length > 0) {
+      this.batch.push(chunk);
+
+      // Process batch when it reaches the threshold
+      if (this.batch.length >= this.batchSize) {
         await this.processBatchWithRetry(this.batch, 0);
         this.batch = [];
       }
@@ -90,9 +81,9 @@ export class BatchEmbeddingProcessor {
   }
 
   /**
-   * Process the current batch (with mutex protection)
+   * Process any remaining chunks in the batch
    */
-  private async processBatch(): Promise<void> {
+  async flush(): Promise<void> {
     await this.mutex.runExclusive(async () => {
       if (this.batch.length > 0) {
         await this.processBatchWithRetry(this.batch, 0);
@@ -158,15 +149,29 @@ export class BatchEmbeddingProcessor {
     log.debug(`Batch complete (${texts.length} embeddings generated)`);
 
     // Store all embeddings in database within a transaction
-    this.db.insertChunks(
-      batch.map((chunk, i) => ({
+    const dbParams = batch.map((chunk, i) => {
+      const embedding = embeddings[i];
+
+      // Validate each embedding before insertion
+      if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+        log.error(`Invalid embedding at index ${i} for chunk ${chunk.chunkId}`, {
+          embeddingType: typeof embedding,
+          isArray: Array.isArray(embedding),
+          length: embedding?.length,
+          embeddingsArrayLength: embeddings.length,
+          batchLength: batch.length
+        });
+        throw new Error(`Invalid embedding at index ${i}: type=${typeof embedding}, isArray=${Array.isArray(embedding)}, length=${embedding?.length}`);
+      }
+
+      return {
         id: chunk.chunkId,
         file_path: chunk.params.rel,
         symbol: chunk.params.symbol,
         sha: chunk.params.sha,
         lang: chunk.params.lang,
         chunk_type: chunk.params.chunkType,
-        embedding: embeddings[i],
+        embedding: embedding,
         embedding_provider: this.embeddingProvider.getName(),
         embedding_dimensions: this.embeddingProvider.getDimensions(),
         codevault_tags: chunk.params.codevaultMetadata.tags,
@@ -175,8 +180,10 @@ export class BatchEmbeddingProcessor {
         doc_comments: chunk.params.docComments,
         variables_used: chunk.params.importantVariables,
         context_info: chunk.params.contextInfo
-      }))
-    );
+      };
+    });
+
+    this.db.insertChunks(dbParams);
   }
 
   /**
