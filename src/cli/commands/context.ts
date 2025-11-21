@@ -1,6 +1,7 @@
 import path from 'path';
 import { getActiveContextPack, listContextPacks, loadContextPack, setActiveContextPack } from '../../context/packs.js';
 import type { Command } from 'commander';
+import { print } from '../../utils/logger.js';
 
 function resolveProjectPath(projectPath = '.'): string {
   return path.resolve(projectPath || '.');
@@ -34,7 +35,7 @@ function printPackDetails(pack: any): void {
     description: pack.description || null,
     scope: pack.scope
   };
-  console.log(JSON.stringify(output, null, 2));
+  print(JSON.stringify(output, null, 2));
 }
 
 export function registerContextCommands(program: Command): void {
@@ -52,19 +53,19 @@ export function registerContextCommands(program: Command): void {
       const activeKey = active ? active.key : null;
 
       if (!packs || packs.length === 0) {
-        console.log('No context packs found. Create files in .codevault/contextpacks/*.json');
+        print('No context packs found. Create files in .codevault/contextpacks/*.json');
         return;
       }
 
-      console.log(`Context packs in ${resolvedPath}:`);
+      print(`Context packs in ${resolvedPath}:`);
       packs
         .sort((a, b) => a.key.localeCompare(b.key))
         .forEach(pack => {
-          console.log(`  ${formatPackLine(pack, activeKey)}`);
+          print(`  ${formatPackLine(pack, activeKey)}`);
         });
 
       if (active) {
-        console.log(`\nActive: ${active.key}${active.name && active.name !== active.key ? ` (${active.name})` : ''}`);
+        print(`\nActive: ${active.key}${active.name && active.name !== active.key ? ` (${active.name})` : ''}`);
       }
     });
 
@@ -89,17 +90,17 @@ export function registerContextCommands(program: Command): void {
       const resolvedPath = resolveProjectPath(projectPath);
       try {
         const pack = setActiveContextPack(name, resolvedPath);
-        console.log(`Activated context pack: ${pack.key}`);
+        print(`Activated context pack: ${pack.key}`);
         if (pack.name && pack.name !== pack.key) {
-          console.log(`Display name: ${pack.name}`);
+          print(`Display name: ${pack.name}`);
         }
         if (pack.description) {
-          console.log(`Description: ${pack.description}`);
+          print(`Description: ${pack.description}`);
         }
         if (pack.scope && Object.keys(pack.scope).length > 0) {
-          console.log('Default scope:');
+          print('Default scope:');
           for (const [key, value] of Object.entries(pack.scope)) {
-            console.log(`  ${key}: ${Array.isArray(value) ? value.join(', ') : value}`);
+            print(`  ${key}: ${Array.isArray(value) ? value.join(', ') : value}`);
           }
         }
       } catch (error) {

@@ -83,7 +83,8 @@ export class OpenAIProvider extends EmbeddingProvider {
           dataType: typeof response?.data,
           dataLength: Array.isArray(response?.data) ? response.data.length : undefined
         };
-        console.debug('[codevault] Invalid API response (single)', meta);
+        const { log } = await import('../utils/logger.js');
+        log.debug('[codevault] Invalid API response (single)', meta);
         throw new Error(`Invalid API response: expected data array with at least one item, got ${typeof response?.data}`);
       }
 
@@ -174,7 +175,8 @@ export class OpenAIProvider extends EmbeddingProvider {
       // Process current batch if not empty
       if (currentBatch.length > 0) {
         if (!process.env.CODEVAULT_QUIET) {
-          console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
+          const { log } = await import('../utils/logger.js');
+          log.debug(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
         }
 
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
@@ -200,7 +202,8 @@ export class OpenAIProvider extends EmbeddingProvider {
             };
             // Surface only at debug level; normal runs stay clean
             if (process.env.CODEVAULT_LOG_LEVEL === 'debug') {
-              console.warn('[codevault] Invalid API response (batch)', meta);
+              const { log } = await import('../utils/logger.js');
+              log.debug('[codevault] Invalid API response (batch)', meta);
             }
             throw new Error(`Invalid API response: expected data array, got ${typeof response?.data}`);
           }
@@ -224,9 +227,10 @@ export class OpenAIProvider extends EmbeddingProvider {
         allEmbeddings.push(...batchEmbeddings);
       }
     }
-    
+
     if (!process.env.CODEVAULT_QUIET) {
-      console.log(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
+      const { log } = await import('../utils/logger.js');
+      log.debug(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
     }
 
     return allEmbeddings;

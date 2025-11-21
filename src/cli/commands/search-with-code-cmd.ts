@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
+import { print } from '../../utils/logger.js';
 
 export function registerSearchWithCodeCommand(program: Command): void {
   program
@@ -31,19 +32,19 @@ export function registerSearchWithCodeCommand(program: Command): void {
         const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
 
         if (!results.success) {
-          console.log(chalk.yellow(`\nNo results found for "${query}"`));
+          print(chalk.yellow(`\nNo results found for "${query}"`));
           if (results.suggestion) {
-            console.log(chalk.gray(`Suggestion: ${results.suggestion}`));
+            print(chalk.gray(`Suggestion: ${results.suggestion}`));
           }
           return;
         }
 
         if (results.results.length === 0) {
-          console.log(chalk.yellow(`\nNo results found for "${query}"`));
+          print(chalk.yellow(`\nNo results found for "${query}"`));
           return;
         }
 
-        console.log(chalk.cyan(`\n🔍 Found ${results.results.length} results with code for "${query}"\n`));
+        print(chalk.cyan(`\n🔍 Found ${results.results.length} results with code for "${query}"\n`));
 
         const { getChunk } = await import('../../core/search.js');
 
@@ -51,9 +52,9 @@ export function registerSearchWithCodeCommand(program: Command): void {
           const result = results.results[index];
           const score = (result.meta.score * 100).toFixed(0);
 
-          console.log(chalk.gray('━'.repeat(80)));
-          console.log(chalk.white(`📄 ${result.path} · ${result.meta.symbol}() · Score: ${score}%`));
-          console.log(chalk.gray('━'.repeat(80)));
+          print(chalk.gray('━'.repeat(80)));
+          print(chalk.white(`📄 ${result.path} · ${result.meta.symbol}() · Score: ${score}%`));
+          print(chalk.gray('━'.repeat(80)));
 
           const chunkResult = await getChunk(result.sha, resolvedPath);
 
@@ -66,17 +67,17 @@ export function registerSearchWithCodeCommand(program: Command): void {
               truncated = true;
             }
 
-            console.log();
-            console.log(code);
+            print('');
+            print(code);
 
             if (truncated) {
-              console.log(chalk.yellow(`\n⚠️  Code truncated (${chunkResult.code.length} chars, showing ${maxCodeSize})`));
+              print(chalk.yellow(`\n⚠️  Code truncated (${chunkResult.code.length} chars, showing ${maxCodeSize})`));
             }
           } else {
-            console.log(chalk.red(`\n❌ Error retrieving code: ${chunkResult.error}`));
+            print(chalk.red(`\n❌ Error retrieving code: ${chunkResult.error}`));
           }
 
-          console.log('');
+          print('');
         }
 
         delete process.env.CODEVAULT_QUIET;

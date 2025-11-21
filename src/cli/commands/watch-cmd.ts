@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { startWatch } from '../../indexer/watch.js';
+import { print } from '../../utils/logger.js';
 
 export function registerWatchCommand(program: Command): void {
   program
@@ -15,9 +16,9 @@ export function registerWatchCommand(program: Command): void {
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const debounceMs = parseInt(options.debounce, 10);
 
-      console.log(`👀 Watching ${resolvedPath} for changes...`);
-      console.log(`Provider: ${options.provider}`);
-      console.log(`Debounce: ${debounceMs}ms`);
+      print(`👀 Watching ${resolvedPath} for changes...`);
+      print(`Provider: ${options.provider}`);
+      print(`Debounce: ${debounceMs}ms`);
 
       try {
         const controller = startWatch({
@@ -27,16 +28,16 @@ export function registerWatchCommand(program: Command): void {
           encrypt: options.encrypt,
           concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
           onBatch: ({ changed, deleted }) => {
-            console.log(`🔁 Indexed ${changed.length} changed / ${deleted.length} deleted files`);
+            print(`🔁 Indexed ${changed.length} changed / ${deleted.length} deleted files`);
           }
         });
 
         await controller.ready;
-        console.log('✅ Watcher active. Press Ctrl+C to stop.');
+        print('✅ Watcher active. Press Ctrl+C to stop.');
 
         await new Promise<void>(resolve => {
           const shutdown = () => {
-            console.log('\nStopping watcher...');
+            print('\nStopping watcher...');
             void controller.close().then(() => {
               process.off('SIGINT', shutdown);
               process.off('SIGTERM', shutdown);

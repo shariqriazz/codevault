@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { Command } from 'commander';
 import { readCodemap } from '../../codemap/io.js';
+import { print } from '../../utils/logger.js';
 
 export function registerInfoCommand(program: Command): void {
   program
@@ -11,8 +12,8 @@ export function registerInfoCommand(program: Command): void {
         const codemapPath = 'codevault.codemap.json';
 
         if (!fs.existsSync(codemapPath)) {
-          console.log('Project not indexed');
-          console.log('TIP: Run "codevault index" to index the project');
+          print('Project not indexed');
+          print('TIP: Run "codevault index" to index the project');
           return;
         }
 
@@ -33,19 +34,19 @@ export function registerInfoCommand(program: Command): void {
           .sort(([, a], [, b]) => b - a)
           .slice(0, 10);
 
-        console.log('CodeVault project information\n');
-        console.log(`Total indexed functions: ${chunks.length}`);
-        console.log('');
+        print('CodeVault project information\n');
+        print(`Total indexed functions: ${chunks.length}`);
+        print('');
 
-        console.log('By language:');
+        print('By language:');
         Object.entries(langStats).forEach(([lang, count]) => {
-          console.log(`  ${lang}: ${count} functions`);
+          print(`  ${lang}: ${count} functions`);
         });
-        console.log('');
+        print('');
 
-        console.log('Files with most functions:');
+        print('Files with most functions:');
         topFiles.forEach(([file, count]) => {
-          console.log(`  ${file}: ${count} functions`);
+          print(`  ${file}: ${count} functions`);
         });
       } catch (error) {
         console.error('ERROR getting information:', (error as Error).message);

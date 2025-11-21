@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { indexProject } from '../../core/indexer.js';
+import { print } from '../../utils/logger.js';
 
 export function registerUpdateCommand(program: Command): void {
   program
@@ -12,8 +13,8 @@ export function registerUpdateCommand(program: Command): void {
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .action(async (projectPath = '.', options) => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
-      console.log('🔄 Updating project index...');
-      console.log(`Provider: ${options.provider}`);
+      print('🔄 Updating project index...');
+      print(`Provider: ${options.provider}`);
       try {
         await indexProject({
           repoPath: resolvedPath,
@@ -21,7 +22,7 @@ export function registerUpdateCommand(program: Command): void {
           encryptMode: options.encrypt,
           concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
         });
-        console.log('✅ Index updated successfully');
+        print('✅ Index updated successfully');
       } catch (error) {
         console.error('❌ ERROR during update:', (error as Error).message);
         process.exit(1);
