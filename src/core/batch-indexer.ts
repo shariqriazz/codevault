@@ -242,8 +242,8 @@ export class BatchEmbeddingProcessor {
       } else if (fatalApi) {
         const fatalAttempt = retryState.fatal ?? 0;
         if (fatalAttempt < MAX_FATAL_RETRIES) {
-        const delay = backoffWithCapEmbed(fatalAttempt);
-          log.warn(`Fatal API response. Retrying full batch after ${delay}ms (fatal attempt ${fatalAttempt + 1}/${MAX_FATAL_RETRIES})`);
+          const delay = backoffWithCapEmbed(fatalAttempt);
+          log.debug(`Fatal API response. Retrying full batch after ${delay}ms (fatal attempt ${fatalAttempt + 1}/${MAX_FATAL_RETRIES})`);
           await new Promise(resolve => setTimeout(resolve, delay));
           await this.processBatchWithRetry(
             currentBatch,
@@ -254,7 +254,7 @@ export class BatchEmbeddingProcessor {
           return;
         }
 
-        log.warn(`Fatal API response persisted after ${MAX_FATAL_RETRIES} retry. Falling back to per-chunk.`);
+        log.debug(`Fatal API response persisted after ${MAX_FATAL_RETRIES} retry. Falling back to per-chunk.`);
         await this.fallbackToIndividualProcessing(currentBatch);
         return;
       } else {
@@ -264,12 +264,12 @@ export class BatchEmbeddingProcessor {
         const nextAttempt = attempt + 1;
 
         if (nextAttempt > MAX_ANY_RETRIES) {
-          log.warn(
+          log.debug(
             `Batch retry cap reached (${nextAttempt - 1}). Continuing to retry with capped backoff; investigate provider errors.`,
             { batchSize: currentBatch.length }
           );
         } else {
-          log.warn(
+          log.debug(
             `Batch will be retried after backoff (${delay}ms) (attempt ${nextAttempt}/${MAX_ANY_RETRIES})`
           );
         }
