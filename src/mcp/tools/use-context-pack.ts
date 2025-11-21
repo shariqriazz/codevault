@@ -17,11 +17,16 @@ export const useContextPackResultSchema = z.object({
   }).optional()
 });
 
+interface ErrorLogger {
+  debugLog?: (message: string, context?: Record<string, any>) => void;
+  log?: (error: unknown, context?: Record<string, any>) => void;
+}
+
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
   setSessionPack: (pack: any) => void;
   clearSessionPack: () => void;
-  errorLogger?: any;
+  errorLogger?: ErrorLogger;
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
@@ -86,7 +91,15 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions) {
+interface MCPServer {
+  tool: (
+    name: string,
+    schema: Record<string, any>,
+    handler: (params: any) => Promise<any>
+  ) => void;
+}
+
+export function registerUseContextPackTool(server: MCPServer, options: CreateHandlerOptions) {
   const handler = createUseContextPackHandler(options);
 
   server.tool(

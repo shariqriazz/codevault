@@ -19,11 +19,11 @@ const backoffWithCap = (attempt: number): number => {
   return Math.min(base, 30000); // cap at 30s
 };
 
-function isRateLimitError(error: any): boolean {
-  const message = error?.message || String(error);
+function isRateLimitError(error: unknown): boolean {
+  const message = String((error as any)?.message || error);
   return (
-    error?.status === 429 ||
-    error?.statusCode === 429 ||
+    (error as any)?.status === 429 ||
+    (error as any)?.statusCode === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -31,10 +31,10 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-function isBatchSizeError(error: any): boolean {
-  const message = error?.message || String(error);
+function isBatchSizeError(error: unknown): boolean {
+  const message = String((error as any)?.message || error);
   return (
-    error?.status === 413 ||
+    (error as any)?.status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -42,9 +42,9 @@ function isBatchSizeError(error: any): boolean {
   );
 }
 
-function isTransientApiError(error: any): boolean {
-  const status = error?.status || error?.statusCode;
-  const message = error?.message || String(error);
+function isTransientApiError(error: unknown): boolean {
+  const status = (error as any)?.status || (error as any)?.statusCode;
+  const message = String((error as any)?.message || error);
 
   // Upstream 5xx/gateway and common flaky transport signals
   return (
@@ -81,7 +81,7 @@ function serializeErrorForLog(error: any): { [key: string]: LogValue } {
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = error?.response?.data ?? error?.error?.data;
+  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -283,6 +283,19 @@ export class BatchEmbeddingProcessor {
         );
         return;
       }
+
+      // Other errors or max retries reached - fall back to individual processing
+      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
+      log.debug(
+        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
+        {
+          batchSize: currentBatch.length,
+          error: serializeErrorForLog(error)
+        }
+      );
+      log.info('Falling back to individual processing (this will be slower)');
+
+      await this.fallbackToIndividualProcessing(currentBatch);
     }
   }
 
@@ -416,12 +429,13 @@ interface RetryState {
  * Treat responses that return an error without data as fatal (deterministic) so we don't waste
  * transient retries on them.
  */
-function isFatalApiResponse(error: any): boolean {
+function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const msg = error?.message || '';
-  const status = error?.status || error?.statusCode;
-  const hasErrorKey = Array.isArray(error?.topLevelKeys) && error.topLevelKeys.includes('error');
-  const responseData = error?.response?.data ?? error?.error?.data;
+  const msg = String((error as any)?.message || '');
+  const status = (error as any)?.status || (error as any)?.statusCode;
+  const topLevelKeys = (error as any)?.topLevelKeys;
+  const hasErrorKey = Array.isArray(topLevelKeys) && topLevelKeys.includes('error');
+  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;

@@ -72,11 +72,13 @@ export class CandidateRetriever {
       if (chunk.codevault_tags) {
         try {
           const tags = JSON.parse(chunk.codevault_tags || '[]');
-          tags.forEach((tag: string) => {
-            if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {
-              boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
-            }
-          });
+          if (Array.isArray(tags)) {
+            tags.forEach((tag: unknown) => {
+              if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {
+                boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
+              }
+            });
+          }
         } catch (error) {
           logger.warn('Failed to parse codevault_tags for chunk', {
             chunkId: chunk.id,

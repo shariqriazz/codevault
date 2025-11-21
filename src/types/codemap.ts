@@ -157,11 +157,16 @@ function internalNormalize(raw: any): CodemapChunk {
   const data = parsed.success ? parsed.data : fallback;
   const extras = extractExtras(data);
 
-  const file = typeof data.file === 'string' && data.file.trim().length > 0 ? data.file : 'unknown';
-  const sha = typeof data.sha === 'string' && data.sha.trim().length > 0 ? data.sha : 'unknown';
-  const lang = typeof data.lang === 'string' && data.lang.trim().length > 0 ? data.lang : 'unknown';
-  const chunkType = typeof data.chunkType === 'string' && data.chunkType.trim().length > 0 ? data.chunkType : undefined;
-  const provider = typeof data.provider === 'string' && data.provider.trim().length > 0 ? data.provider : undefined;
+  const fileRaw = data.file;
+  const file = typeof fileRaw === 'string' && fileRaw.trim().length > 0 ? fileRaw : 'unknown';
+  const shaRaw = data.sha;
+  const sha = typeof shaRaw === 'string' && shaRaw.trim().length > 0 ? shaRaw : 'unknown';
+  const langRaw = data.lang;
+  const lang = typeof langRaw === 'string' && langRaw.trim().length > 0 ? langRaw : 'unknown';
+  const chunkTypeRaw = data.chunkType;
+  const chunkType = typeof chunkTypeRaw === 'string' && chunkTypeRaw.trim().length > 0 ? chunkTypeRaw : undefined;
+  const providerRaw = data.provider;
+  const provider = typeof providerRaw === 'string' && providerRaw.trim().length > 0 ? providerRaw : undefined;
   const dimensions = typeof data.dimensions === 'number' && Number.isFinite(data.dimensions) ? data.dimensions : undefined;
   const hasCodevaultTags = typeof data.hasCodevaultTags === 'boolean' ? data.hasCodevaultTags : false;
   const hasIntent = typeof data.hasIntent === 'boolean' ? data.hasIntent : false;
@@ -190,8 +195,9 @@ function internalNormalize(raw: any): CodemapChunk {
     ? sanitizeStringArray(data.symbol_neighbors)
     : [];
 
-  const symbol = typeof data.symbol === 'string' && data.symbol.trim().length > 0
-    ? data.symbol
+  const symbolRaw = data.symbol;
+  const symbol = typeof symbolRaw === 'string' && symbolRaw.trim().length > 0
+    ? symbolRaw
     : null;
 
   const normalized: any = {
