@@ -11,6 +11,17 @@ import {
 import type { EmbeddingOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
 
+interface OpenAIConfig {
+  apiKey?: string;
+  baseURL?: string;
+}
+
+interface EmbeddingRequestBody {
+  model: string;
+  input: string | string[];
+  provider?: ProviderRoutingConfig;
+}
+
 export class OpenAIProvider extends EmbeddingProvider {
   private openai: OpenAI | null = null;
   private model: string;
@@ -18,7 +29,7 @@ export class OpenAIProvider extends EmbeddingProvider {
   private baseUrl?: string;
   private dimensionsOverride?: number;
   private routingConfig?: ProviderRoutingConfig;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: EmbeddingOptions = {}) {
     super();
@@ -42,16 +53,16 @@ export class OpenAIProvider extends EmbeddingProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
-      
+      const config: OpenAIConfig = {};
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
   }
@@ -64,7 +75,7 @@ export class OpenAIProvider extends EmbeddingProvider {
     const maxChars = profile.maxChunkChars || 8000;
 
     return await this.rateLimiter.execute(async () => {
-      const requestBody: any = {
+      const requestBody: EmbeddingRequestBody = {
         model: this.model,
         input: text.slice(0, maxChars)
       };
@@ -178,7 +189,7 @@ export class OpenAIProvider extends EmbeddingProvider {
         }
 
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
-          const requestBody: any = {
+          const requestBody: EmbeddingRequestBody = {
             model: this.model,
             input: currentBatch
           };
@@ -192,11 +203,14 @@ export class OpenAIProvider extends EmbeddingProvider {
 
           // Validate response structure
           if (!response || !response.data || !Array.isArray(response.data)) {
+            const errorPayload = (response && typeof response === 'object' && 'error' in response && response.error)
+              ? JSON.stringify(response.error).slice(0, 200)
+              : undefined;
             const meta = {
-              topLevelKeys: response ? Object.keys(response as any) : [],
+              topLevelKeys: response && typeof response === 'object' ? Object.keys(response) : [],
               dataType: typeof response?.data,
               dataLength: Array.isArray(response?.data) ? response.data.length : undefined,
-              errorPayload: (response as any)?.error ? JSON.stringify((response as any).error).slice(0, 200) : undefined
+              errorPayload
             };
             // Surface only at debug level; normal runs stay clean
             if (process.env.CODEVAULT_LOG_LEVEL === 'debug') {

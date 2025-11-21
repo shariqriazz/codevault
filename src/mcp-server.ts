@@ -26,9 +26,15 @@ import { CACHE_CONSTANTS } from './config/constants.js';
 import { clearSearchCaches } from './core/search.js';
 import { clearTokenCache } from './chunking/token-counter.js';
 import { logger } from './utils/logger.js';
-import { ZodError } from 'zod';
+import { ZodError, ZodIssue } from 'zod';
+import { safeGetProperty, safeGetString } from './utils/error-utils.js';
+import type { ContextPack } from './types/context-pack.js';
 
 type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
+
+interface ZodErrorLike {
+  issues: ZodIssue[];
+}
 
 interface MCPErrorPayload {
   code: string;
@@ -50,7 +56,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   const normalizedError = error instanceof Error ? error : new Error(String(error));
-  const code = (error as any)?.code;
+  const code = safeGetProperty(error, 'code');
 
   if (code === 'ENCRYPTION_KEY_REQUIRED') {
     return {
@@ -80,7 +86,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   return {
-    code: code || 'RUNTIME_ERROR',
+    code: (typeof code === 'string' ? code : null) || 'RUNTIME_ERROR',
     type: 'runtime',
     message: normalizedError.message,
     details: normalizedError.stack ? { stack: normalizedError.stack } : undefined
@@ -103,7 +109,8 @@ function buildMcpErrorResponse(error: unknown) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const packageJson: unknown = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const packageVersion = safeGetString(packageJson, 'version') || '0.0.0';
 
 /**
  * Minimal MCP server exposing CodeVault tools over stdio for AI assistants.
@@ -113,14 +120,14 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: any = null;
+  private sessionContextPack: ContextPack | null = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.server = new Server(
       {
         name: 'codevault-code-memory',
-        version: packageJson.version,
+        version: packageVersion,
       },
       {
         capabilities: {
@@ -311,12 +318,15 @@ export class McpServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as any).issues)) {
-          const validationError = `Validation Error: ${(error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
-          return {
-            content: [{ type: 'text', text: validationError }],
-            isError: true,
-          };
+        if (error && typeof error === 'object' && 'issues' in error) {
+          const zodError = error as ZodErrorLike;
+          if (Array.isArray(zodError.issues)) {
+            const validationError = `Validation Error: ${zodError.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+            return {
+              content: [{ type: 'text', text: validationError }],
+              isError: true,
+            };
+          }
         }
 
         return {
@@ -329,9 +339,9 @@ export class McpServer {
   public async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    logger.info('CodeVault MCP Server started', { version: packageJson.version });
-    
+
+    logger.info('CodeVault MCP Server started', { version: packageVersion });
+
     this.scheduleCacheCleanup();
     this.setupShutdownHandlers();
   }

@@ -1,5 +1,5 @@
 import cliProgress from 'cli-progress';
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import chalk from 'chalk';
 
 const STALLED_ETA_SENTINEL = -1;
@@ -23,7 +23,7 @@ function formatEta(ms: number | null): string {
 
 export class IndexerUI {
   private progressBar: cliProgress.SingleBar | null = null;
-  private spinner: any = null;
+  private spinner: Ora | null = null;
   private startTime: number = 0;
   private totalFiles: number = 0;
   private processedFiles: number = 0;

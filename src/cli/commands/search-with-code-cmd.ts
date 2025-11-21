@@ -3,6 +3,22 @@ import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 
+interface SearchWithCodeCommandOptions {
+  limit: string;
+  provider: string;
+  project?: string;
+  directory?: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker: string;
+  hybrid: string;
+  bm25: string;
+  symbol_boost: string;
+  maxCodeSize?: string;
+  [key: string]: unknown;
+}
+
 export function registerSearchWithCodeCommand(program: Command): void {
   program
     .command('search-with-code <query> [path]')
@@ -19,7 +35,7 @@ export function registerSearchWithCodeCommand(program: Command): void {
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
     .option('--max-code-size <bytes>', 'max code size to display per chunk', '100000')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath = '.', options: SearchWithCodeCommandOptions) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 

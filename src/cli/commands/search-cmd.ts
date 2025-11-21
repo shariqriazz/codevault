@@ -3,6 +3,21 @@ import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 
+interface SearchCommandOptions {
+  limit: string;
+  provider: string;
+  project?: string;
+  directory?: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker: string;
+  hybrid: string;
+  bm25: string;
+  symbol_boost: string;
+  [key: string]: unknown;
+}
+
 export function registerSearchCommand(program: Command): void {
   program
     .command('search <query> [path]')
@@ -18,7 +33,7 @@ export function registerSearchCommand(program: Command): void {
     .option('--hybrid <mode>', 'hybrid search (on|off)', 'on')
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath = '.', options: SearchCommandOptions) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 

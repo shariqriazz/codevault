@@ -3,7 +3,9 @@ import LangC from 'tree-sitter-c';
 import LangCSharp from 'tree-sitter-c-sharp';
 import LangCpp from 'tree-sitter-cpp';
 import * as LangCSSModule from 'tree-sitter-css/bindings/node/index.js';
-const LangCSS = (LangCSSModule as any).default || LangCSSModule;
+import { safeGetProperty } from '../utils/error-utils.js';
+
+const LangCSS = safeGetProperty(LangCSSModule, 'default') || LangCSSModule;
 import LangElixir from 'tree-sitter-elixir';
 import LangGo from 'tree-sitter-go';
 import LangHaskell from 'tree-sitter-haskell';
@@ -24,29 +26,37 @@ import LangSwift from 'tree-sitter-swift';
 import LangTSX from 'tree-sitter-typescript/bindings/node/tsx.js';
 import LangTS from 'tree-sitter-typescript/bindings/node/typescript.js';
 
-function resolveTreeSitterLanguage(module: any, preferredKey: string | null = null): any {
+function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): unknown {
   if (!module) {
     return null;
   }
 
-  if (module.default) {
-    return resolveTreeSitterLanguage(module.default, preferredKey);
+  const defaultProp = safeGetProperty(module, 'default');
+  if (defaultProp) {
+    return resolveTreeSitterLanguage(defaultProp, preferredKey);
   }
 
-  if (preferredKey && module[preferredKey]) {
-    return resolveTreeSitterLanguage(module[preferredKey], null);
+  if (preferredKey) {
+    const preferredProp = safeGetProperty(module, preferredKey);
+    if (preferredProp) {
+      return resolveTreeSitterLanguage(preferredProp, null);
+    }
   }
 
   if (typeof module === 'object' && module !== null) {
-    if (module.language && typeof module.language === 'object') {
+    const languageProp = safeGetProperty(module, 'language');
+    if (languageProp && typeof languageProp === 'object') {
       return module;
     }
 
     const values = Object.values(module);
     for (const value of values) {
       const resolved = resolveTreeSitterLanguage(value, null);
-      if (resolved && resolved.language && typeof resolved.language === 'object') {
-        return resolved;
+      if (resolved && typeof resolved === 'object' && resolved !== null) {
+        const resolvedLangProp = safeGetProperty(resolved, 'language');
+        if (resolvedLangProp && typeof resolvedLangProp === 'object') {
+          return resolved;
+        }
       }
     }
   }

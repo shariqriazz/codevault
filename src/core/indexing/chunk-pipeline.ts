@@ -28,7 +28,22 @@ export interface OversizedChunk {
 
 interface ExistingChunks {
   staleChunkIds: Set<string>;
-  existingChunks: Map<string, any>;
+  existingChunks: Map<string, Record<string, unknown>>;
+}
+
+interface ChunkingStats {
+  totalNodes: number;
+  skippedSmall: number;
+  subdivided: number;
+  mergedSmall: number;
+  statementFallback: number;
+  normalChunks: number;
+  fileGrouped?: number;
+  functionsGrouped?: number;
+}
+
+interface ProgressCallback {
+  (event: { type: string; file: string; symbol: string; chunkId: string }): void;
 }
 
 interface EmbedStoreParams {
@@ -40,11 +55,17 @@ interface EmbedStoreParams {
   rel: string;
   symbol: string;
   chunkType: string;
-  codevaultMetadata: any;
-  importantVariables: any[];
+  codevaultMetadata: Record<string, unknown>;
+  importantVariables: string[];
   docComments: string | null;
-  contextInfo: any;
-  symbolData: any;
+  contextInfo: Record<string, unknown>;
+  symbolData: Record<string, unknown>;
+}
+
+interface SmallChunk {
+  node: TreeSitterNode;
+  code: string;
+  size: number;
 }
 
 /**
@@ -188,9 +209,9 @@ export class ChunkPipeline {
     rel: string,
     existing: ExistingChunks,
     chunkMerkleHashes: string[],
-    onProgress: any,
+    onProgress: ProgressCallback | null,
     embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-    chunkingStats: any
+    chunkingStats: ChunkingStats
   ): Promise<void> {
     this.processedNodes = new Set<number>();
 
@@ -224,17 +245,17 @@ export class ChunkPipeline {
   }
 
   private async yieldChunk(
-      node: TreeSitterNode, 
-      source: string, 
-      rule: LanguageRule, 
-      limits: SizeLimits, 
-      modelProfile: ModelProfile, 
+      node: TreeSitterNode,
+      source: string,
+      rule: LanguageRule,
+      limits: SizeLimits,
+      modelProfile: ModelProfile,
       rel: string,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: ProgressCallback | null,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any,
+      chunkingStats: ChunkingStats,
       parentNode: TreeSitterNode | null = null
   ): Promise<void> {
     chunkingStats.totalNodes++;
@@ -256,13 +277,13 @@ export class ChunkPipeline {
         modelProfile,
         true
       );
-      
-      const smallChunks: any[] = [];
-      
+
+      const smallChunks: SmallChunk[] = [];
+
       for (let i = 0; i < subAnalyses.length; i++) {
         const subAnalysis = subAnalyses[i];
         const subNode = subAnalysis.node;
-        
+
         if (subAnalysis.size < limits.min) {
           const subCode = source.slice(subNode.startIndex, subNode.endIndex);
           smallChunks.push({
@@ -282,10 +303,10 @@ export class ChunkPipeline {
       }
       
       if (smallChunks.length > 0) {
-        const totalSmallSize = smallChunks.reduce((sum: number, c: any) => sum + c.size, 0);
-        
+        const totalSmallSize = smallChunks.reduce((sum: number, c: SmallChunk) => sum + c.size, 0);
+
         if (totalSmallSize >= limits.min || smallChunks.length >= 3) {
-          const mergedCode = smallChunks.map((c: any) => c.code).join('\n\n');
+          const mergedCode = smallChunks.map((c: SmallChunk) => c.code).join('\n\n');
           const mergedNode: TreeSitterNode = {
             ...node,
             type: `${node.type}_merged`,
@@ -336,18 +357,18 @@ export class ChunkPipeline {
   }
 
   private async processChunk(
-      node: TreeSitterNode, 
-      code: string, 
-      suffix: string | null, 
+      node: TreeSitterNode,
+      code: string,
+      suffix: string | null,
       parentNode: TreeSitterNode | null,
       source: string,
       rel: string,
       rule: LanguageRule,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: ProgressCallback | null,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any
+      chunkingStats: ChunkingStats
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
     if (!symbol) return;
@@ -409,7 +430,7 @@ export class ChunkPipeline {
       symbol,
       chunkType,
       codevaultMetadata,
-      importantVariables,
+      importantVariables: importantVariables.map(v => v.name),
       docComments,
       contextInfo,
       symbolData

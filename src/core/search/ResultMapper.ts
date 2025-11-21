@@ -5,6 +5,33 @@ import { readChunkFromDisk } from '../../storage/encrypted-chunks.js';
 import { SEARCH_CONSTANTS } from '../../config/constants.js';
 import { logger } from '../../utils/logger.js';
 import { resolveProviderContext } from '../../config/resolver.js';
+import { safeGetProperty } from '../../utils/error-utils.js';
+
+interface ResultMeta {
+  id: string;
+  symbol: string;
+  score: number;
+  intent?: string;
+  description?: string;
+  searchType: string;
+  vectorScore?: number;
+  hybridScore?: number;
+  bm25Score?: number;
+  bm25Rank?: number;
+  vectorRank?: number;
+  rerankerScore?: number;
+  rerankerRank?: number;
+  symbolBoost?: number;
+  symbolBoostSources?: string[];
+  scoreRaw?: number;
+}
+
+interface ChunkData {
+  symbol?: string;
+  file_path?: string;
+  codevault_description?: string;
+  codevault_intent?: string;
+}
 
 /**
  * ResultMapper handles:
@@ -22,12 +49,12 @@ export class ResultMapper {
     searchType: string
   ): SearchResult[] {
     return candidates.map(result => {
-      const meta: any = {
+      const meta: ResultMeta = {
         id: result.id,
         symbol: result.symbol,
         score: Math.min(1, Math.max(result.score || 0, 0)),
-        intent: result.codevault_intent,
-        description: result.codevault_description,
+        intent: result.codevault_intent as string | undefined,
+        description: result.codevault_description as string | undefined,
         searchType: searchType,
         vectorScore: result.vectorScore
       };
@@ -79,9 +106,10 @@ export class ResultMapper {
     try {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
-        getTextAsync: async candidate => {
-          const codeText = (await this.readChunkText(candidate.sha, chunkDir)) || '';
-          return this.buildBm25Document(candidate, codeText);
+        getTextAsync: async (candidate) => {
+          const sha = typeof candidate.sha === 'string' ? candidate.sha : '';
+          const codeText = (await this.readChunkText(sha, chunkDir)) || '';
+          return this.buildBm25Document(candidate as ChunkData, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
         apiKey: providerContext.reranker.apiKey,
@@ -140,7 +168,7 @@ export class ResultMapper {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
+  private buildBm25Document(chunk: ChunkData, codeText: string | null): string {
     if (!chunk) return '';
 
     const parts = [

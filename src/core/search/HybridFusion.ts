@@ -6,6 +6,7 @@ import { SimpleLRU } from '../../utils/simple-lru.js';
 import { readChunkFromDisk } from '../../storage/encrypted-chunks.js';
 import { RRF_K, CACHE_CONSTANTS } from '../../config/constants.js';
 import { logger } from '../../utils/logger.js';
+import { getErrorMessage, safeGetProperty, safeGetString } from '../../utils/error-utils.js';
 
 /**
  * ChunkLoadingStats tracks failures when loading chunk text for BM25
@@ -238,7 +239,7 @@ export class HybridFusion {
       return undefined;
     }
 
-    const reasons: any = {};
+    const reasons: Record<string, number> = {};
     for (const [reason, count] of this.chunkLoadingStats.reasons.entries()) {
       reasons[reason] = count;
     }
@@ -374,17 +375,18 @@ export class HybridFusion {
       }
 
       return code;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.chunkLoadingStats.failed++;
-      const reason = error.code ? String(error.code).toLowerCase() : 'unknown_error';
+      const errorCode = safeGetProperty(error, 'code');
+      const reason = errorCode ? String(errorCode).toLowerCase() : 'unknown_error';
       this.chunkLoadingStats.reasons.set(
         reason,
         (this.chunkLoadingStats.reasons.get(reason) || 0) + 1
       );
 
       logger.warn(`Failed to load chunk ${sha}`, {
-        error: error.message,
-        code: error.code
+        error: getErrorMessage(error),
+        code: errorCode ? String(errorCode) : undefined
       });
 
       this.chunkCache.set(cacheKey, null);
@@ -392,14 +394,14 @@ export class HybridFusion {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
+  private buildBm25Document(chunk: unknown, codeText: string | null): string {
     if (!chunk) return '';
 
     const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
+      safeGetString(chunk, 'symbol'),
+      safeGetString(chunk, 'file_path'),
+      safeGetString(chunk, 'codevault_description'),
+      safeGetString(chunk, 'codevault_intent'),
       codeText
     ].filter(value => typeof value === 'string' && value.trim().length > 0);
 

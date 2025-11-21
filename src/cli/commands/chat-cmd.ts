@@ -12,6 +12,7 @@ import {
   type ConversationTurn
 } from '../../synthesis/conversational-synthesizer.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
+import { safeGetString } from '../../utils/error-utils.js';
 
 interface ChatOptions {
   provider: string;
@@ -151,7 +152,7 @@ export function registerChatCommand(program: Command): void {
             }
 
           } catch (error) {
-            if ((error as any).code === 'ERR_USE_AFTER_CLOSE') {
+            if (safeGetString(error, 'code') === 'ERR_USE_AFTER_CLOSE') {
               // User pressed Ctrl+C
               isRunning = false;
               break;

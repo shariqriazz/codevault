@@ -14,13 +14,14 @@ import { registerSearchCommand } from './commands/search-cmd.js';
 import { registerSearchWithCodeCommand } from './commands/search-with-code-cmd.js';
 import { registerUpdateCommand } from './commands/update-cmd.js';
 import { registerWatchCommand } from './commands/watch-cmd.js';
+import { safeGetString } from '../utils/error-utils.js';
 
 function readPackageVersion(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  return packageJson.version;
+  const packageJson: unknown = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  return safeGetString(packageJson, 'version') || '0.0.0';
 }
 
 export async function runCli(argv = process.argv): Promise<void> {

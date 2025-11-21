@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider } from '../../providers/index.js';
-import { BATCH_SIZE } from '../../providers/base.js';
+import { BATCH_SIZE, type ModelProfile } from '../../providers/base.js';
 import { readCodemap, type Codemap } from '../../codemap/io.js';
 import { loadMerkle, cloneMerkle, type MerkleTree } from '../../indexer/merkle.js';
 import { resolveEncryptionPreference } from '../../storage/encrypted-chunks.js';
@@ -11,6 +11,14 @@ import { logger } from '../../utils/logger.js';
 import { resolveProviderContext } from '../../config/resolver.js';
 import type { IndexProjectOptions } from '../types.js';
 
+export interface SizeLimits {
+  optimal: number;
+  min: number;
+  max: number;
+  overlap: number;
+  unit: string;
+}
+
 export interface IndexContextData {
   repo: string;
   repoPath: string;
@@ -18,8 +26,8 @@ export interface IndexContextData {
   providerInstance: EmbeddingProvider;
   providerName: string;
   modelName: string | null;
-  modelProfile: any;
-  limits: any;
+  modelProfile: ModelProfile;
+  limits: SizeLimits;
   codemapPath: string;
   chunkDir: string;
   dbPath: string;

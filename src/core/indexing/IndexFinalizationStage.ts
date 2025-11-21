@@ -145,7 +145,7 @@ export class IndexFinalizationStage {
     for (const rel of orphaned) {
       this.context.db.deleteChunksByFilePath(rel);
       for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
-        if ((meta as any)?.file === rel) {
+        if (meta?.file === rel) {
           delete this.state.codemap[chunkId];
         }
       }

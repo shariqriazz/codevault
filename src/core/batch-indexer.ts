@@ -19,11 +19,42 @@ const backoffWithCap = (attempt: number): number => {
   return Math.min(base, 30000); // cap at 30s
 };
 
-function isRateLimitError(error: any): boolean {
-  const message = error?.message || String(error);
+// Helper type for error-like objects
+interface ErrorLike {
+  message?: unknown;
+  status?: unknown;
+  statusCode?: unknown;
+  response?: unknown;
+  error?: unknown;
+  code?: unknown;
+  name?: unknown;
+  type?: unknown;
+  [key: string]: unknown;
+}
+
+function isErrorLike(value: unknown): value is ErrorLike {
+  return typeof value === 'object' && value !== null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isErrorLike(error) && typeof error.message === 'string') {
+    return error.message;
+  }
+  return String(error);
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (!isErrorLike(error)) return undefined;
+  if (typeof error.status === 'number') return error.status;
+  if (typeof error.statusCode === 'number') return error.statusCode;
+  return undefined;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  const message = getErrorMessage(error);
   return (
-    error?.status === 429 ||
-    error?.statusCode === 429 ||
+    status === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -31,10 +62,11 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-function isBatchSizeError(error: any): boolean {
-  const message = error?.message || String(error);
+function isBatchSizeError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  const message = getErrorMessage(error);
   return (
-    error?.status === 413 ||
+    status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -42,9 +74,9 @@ function isBatchSizeError(error: any): boolean {
   );
 }
 
-function isTransientApiError(error: any): boolean {
-  const status = error?.status || error?.statusCode;
-  const message = error?.message || String(error);
+function isTransientApiError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  const message = getErrorMessage(error);
 
   // Upstream 5xx/gateway and common flaky transport signals
   return (
@@ -71,17 +103,30 @@ const backoffWithCapEmbed = (attempt: number): number => {
   return Math.min(base, 20000); // cap at 20s
 };
 
-function serializeErrorForLog(error: any): { [key: string]: LogValue } {
+function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
 
-  const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
+  if (!isErrorLike(error)) {
+    return { message: String(error) };
+  }
+
+  const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'] as const;
   for (const key of candidates) {
-    if (error[key] !== undefined) info[key] = String(error[key]);
+    const value = error[key];
+    if (value !== undefined) {
+      info[key] = String(value);
+    }
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  let responseData: unknown;
+  if (isErrorLike(error.response) && 'data' in error.response) {
+    responseData = error.response.data;
+  } else if (isErrorLike(error.error) && 'data' in error.error) {
+    responseData = error.error.data;
+  }
+
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -94,6 +139,17 @@ function serializeErrorForLog(error: any): { [key: string]: LogValue } {
   return info;
 }
 
+interface CodevaultMetadata {
+  tags?: string[];
+  intent?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface ContextInfo {
+  [key: string]: unknown;
+}
+
 interface ChunkToEmbed {
   chunkId: string;
   enhancedEmbeddingText: string;
@@ -104,10 +160,10 @@ interface ChunkToEmbed {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: CodevaultMetadata;
+    importantVariables: string[];
     docComments: string | null;
-    contextInfo: any;
+    contextInfo: ContextInfo;
   };
 }
 
@@ -344,9 +400,9 @@ export class BatchEmbeddingProcessor {
         embedding: embedding,
         embedding_provider: this.embeddingProvider.getName(),
         embedding_dimensions: this.embeddingProvider.getDimensions(),
-        codevault_tags: chunk.params.codevaultMetadata.tags,
-        codevault_intent: chunk.params.codevaultMetadata.intent,
-        codevault_description: chunk.params.codevaultMetadata.description,
+        codevault_tags: chunk.params.codevaultMetadata.tags ?? [],
+        codevault_intent: chunk.params.codevaultMetadata.intent ?? null,
+        codevault_description: chunk.params.codevaultMetadata.description ?? null,
         doc_comments: chunk.params.docComments,
         variables_used: chunk.params.importantVariables,
         context_info: chunk.params.contextInfo
@@ -384,9 +440,9 @@ export class BatchEmbeddingProcessor {
           embedding,
           embedding_provider: this.embeddingProvider.getName(),
           embedding_dimensions: this.embeddingProvider.getDimensions(),
-          codevault_tags: chunk.params.codevaultMetadata.tags,
-          codevault_intent: chunk.params.codevaultMetadata.intent,
-          codevault_description: chunk.params.codevaultMetadata.description,
+          codevault_tags: chunk.params.codevaultMetadata.tags ?? [],
+          codevault_intent: chunk.params.codevaultMetadata.intent ?? null,
+          codevault_description: chunk.params.codevaultMetadata.description ?? null,
           doc_comments: chunk.params.docComments,
           variables_used: chunk.params.importantVariables,
           context_info: chunk.params.contextInfo
@@ -429,12 +485,28 @@ interface RetryState {
  * Treat responses that return an error without data as fatal (deterministic) so we don't waste
  * transient retries on them.
  */
-function isFatalApiResponse(error: any): boolean {
+function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const msg = error?.message || '';
-  const status = error?.status || error?.statusCode;
-  const hasErrorKey = Array.isArray((error as any)?.topLevelKeys) && (error as any).topLevelKeys.includes('error');
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+
+  const msg = getErrorMessage(error);
+  const status = getErrorStatus(error);
+
+  // Check for topLevelKeys (custom error property)
+  let hasErrorKey = false;
+  if (isErrorLike(error) && 'topLevelKeys' in error) {
+    const topLevelKeys = error.topLevelKeys;
+    hasErrorKey = Array.isArray(topLevelKeys) && topLevelKeys.includes('error');
+  }
+
+  // Check for response data
+  let responseData: unknown;
+  if (isErrorLike(error)) {
+    if (isErrorLike(error.response) && 'data' in error.response) {
+      responseData = error.response.data;
+    } else if (isErrorLike(error.error) && 'data' in error.error) {
+      responseData = error.error.data;
+    }
+  }
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;

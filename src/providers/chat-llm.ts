@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { createRateLimiter, RateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
 
@@ -14,6 +14,28 @@ export interface ChatCompletionOptions {
   stream?: boolean;
 }
 
+interface OpenAIConfig {
+  apiKey?: string;
+  baseURL?: string;
+}
+
+interface ChatRequestBody {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  temperature: number;
+  max_tokens: number;
+  stream?: boolean;
+  provider?: ProviderRoutingConfig;
+}
+
+interface StreamChunk {
+  choices?: Array<{
+    delta?: {
+      content?: string;
+    };
+  }>;
+}
+
 export abstract class ChatLLMProvider {
   abstract generateCompletion(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<string>;
   abstract generateStreamingCompletion(messages: ChatMessage[], options?: ChatCompletionOptions): AsyncGenerator<string>;
@@ -21,7 +43,7 @@ export abstract class ChatLLMProvider {
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
 
-  rateLimiter?: any;
+  rateLimiter?: RateLimiter;
 }
 
 export class OpenAIChatProvider extends ChatLLMProvider {
@@ -32,7 +54,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   private maxTokensOverride?: number;
   private temperatureOverride?: number;
   private routingConfig?: ProviderRoutingConfig;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: ChatOptions = {}) {
     super();
@@ -51,16 +73,16 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
-      
+      const config: OpenAIConfig = {};
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
   }
@@ -76,19 +98,20 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     return await this.rateLimiter.execute(async () => {
-      const requestBody: any = {
+      const requestBody = {
         model: this.model,
         messages: messages.map(msg => ({
           role: msg.role,
           content: msg.content
         })),
         temperature,
-        max_tokens: maxTokens
+        max_tokens: maxTokens,
+        stream: false as const
       };
 
       // Add provider routing for OpenRouter if configured
       if (this.routingConfig && this.isOpenRouter()) {
-        requestBody.provider = this.routingConfig;
+        (requestBody as any).provider = this.routingConfig;
       }
 
       const completion = await this.openai!.chat.completions.create(requestBody);
@@ -110,7 +133,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     // Apply rate limiting to streaming requests to prevent overwhelming the provider
     await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
 
-    const requestBody: any = {
+    const requestBody = {
       model: this.model,
       messages: messages.map(msg => ({
         role: msg.role,
@@ -123,13 +146,14 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
     // Add provider routing for OpenRouter if configured
     if (this.routingConfig && this.isOpenRouter()) {
-      requestBody.provider = this.routingConfig;
+      (requestBody as any).provider = this.routingConfig;
     }
 
-    const stream = await (this.openai!.chat.completions.create as any)(requestBody);
+    const stream = await this.openai!.chat.completions.create(requestBody);
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
+    for await (const chunk of stream as any) {
+      const typedChunk = chunk as unknown as StreamChunk;
+      const content = typedChunk.choices?.[0]?.delta?.content;
       if (content) {
         yield content;
       }

@@ -1,5 +1,6 @@
 import type { Codemap } from '../types/codemap.js';
 import { SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
+import { safeGetString, safeGetProperty } from '../utils/error-utils.js';
 
 const SIGNATURE_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.SIGNATURE_MATCH_BOOST;
 const NEIGHBOR_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.NEIGHBOR_MATCH_BOOST;
@@ -63,15 +64,16 @@ function splitSymbolWords(symbol: string): string[] {
     .filter(word => word.length > 0);
 }
 
-function computeSignatureMatchStrength(query: string, entry: any): number {
+function computeSignatureMatchStrength(query: string, entry: unknown): number {
   if (!entry) {
     return 0;
   }
 
   const queryLower = query.toLowerCase();
-  const rawSymbol = typeof entry.symbol === 'string' ? entry.symbol : '';
+  const rawSymbol = safeGetString(entry, 'symbol') || '';
   const symbol = rawSymbol.toLowerCase();
-  const signature = typeof entry.symbol_signature === 'string' ? entry.symbol_signature.toLowerCase() : '';
+  const rawSignature = safeGetString(entry, 'symbol_signature') || '';
+  const signature = rawSignature.toLowerCase();
 
   let weight = 0;
   const matchedTokens = new Set<string>();
@@ -106,8 +108,9 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   }
 
   let parameterMatches = 0;
-  if (Array.isArray(entry.symbol_parameters)) {
-    for (const param of entry.symbol_parameters) {
+  const symbolParameters = safeGetProperty(entry, 'symbol_parameters');
+  if (Array.isArray(symbolParameters)) {
+    for (const param of symbolParameters) {
       if (typeof param !== 'string') {
         continue;
       }
@@ -144,17 +147,18 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   return Math.max(0, Math.min(weight / 4, 1));
 }
 
-function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: any }> {
+function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: unknown }> {
   const index = new Map();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }
 
   for (const [chunkId, entry] of Object.entries(codemap)) {
-    if (!entry || typeof entry.sha !== 'string') {
+    const sha = safeGetString(entry, 'sha');
+    if (!entry || !sha) {
       continue;
     }
-    index.set(entry.sha, { chunkId, entry });
+    index.set(sha, { chunkId, entry });
   }
 
   return index;

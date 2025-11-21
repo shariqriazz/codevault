@@ -6,6 +6,7 @@ import zlib from 'zlib';
 import { promisify } from 'node:util';
 import { log } from '../utils/logger.js';
 import { ENCRYPTION_CONSTANTS } from '../config/constants.js';
+import { getErrorMessage, isErrorLike, safeGetProperty } from '../utils/error-utils.js';
 
 const {
   MAGIC_HEADER,
@@ -187,7 +188,7 @@ export function getEncryptionKeySet(): EncryptionKeySet {
 const warnedInvalidMode = new Set<string>();
 let warnedInvalidKey = false;
 
-function normalizeMode(mode: any): string | undefined {
+function normalizeMode(mode: unknown): string | undefined {
   if (typeof mode !== 'string') {
     return undefined;
   }
@@ -265,35 +266,36 @@ function buildDecryptionAttempts(payload: Buffer): Array<{ version: number; offs
   return attempts;
 }
 
+interface EncryptionError extends Error {
+  code?: string;
+  cause?: unknown;
+}
+
 function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
   const header = payload.subarray(0, MAGIC_HEADER_BUFFER.length);
   if (!header.equals(MAGIC_HEADER_BUFFER)) {
-    const error: any = new Error('Encrypted chunk payload has an unknown header.');
+    const error: EncryptionError = new Error('Encrypted chunk payload has an unknown header.');
     error.code = 'ENCRYPTION_FORMAT_UNRECOGNIZED';
     throw error;
   }
 
   const attempts = buildDecryptionAttempts(payload);
-  const errors: any[] = [];
+  const errors: EncryptionError[] = [];
 
   for (const attempt of attempts) {
     const { version, offset } = attempt;
     if (version > CURRENT_ENCRYPTION_VERSION) {
-      errors.push(
-        Object.assign(new Error(`Unsupported encryption version ${version}`), {
-          code: 'ENCRYPTION_VERSION_UNSUPPORTED'
-        })
-      );
+      const err: EncryptionError = new Error(`Unsupported encryption version ${version}`);
+      err.code = 'ENCRYPTION_VERSION_UNSUPPORTED';
+      errors.push(err);
       continue;
     }
 
     const minimumLength = offset + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1;
     if (!payload || payload.length < minimumLength) {
-      errors.push(
-        Object.assign(new Error('Encrypted chunk payload is truncated.'), {
-          code: 'ENCRYPTION_PAYLOAD_INVALID'
-        })
-      );
+      const err: EncryptionError = new Error('Encrypted chunk payload is truncated.');
+      err.code = 'ENCRYPTION_PAYLOAD_INVALID';
+      errors.push(err);
       continue;
     }
 
@@ -314,7 +316,7 @@ function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
     try {
       return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     } catch (error) {
-      const authError: any = new Error('authentication failed');
+      const authError: EncryptionError = new Error('authentication failed');
       authError.code = 'ENCRYPTION_AUTH_FAILED';
       authError.cause = error;
       errors.push(authError);
@@ -389,20 +391,20 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     }
 
     if (candidateKeys.length === 0) {
-      const error: any = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`);
+      const error: EncryptionError = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`);
       error.code = 'ENCRYPTION_KEY_REQUIRED';
       throw error;
     }
 
     const payload = await fs.readFile(encryptedPath);
     let decrypted: Buffer | null = null;
-    const errors: any[] = [];
+    const errors: EncryptionError[] = [];
     for (const candidate of candidateKeys) {
       try {
         decrypted = decryptBuffer(payload, candidate);
         break;
-      } catch (error: any) {
-        errors.push(error);
+      } catch (error) {
+        errors.push(error as EncryptionError);
         continue;
       }
     }
@@ -410,15 +412,15 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     if (!decrypted) {
       const lastError = errors[errors.length - 1];
       if (lastError && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
-        const authError: any = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`);
+        const authError: EncryptionError = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`);
         authError.code = 'ENCRYPTION_AUTH_FAILED';
         authError.cause = lastError;
         throw authError;
       }
-      const genericError: any = new Error(
-        `Failed to decrypt chunk ${sha}: ${(lastError as Error)?.message || 'unknown error'}`
+      const genericError: EncryptionError = new Error(
+        `Failed to decrypt chunk ${sha}: ${lastError?.message || 'unknown error'}`
       );
-      genericError.code = (lastError)?.code || 'ENCRYPTION_DECRYPT_FAILED';
+      genericError.code = lastError?.code || 'ENCRYPTION_DECRYPT_FAILED';
       genericError.cause = lastError;
       throw genericError;
     }
@@ -427,8 +429,8 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
       const codeBuffer = await gunzipAsync(decrypted);
       const code = codeBuffer.toString('utf8');
       return { code, encrypted: true };
-    } catch (error: any) {
-      const decompressionError: any = new Error(`Failed to decompress chunk ${sha}: ${error.message}`);
+    } catch (error) {
+      const decompressionError: EncryptionError = new Error(`Failed to decompress chunk ${sha}: ${getErrorMessage(error)}`);
       decompressionError.code = 'CHUNK_DECOMPRESSION_FAILED';
       decompressionError.cause = error;
       throw decompressionError;
@@ -441,8 +443,8 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
       const codeBuffer = await gunzipAsync(compressed);
       const code = codeBuffer.toString('utf8');
       return { code, encrypted: false };
-    } catch (error: any) {
-      const readError: any = new Error(`Failed to read chunk ${sha}: ${error.message}`);
+    } catch (error) {
+      const readError: EncryptionError = new Error(`Failed to read chunk ${sha}: ${getErrorMessage(error)}`);
       readError.code = 'CHUNK_READ_FAILED';
       readError.cause = error;
       throw readError;

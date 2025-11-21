@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { loadContextPack } from '../../context/packs.js';
+import type { ContextPack } from '../../types/context-pack.js';
 
 export const useContextPackInputSchema = z.object({
   name: z.string().min(1, 'Context pack name is required'),
@@ -13,15 +14,24 @@ export const useContextPackResultSchema = z.object({
     key: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    scope: z.record(z.string(), z.any())
+    scope: z.record(z.string(), z.unknown())
   }).optional()
 });
 
+interface ErrorLogger {
+  debugLog?: (message: string, context?: Record<string, unknown>) => void;
+  log?: (error: unknown, context?: Record<string, unknown>) => void;
+}
+
+interface ToolServer {
+  tool: (name: string, schema: Record<string, z.ZodType>, handler: (params: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }> }>) => void;
+}
+
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
-  setSessionPack: (pack: any) => void;
+  setSessionPack: (pack: ContextPack) => void;
   clearSessionPack: () => void;
-  errorLogger?: any;
+  errorLogger?: ErrorLogger;
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
@@ -36,7 +46,7 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
       if (typeof clearSessionPack === 'function') {
         clearSessionPack();
       }
-      if (errorLogger && typeof errorLogger.debugLog === 'function') {
+      if (errorLogger?.debugLog) {
         errorLogger.debugLog('Cleared MCP session context pack', { basePath, name });
       }
       return {
@@ -49,14 +59,15 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
       const pack = loadContextPack(name, basePath);
       const sessionPack = {
         ...pack,
+        description: pack.description ?? undefined,
         basePath
       };
 
       if (typeof setSessionPack === 'function') {
-        setSessionPack(sessionPack);
+        setSessionPack(sessionPack as any);
       }
 
-      if (errorLogger && typeof errorLogger.debugLog === 'function') {
+      if (errorLogger?.debugLog) {
         errorLogger.debugLog('Activated MCP session context pack', {
           pack: pack.key,
           basePath
@@ -69,12 +80,12 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
         pack: {
           key: pack.key,
           name: pack.name,
-          description: pack.description || null,
+          description: pack.description ?? undefined,
           scope: pack.scope
         }
       };
     } catch (error) {
-      if (errorLogger && typeof errorLogger.log === 'function') {
+      if (errorLogger?.log) {
         errorLogger.log(error, {
           operation: 'use_context_pack',
           name,
@@ -86,7 +97,7 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions) {
+export function registerUseContextPackTool(server: ToolServer, options: CreateHandlerOptions) {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -95,8 +106,8 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    async (params: any) => {
-      const result = await handler(params);
+    async (params: Record<string, unknown>) => {
+      const result = await handler(params as { name: string; path?: string });
       return {
         content: [
           {

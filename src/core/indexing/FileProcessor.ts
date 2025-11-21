@@ -10,6 +10,23 @@ import type { IndexProjectOptions } from '../types.js';
 import {normalizeChunkMetadata} from '../../types/codemap.js';
 import {writeChunkToDisk, removeChunkArtifacts} from '../../storage/encrypted-chunks.js';
 import { PersistManager } from './PersistManager.js';
+import { getErrorMessage, safeGetProperty } from '../../utils/error-utils.js';
+
+interface ChunkMetadata {
+  file?: string;
+  sha?: string;
+  symbol?: string;
+  lang?: string;
+  chunkType?: string;
+  provider?: string;
+  dimensions?: number;
+  hasCodevaultTags?: boolean;
+  hasIntent?: boolean;
+  hasDocumentation?: boolean;
+  variableCount?: number;
+  encrypted?: boolean;
+  [key: string]: unknown;
+}
 
 /**
  * FileProcessor handles the processing of individual files:
@@ -38,9 +55,13 @@ export class FileProcessor {
 
     if (!rule) return;
 
-    const existingChunks = new Map(
+    const existingChunks = new Map<string, ChunkMetadata>(
       Object.entries(this.state.codemap)
-        .filter(([, metadata]) => metadata && (metadata as any).file === rel) as [string, any][]
+        .filter(([, metadata]) => {
+          const meta = metadata as ChunkMetadata;
+          return meta && meta.file === rel;
+        })
+        .map(([id, metadata]) => [id, metadata as ChunkMetadata])
     );
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
@@ -110,7 +131,7 @@ export class FileProcessor {
       this.state.addError({
         type: 'processing_error',
         file: rel,
-        error: (error as Error).message
+        error: getErrorMessage(error)
       });
 
       // Try fallback processing
@@ -133,7 +154,7 @@ export class FileProcessor {
     rel: string,
     abs: string,
     rule: { lang: string } | null | undefined,
-    existingChunks: Map<string, any>,
+    existingChunks: Map<string, ChunkMetadata>,
     staleChunkIds: Set<string>,
     chunkMerkleHashes: string[]
   ): Promise<void> {
@@ -211,7 +232,7 @@ export class FileProcessor {
       this.state.addError({
         type: 'fallback_error',
         file: rel,
-        error: (fallbackError as Error).message
+        error: getErrorMessage(fallbackError)
       });
     }
   }
@@ -228,11 +249,11 @@ export class FileProcessor {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: Record<string, unknown>;
+    importantVariables: string[];
     docComments: string | null;
-    contextInfo: any;
-    symbolData: any;
+    contextInfo: Record<string, unknown>;
+    symbolData: Record<string, unknown>;
   }): Promise<void> {
     try {
       if (!this.context.batchProcessor) {
@@ -268,6 +289,13 @@ export class FileProcessor {
       });
 
       const previousMetadata = this.state.codemap[params.chunkId];
+      const tags = safeGetProperty(params.codevaultMetadata, 'tags');
+      const intent = safeGetProperty(params.codevaultMetadata, 'intent');
+      const signature = safeGetProperty(params.symbolData, 'signature');
+      const symbolParams = safeGetProperty(params.symbolData, 'parameters');
+      const returnType = safeGetProperty(params.symbolData, 'returnType');
+      const calls = safeGetProperty(params.symbolData, 'calls');
+
       this.state.codemap[params.chunkId] = normalizeChunkMetadata({
         file: params.rel,
         symbol: params.symbol,
@@ -276,22 +304,22 @@ export class FileProcessor {
         chunkType: params.chunkType,
         provider: this.context.providerInstance.getName(),
         dimensions: this.context.providerInstance.getDimensions(),
-        hasCodevaultTags: Array.isArray(params.codevaultMetadata.tags) && params.codevaultMetadata.tags.length > 0,
-        hasIntent: !!params.codevaultMetadata.intent,
+        hasCodevaultTags: Array.isArray(tags) && tags.length > 0,
+        hasIntent: !!intent,
         hasDocumentation: !!params.docComments,
         variableCount: Array.isArray(params.importantVariables) ? params.importantVariables.length : 0,
         encrypted: !!(writeResult && writeResult.encrypted),
-        symbol_signature: params.symbolData && params.symbolData.signature ? params.symbolData.signature : undefined,
-        symbol_parameters: params.symbolData && Array.isArray(params.symbolData.parameters) ? params.symbolData.parameters : undefined,
-        symbol_return: params.symbolData && params.symbolData.returnType ? params.symbolData.returnType : undefined,
-        symbol_calls: params.symbolData && Array.isArray(params.symbolData.calls) ? params.symbolData.calls : undefined
+        symbol_signature: typeof signature === 'string' ? signature : undefined,
+        symbol_parameters: Array.isArray(symbolParams) ? symbolParams : undefined,
+        symbol_return: typeof returnType === 'string' ? returnType : undefined,
+        symbol_calls: Array.isArray(calls) ? calls : undefined
       }, previousMetadata);
       this.persistManager.scheduleCodemapSave();
     } catch (error) {
       this.state.addError({
         type: 'indexing_error',
         chunkId: params.chunkId,
-        error: (error as Error).message
+        error: getErrorMessage(error)
       });
       throw error;
     }
@@ -300,7 +328,7 @@ export class FileProcessor {
   /**
    * Delete chunks from database and file system
    */
-  private async deleteChunks(chunkIds: string[], metadataLookup = new Map<string, any>()): Promise<void> {
+  private async deleteChunks(chunkIds: string[], metadataLookup = new Map<string, ChunkMetadata>()): Promise<void> {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       return;
     }
@@ -310,7 +338,7 @@ export class FileProcessor {
     }
 
     for (const chunkId of chunkIds) {
-      const metadata = metadataLookup.get(chunkId) || this.state.codemap[chunkId];
+      const metadata = metadataLookup.get(chunkId) || (this.state.codemap[chunkId] as ChunkMetadata);
       if (metadata && metadata.sha) {
         await removeChunkArtifacts(this.context.chunkDir, metadata.sha);
       }
@@ -327,10 +355,15 @@ export class FileProcessor {
    */
   async removeFileArtifacts(fileRel: string): Promise<void> {
     const entries = Object.entries(this.state.codemap)
-      .filter(([, metadata]) => metadata && (metadata as any).file === fileRel);
+      .filter(([, metadata]) => {
+        const meta = metadata as ChunkMetadata;
+        return meta && meta.file === fileRel;
+      });
 
     if (entries.length > 0) {
-      const metadataLookup = new Map(entries as [string, any][]);
+      const metadataLookup = new Map<string, ChunkMetadata>(
+        entries.map(([id, metadata]) => [id, metadata as ChunkMetadata])
+      );
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
       this.persistManager.scheduleCodemapSave();

@@ -1,12 +1,21 @@
 import path from 'path';
 import { getActiveContextPack, listContextPacks, loadContextPack, setActiveContextPack } from '../../context/packs.js';
 import type { Command } from 'commander';
+import { getErrorMessage } from '../../utils/error-utils.js';
+
+interface ContextPackInfo {
+  key: string;
+  name?: string;
+  description?: string | null;
+  scope?: Record<string, unknown>;
+  invalid?: boolean;
+}
 
 function resolveProjectPath(projectPath = '.'): string {
   return path.resolve(projectPath || '.');
 }
 
-function formatPackLine(pack: any, activeKey: string | null): string {
+function formatPackLine(pack: ContextPackInfo, activeKey: string | null): string {
   const parts: string[] = [];
   const isActive = pack.key === activeKey;
   const marker = isActive ? '•' : '-';
@@ -27,7 +36,7 @@ function formatPackLine(pack: any, activeKey: string | null): string {
   return parts.join(' ');
 }
 
-function printPackDetails(pack: any): void {
+function printPackDetails(pack: ContextPackInfo): void {
   const output = {
     key: pack.key,
     name: pack.name,
@@ -77,7 +86,7 @@ export function registerContextCommands(program: Command): void {
         const pack = loadContextPack(name, resolvedPath);
         printPackDetails(pack);
       } catch (error) {
-        console.error(`Failed to load context pack "${name}": ${(error as Error).message}`);
+        console.error(`Failed to load context pack "${name}": ${getErrorMessage(error)}`);
         process.exitCode = 1;
       }
     });
@@ -103,7 +112,7 @@ export function registerContextCommands(program: Command): void {
           }
         }
       } catch (error) {
-        console.error(`Failed to activate context pack "${name}": ${(error as Error).message}`);
+        console.error(`Failed to activate context pack "${name}": ${getErrorMessage(error)}`);
         process.exitCode = 1;
       }
     });

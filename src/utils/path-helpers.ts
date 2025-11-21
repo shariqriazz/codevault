@@ -28,7 +28,7 @@ export function resolveProjectRoot(input?: {
   const validation = validatePathSafety(process.cwd(), absolute);
 
   if (!validation.safe || !validation.normalized) {
-    const error: any = new Error(`Path "${absolute}" is outside the project root`);
+    const error = new Error(`Path "${absolute}" is outside the project root`) as Error & { code: string };
     error.code = 'PATH_VALIDATION_FAILED';
     throw error;
   }

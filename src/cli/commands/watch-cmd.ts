@@ -1,5 +1,15 @@
 import { Command } from 'commander';
 import { startWatch } from '../../indexer/watch.js';
+import { getErrorMessage } from '../../utils/error-utils.js';
+
+interface WatchCommandOptions {
+  provider: string;
+  project?: string;
+  directory?: string;
+  debounce: string;
+  encrypt?: string;
+  concurrency?: string;
+}
 
 export function registerWatchCommand(program: Command): void {
   program
@@ -11,7 +21,7 @@ export function registerWatchCommand(program: Command): void {
     .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
-    .action(async (projectPath = '.', options) => {
+    .action(async (projectPath = '.', options: WatchCommandOptions) => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const debounceMs = parseInt(options.debounce, 10);
 
@@ -48,7 +58,7 @@ export function registerWatchCommand(program: Command): void {
           process.on('SIGTERM', shutdown);
         });
       } catch (error) {
-        console.error('❌ Failed to start watcher:', (error as Error).message);
+        console.error('❌ Failed to start watcher:', getErrorMessage(error));
         process.exit(1);
       }
     });

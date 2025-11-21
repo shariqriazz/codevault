@@ -1,4 +1,5 @@
 import { SEARCH_CONSTANTS, BATCH_CONSTANTS } from '../config/constants.js';
+import { safeGetProperty } from '../utils/error-utils.js';
 
 function getAPIUrl(): string {
   return process.env.CODEVAULT_RERANK_API_URL || '';
@@ -90,22 +91,24 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error(`Rerank API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as any;
+  const data: unknown = await response.json();
 
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
-  if (data.results && Array.isArray(data.results)) {
-    return data.results;
+  const results = safeGetProperty(data, 'results');
+  if (Array.isArray(results)) {
+    return results as RerankResult[];
   }
 
   // Alternative response format (some providers use data array)
-  if (data.data && Array.isArray(data.data)) {
-    return data.data;
+  const dataArray = safeGetProperty(data, 'data');
+  if (Array.isArray(dataArray)) {
+    return dataArray as RerankResult[];
   }
 
   // Fallback for direct array response
   if (Array.isArray(data)) {
-    return data;
+    return data as RerankResult[];
   }
 
   throw new Error(`Unexpected rerank API response format. Expected {results: [...]} but got: ${JSON.stringify(data).slice(0, 200)}`);
@@ -114,7 +117,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
 interface Candidate {
   rerankerScore?: number;
   rerankerRank?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface RerankOptions {

@@ -5,6 +5,7 @@ export interface CodevaultMetadata {
   tags: string[];
   intent: string | null;
   description: string | null;
+  [key: string]: unknown;
 }
 
 export function extractCodevaultMetadata(commentText: string | null): CodevaultMetadata {
@@ -104,6 +105,7 @@ export interface ImportantVariable {
   type: string;
   name: string;
   value: string;
+  [key: string]: unknown;
 }
 
 export function extractImportantVariables(node: TreeSitterNode, source: string, rule: LanguageRule): ImportantVariable[] {

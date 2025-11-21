@@ -3,6 +3,15 @@ import { synthesizeAnswer } from '../../synthesis/synthesizer.js';
 import { formatSynthesisResult, formatErrorMessage, formatNoResultsMessage } from '../../synthesis/markdown-formatter.js';
 import type { ScopeFilters } from '../../types/search.js';
 
+interface ErrorLogger {
+  debugLog?: (message: string, context?: Record<string, unknown>) => void;
+  log?: (error: unknown, context?: Record<string, unknown>) => void;
+}
+
+interface MCPServer {
+  tool: (name: string, schema: Record<string, unknown>, handler: (params: Record<string, unknown>) => Promise<unknown>) => void;
+}
+
 export const askCodebaseInputSchema = z.object({
   question: z.string().min(1, 'Question is required'),
   provider: z.string().optional().default('auto'),
@@ -30,7 +39,7 @@ export const askCodebaseResultSchema = z.object({
 
 interface CreateHandlerOptions {
   sessionPack?: any;
-  errorLogger?: any;
+  errorLogger?: ErrorLogger;
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
@@ -138,7 +147,7 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
   };
 }
 
-export function registerAskCodebaseTool(server: any, options: CreateHandlerOptions = {}) {
+export function registerAskCodebaseTool(server: MCPServer, options: CreateHandlerOptions = {}) {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(

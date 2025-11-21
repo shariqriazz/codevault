@@ -2,13 +2,32 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { synthesizeAnswer, synthesizeAnswerStreaming } from '../../synthesis/synthesizer.js';
-import { 
-  formatSynthesisResult, 
-  formatErrorMessage, 
+import {
+  formatSynthesisResult,
+  formatErrorMessage,
   formatNoResultsMessage,
-  addCitationFooter 
+  addCitationFooter
 } from '../../synthesis/markdown-formatter.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
+import { getErrorMessage } from '../../utils/error-utils.js';
+
+interface AskCommandOptions {
+  provider: string;
+  chatProvider: string;
+  path: string;
+  project?: string;
+  directory?: string;
+  maxChunks: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker: string;
+  multiQuery?: boolean;
+  temperature: string;
+  stream?: boolean;
+  citations?: boolean;
+  metadata: boolean;
+}
 
 export function registerAskCommand(program: Command): void {
   program
@@ -29,7 +48,7 @@ export function registerAskCommand(program: Command): void {
     .option('--stream', 'stream the response in real-time')
     .option('--citations', 'add citation footer')
     .option('--no-metadata', 'hide search metadata')
-    .action(async (question, options) => {
+    .action(async (question: string, options: AskCommandOptions) => {
       try {
         // Suppress verbose logs
         process.env.CODEVAULT_QUIET = 'true';
@@ -80,7 +99,7 @@ export function registerAskCommand(program: Command): void {
             console.log('\n');
           } catch (error) {
             spinner.fail(chalk.red('Error generating answer'));
-            console.error(chalk.red(`\n${(error as Error).message}\n`));
+            console.error(chalk.red(`\n${getErrorMessage(error)}\n`));
             process.exit(1);
           }
           
@@ -149,7 +168,7 @@ export function registerAskCommand(program: Command): void {
         delete process.env.CODEVAULT_QUIET;
 
       } catch (error) {
-        console.error(chalk.red('\n❌ Error:'), (error as Error).message);
+        console.error(chalk.red('\n❌ Error:'), getErrorMessage(error));
         process.exit(1);
       }
     });

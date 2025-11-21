@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { log } from '../utils/logger.js';
+import { safeGetString } from '../utils/error-utils.js';
 
 const DB_SCHEMA_VERSION = 2;
 
@@ -530,7 +531,7 @@ export class CodeVaultDatabase {
   transaction<T>(fn: () => T): T {
     const wrapped = this.db.transaction(() => {
       const result = fn();
-      if (result && typeof (result as any).then === 'function') {
+      if (result && typeof result === 'object' && 'then' in result && typeof (result as { then: unknown }).then === 'function') {
         throw new Error('better-sqlite3 transactions must be synchronous; avoid returning a Promise.');
       }
       return result;
@@ -556,7 +557,10 @@ export class CodeVaultDatabase {
       return [];
     }
     const rows = this.getAllPathsStmt.all();
-    return Array.isArray(rows) ? rows.map((row: any) => row.file_path).filter(Boolean) : [];
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return rows.map((row: unknown) => safeGetString(row, 'file_path')).filter((path): path is string => typeof path === 'string');
   }
 
   deleteChunksByFilePath(filePath: string): void {

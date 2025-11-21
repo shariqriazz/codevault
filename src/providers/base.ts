@@ -1,3 +1,5 @@
+import type { RateLimiter } from '../utils/rate-limiter.js';
+
 export interface ModelProfile {
   maxTokens: number;
   optimalTokens: number;
@@ -24,7 +26,7 @@ export abstract class EmbeddingProvider {
   abstract getName(): string;
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
-  
+
   // Batch processing support (optional - providers can override)
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     // Default implementation: process one by one (backward compatible)
@@ -35,8 +37,8 @@ export abstract class EmbeddingProvider {
     }
     return embeddings;
   }
-  
-  rateLimiter?: any;
+
+  rateLimiter?: RateLimiter;
 }
 
 // Batching constants

@@ -42,11 +42,12 @@ export function extractScopeFromPackDefinition(definition: ContextPack): Record<
     ? { ...definition.scope }
     : {};
 
-  const scope = { ...scopeCandidate };
+  const scope: Record<string, any> = { ...scopeCandidate };
 
-  for (const key of ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost']) {
-    if (Object.prototype.hasOwnProperty.call(definition, key) && typeof (definition as any)[key] !== 'undefined') {
-      (scope as any)[key] = (definition as any)[key];
+  const keys = ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost'] as const;
+  for (const key of keys) {
+    if (key in definition && typeof definition[key] !== 'undefined') {
+      scope[key] = definition[key];
     }
   }
 

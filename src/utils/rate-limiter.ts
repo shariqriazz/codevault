@@ -1,3 +1,5 @@
+import { safeGetProperty, safeGetNumber, getErrorMessage, getErrorStatus } from './error-utils.js';
+
 interface TokenUsageEntry {
   time: number;
   tokens: number;
@@ -5,7 +7,7 @@ interface TokenUsageEntry {
 
 interface QueueItem<T> {
   fn: () => Promise<T>;
-  resolve: (value: T) => void;
+  resolve: (value: T | PromiseLike<T>) => void;
   reject: (error: Error) => void;
   retryCount: number;
   estimatedTokens: number;
@@ -140,10 +142,18 @@ export class RateLimiter {
 
       try {
         const result = await fn();
-        
-        const tokensUsed = estimatedTokens || (result)?.usage?.total_tokens || 0;
+
+        // Try to extract token usage from result if available
+        let tokensUsed = estimatedTokens || 0;
+        if (!estimatedTokens && result) {
+          const usage = safeGetProperty(result, 'usage');
+          const totalTokens = safeGetNumber(usage, 'total_tokens');
+          if (totalTokens) {
+            tokensUsed = totalTokens;
+          }
+        }
         this.recordRequest(tokensUsed);
-        
+
         resolve(result);
       } catch (error) {
         if (this.isRateLimitError(error)) {
@@ -170,12 +180,12 @@ export class RateLimiter {
 
   private isRateLimitError(error: unknown): boolean {
     if (!error) return false;
-    
-    const message = (error as any).message || '';
-    const status = (error as any).status || (error as any).statusCode || 0;
-    
-    return status === 429 || 
-           message.includes('429') || 
+
+    const message = getErrorMessage(error);
+    const status = getErrorStatus(error) || 0;
+
+    return status === 429 ||
+           message.includes('429') ||
            message.includes('rate limit') ||
            message.includes('too many requests');
   }

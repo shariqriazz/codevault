@@ -7,6 +7,16 @@ import { indexProjectWithProgress } from '../../utils/indexer-with-progress.js';
 import { log } from '../../utils/logger.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from '../../providers/index.js';
 import { resolveProviderContext } from '../../config/resolver.js';
+import { getErrorMessage, safeGetNumber } from '../../utils/error-utils.js';
+
+interface IndexCommandOptions {
+  provider: string;
+  project?: string;
+  directory?: string;
+  encrypt?: string;
+  concurrency?: string;
+  verbose?: boolean;
+}
 
 export function registerIndexCommand(program: Command): void {
   program
@@ -18,7 +28,7 @@ export function registerIndexCommand(program: Command): void {
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
-    .action(async (projectPath = '.', options) => {
+    .action(async (projectPath = '.', options: IndexCommandOptions) => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const ui = new IndexerUI();
 
@@ -40,6 +50,7 @@ export function registerIndexCommand(program: Command): void {
           const profile = await getModelProfile(providerName, modelName || providerName);
           const limits = getSizeLimits(profile);
 
+          const rateLimiterStats = embeddingProvider.rateLimiter?.getStats();
           ui.showConfiguration({
             provider: providerName,
             model: modelName || undefined,
@@ -49,8 +60,8 @@ export function registerIndexCommand(program: Command): void {
               max: limits.max,
               optimal: limits.optimal
             },
-            rateLimit: embeddingProvider.rateLimiter ? {
-              rpm: embeddingProvider.rateLimiter.getStats().rpm || 0
+            rateLimit: rateLimiterStats ? {
+              rpm: safeGetNumber(rateLimiterStats, 'rpm') || 0
             } : undefined
           });
 
@@ -123,9 +134,9 @@ export function registerIndexCommand(program: Command): void {
       } catch (error) {
         if (!options.verbose) {
           ui.cleanup();
-          ui.showError((error as Error).message);
+          ui.showError(getErrorMessage(error));
         } else {
-          console.error('ERROR during indexing:', (error as Error).message);
+          console.error('ERROR during indexing:', getErrorMessage(error));
         }
         process.exit(1);
       }
