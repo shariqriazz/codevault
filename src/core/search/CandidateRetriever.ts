@@ -71,12 +71,14 @@ export class CandidateRetriever {
       // Tag boost
       if (chunk.codevault_tags) {
         try {
-          const tags = JSON.parse(chunk.codevault_tags || '[]');
-          tags.forEach((tag: string) => {
-            if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {
-              boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
-            }
-          });
+          const tags = JSON.parse(chunk.codevault_tags || '[]') as unknown;
+          if (Array.isArray(tags)) {
+            tags.forEach((tag: unknown) => {
+              if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {
+                boostScore += DOC_BOOST_CONSTANTS.TAG_MATCH_BOOST;
+              }
+            });
+          }
         } catch (error) {
           logger.warn('Failed to parse codevault_tags for chunk', {
             chunkId: chunk.id,
@@ -153,7 +155,8 @@ export class CandidateRetriever {
    * Decode and cache embedding to avoid repeated JSON parsing
    */
   private decodeEmbedding(chunk: DatabaseChunk): Float32Array {
-    const cached = (chunk as any).__cachedEmbedding as Float32Array | undefined;
+    const chunkWithCache = chunk as DatabaseChunk & { __cachedEmbedding?: Float32Array };
+    const cached = chunkWithCache.__cachedEmbedding;
     if (cached) {
       return cached;
     }
@@ -165,7 +168,7 @@ export class CandidateRetriever {
     if (vector.length === 0 && chunk.embedding && chunk.embedding.length > 0) {
       logger.warn('Embedding decoded to empty vector', { chunkId: chunk.id });
     }
-    (chunk as any).__cachedEmbedding = vector;
+    chunkWithCache.__cachedEmbedding = vector;
     return vector;
   }
 }

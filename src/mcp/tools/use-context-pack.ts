@@ -19,9 +19,9 @@ export const useContextPackResultSchema = z.object({
 
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
-  setSessionPack: (pack: any) => void;
+  setSessionPack: (pack: Record<string, unknown>) => void;
   clearSessionPack: () => void;
-  errorLogger?: any;
+  errorLogger?: Record<string, unknown>;
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {

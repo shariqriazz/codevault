@@ -22,7 +22,7 @@ export class ResultMapper {
     searchType: string
   ): SearchResult[] {
     return candidates.map(result => {
-      const meta: any = {
+      const meta: SearchResult['meta'] = {
         id: result.id,
         symbol: result.symbol,
         score: Math.min(1, Math.max(result.score || 0, 0)),
@@ -80,8 +80,9 @@ export class ResultMapper {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
         getTextAsync: async candidate => {
-          const codeText = (await this.readChunkText(candidate.sha, chunkDir)) || '';
-          return this.buildBm25Document(candidate, codeText);
+          const searchCandidate = candidate as SearchCandidate;
+          const codeText = (await this.readChunkText(searchCandidate.sha, chunkDir)) || '';
+          return this.buildBm25Document(searchCandidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
         apiKey: providerContext.reranker.apiKey,
@@ -140,7 +141,7 @@ export class ResultMapper {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
+  private buildBm25Document(chunk: SearchCandidate, codeText: string | null): string {
     if (!chunk) return '';
 
     const parts = [

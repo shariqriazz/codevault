@@ -63,7 +63,7 @@ function splitSymbolWords(symbol: string): string[] {
     .filter(word => word.length > 0);
 }
 
-function computeSignatureMatchStrength(query: string, entry: any): number {
+function computeSignatureMatchStrength(query: string, entry: Record<string, unknown>): number {
   if (!entry) {
     return 0;
   }
@@ -144,17 +144,21 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   return Math.max(0, Math.min(weight / 4, 1));
 }
 
-function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: any }> {
-  const index = new Map();
+function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: Record<string, unknown> }> {
+  const index = new Map<string, { chunkId: string; entry: Record<string, unknown> }>();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }
 
   for (const [chunkId, entry] of Object.entries(codemap)) {
-    if (!entry || typeof entry.sha !== 'string') {
+    if (!entry || typeof entry !== 'object') {
       continue;
     }
-    index.set(entry.sha, { chunkId, entry });
+    const entryObj = entry as Record<string, unknown>;
+    if (typeof entryObj.sha !== 'string') {
+      continue;
+    }
+    index.set(entryObj.sha, { chunkId, entry: entryObj });
   }
 
   return index;

@@ -1,12 +1,12 @@
 import path from 'path';
-import { getActiveContextPack, listContextPacks, loadContextPack, setActiveContextPack } from '../../context/packs.js';
+import { getActiveContextPack, listContextPacks, loadContextPack, setActiveContextPack, type PackInfo } from '../../context/packs.js';
 import type { Command } from 'commander';
 
 function resolveProjectPath(projectPath = '.'): string {
   return path.resolve(projectPath || '.');
 }
 
-function formatPackLine(pack: any, activeKey: string | null): string {
+function formatPackLine(pack: PackInfo, activeKey: string | null): string {
   const parts: string[] = [];
   const isActive = pack.key === activeKey;
   const marker = isActive ? '•' : '-';
@@ -27,7 +27,7 @@ function formatPackLine(pack: any, activeKey: string | null): string {
   return parts.join(' ');
 }
 
-function printPackDetails(pack: any): void {
+function printPackDetails(pack: PackInfo): void {
   const output = {
     key: pack.key,
     name: pack.name,

@@ -1,10 +1,10 @@
 import { synthesizeAnswer } from '../../synthesis/synthesizer.js';
 import { formatSynthesisResult, formatErrorMessage, formatNoResultsMessage } from '../../synthesis/markdown-formatter.js';
 import { resolveProjectRoot } from '../../utils/path-helpers.js';
-import { resolveScopeWithPack } from '../../context/packs.js';
+import { resolveScopeWithPack, type SessionPack } from '../../context/packs.js';
 import { AskCodebaseArgs } from '../schemas.js';
 
-export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPack: any) {
+export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPack: SessionPack | null) {
   const cleanPath = resolveProjectRoot(args);
   
   // Use resolveScopeWithPack like other search tools for consistency

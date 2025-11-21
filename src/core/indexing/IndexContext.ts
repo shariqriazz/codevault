@@ -11,6 +11,17 @@ import { logger } from '../../utils/logger.js';
 import { resolveProviderContext } from '../../config/resolver.js';
 import type { IndexProjectOptions } from '../types.js';
 
+import type { ModelProfile } from '../../providers/base.js';
+import type { EncryptionPreference } from '../../storage/encrypted-chunks.js';
+
+export type SizeLimits = {
+  optimal: number;
+  min: number;
+  max: number;
+  overlap: number;
+  unit: string;
+};
+
 export interface IndexContextData {
   repo: string;
   repoPath: string;
@@ -18,12 +29,12 @@ export interface IndexContextData {
   providerInstance: EmbeddingProvider;
   providerName: string;
   modelName: string | null;
-  modelProfile: any;
-  limits: any;
+  modelProfile: ModelProfile;
+  limits: SizeLimits;
   codemapPath: string;
   chunkDir: string;
   dbPath: string;
-  encryptionPreference: any;
+  encryptionPreference: EncryptionPreference;
   codemap: Codemap;
   merkle: MerkleTree;
   updatedMerkle: MerkleTree;

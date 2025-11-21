@@ -187,7 +187,7 @@ export function getEncryptionKeySet(): EncryptionKeySet {
 const warnedInvalidMode = new Set<string>();
 let warnedInvalidKey = false;
 
-function normalizeMode(mode: any): string | undefined {
+function normalizeMode(mode: unknown): string | undefined {
   if (typeof mode !== 'string') {
     return undefined;
   }
@@ -268,13 +268,13 @@ function buildDecryptionAttempts(payload: Buffer): Array<{ version: number; offs
 function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
   const header = payload.subarray(0, MAGIC_HEADER_BUFFER.length);
   if (!header.equals(MAGIC_HEADER_BUFFER)) {
-    const error: any = new Error('Encrypted chunk payload has an unknown header.');
+    const error = new Error('Encrypted chunk payload has an unknown header.') as Error & { code: string };
     error.code = 'ENCRYPTION_FORMAT_UNRECOGNIZED';
     throw error;
   }
 
   const attempts = buildDecryptionAttempts(payload);
-  const errors: any[] = [];
+  const errors: (Error & { code?: string })[] = [];
 
   for (const attempt of attempts) {
     const { version, offset } = attempt;
@@ -314,7 +314,7 @@ function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
     try {
       return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     } catch (error) {
-      const authError: any = new Error('authentication failed');
+      const authError = new Error('authentication failed') as Error & { code: string; cause: unknown };
       authError.code = 'ENCRYPTION_AUTH_FAILED';
       authError.cause = error;
       errors.push(authError);
@@ -389,20 +389,20 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     }
 
     if (candidateKeys.length === 0) {
-      const error: any = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`);
+      const error = new Error(`Chunk ${sha} is encrypted and no CODEVAULT_ENCRYPTION_KEY is configured.`) as Error & { code: string };
       error.code = 'ENCRYPTION_KEY_REQUIRED';
       throw error;
     }
 
     const payload = await fs.readFile(encryptedPath);
     let decrypted: Buffer | null = null;
-    const errors: any[] = [];
+    const errors: (Error & { code?: string })[] = [];
     for (const candidate of candidateKeys) {
       try {
         decrypted = decryptBuffer(payload, candidate);
         break;
-      } catch (error: any) {
-        errors.push(error);
+      } catch (error) {
+        errors.push(error as Error & { code?: string });
         continue;
       }
     }
@@ -410,14 +410,14 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     if (!decrypted) {
       const lastError = errors[errors.length - 1];
       if (lastError && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
-        const authError: any = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`);
+        const authError = new Error(`Failed to decrypt chunk ${sha}: authentication failed.`) as Error & { code: string; cause: unknown };
         authError.code = 'ENCRYPTION_AUTH_FAILED';
         authError.cause = lastError;
         throw authError;
       }
-      const genericError: any = new Error(
+      const genericError = new Error(
         `Failed to decrypt chunk ${sha}: ${(lastError as Error)?.message || 'unknown error'}`
-      );
+      ) as Error & { code: string; cause: unknown };
       genericError.code = (lastError)?.code || 'ENCRYPTION_DECRYPT_FAILED';
       genericError.cause = lastError;
       throw genericError;
@@ -427,8 +427,9 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
       const codeBuffer = await gunzipAsync(decrypted);
       const code = codeBuffer.toString('utf8');
       return { code, encrypted: true };
-    } catch (error: any) {
-      const decompressionError: any = new Error(`Failed to decompress chunk ${sha}: ${error.message}`);
+    } catch (error) {
+      const err = error as Error;
+      const decompressionError = new Error(`Failed to decompress chunk ${sha}: ${err.message}`) as Error & { code: string; cause: unknown };
       decompressionError.code = 'CHUNK_DECOMPRESSION_FAILED';
       decompressionError.cause = error;
       throw decompressionError;
@@ -441,8 +442,9 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
       const codeBuffer = await gunzipAsync(compressed);
       const code = codeBuffer.toString('utf8');
       return { code, encrypted: false };
-    } catch (error: any) {
-      const readError: any = new Error(`Failed to read chunk ${sha}: ${error.message}`);
+    } catch (error) {
+      const err = error as Error;
+      const readError = new Error(`Failed to read chunk ${sha}: ${err.message}`) as Error & { code: string; cause: unknown };
       readError.code = 'CHUNK_READ_FAILED';
       readError.cause = error;
       throw readError;

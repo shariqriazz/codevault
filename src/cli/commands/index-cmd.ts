@@ -18,8 +18,15 @@ export function registerIndexCommand(program: Command): void {
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
+    .action(async (projectPath = '.', options: Record<string, unknown>) => {
+      let resolvedPath = '.';
+      if (typeof options.project === 'string') {
+        resolvedPath = options.project;
+      } else if (typeof options.directory === 'string') {
+        resolvedPath = options.directory;
+      } else if (typeof projectPath === 'string' && projectPath) {
+        resolvedPath = projectPath;
+      }
       const ui = new IndexerUI();
 
       try {
@@ -31,7 +38,7 @@ export function registerIndexCommand(program: Command): void {
           ui.showHeader();
 
           const providerContext = resolveProviderContext(resolvedPath);
-          const embeddingProvider = createEmbeddingProvider(options.provider, providerContext.embedding);
+          const embeddingProvider = createEmbeddingProvider(String(options.provider), providerContext.embedding);
           if (embeddingProvider.init) {
             await embeddingProvider.init();
           }
@@ -50,24 +57,24 @@ export function registerIndexCommand(program: Command): void {
               optimal: limits.optimal
             },
             rateLimit: embeddingProvider.rateLimiter ? {
-              rpm: embeddingProvider.rateLimiter.getStats().rpm || 0
+              rpm: ((embeddingProvider.rateLimiter as { getStats: () => { rpm: number | null } }).getStats().rpm as number | null) || 0
             } : undefined
           });
 
           ui.startScanning();
         } else {
           console.log('Starting project indexing...');
-          console.log(`Provider: ${options.provider}`);
+          console.log(`Provider: ${String(options.provider)}`);
         }
 
         let result;
 
         if (!options.verbose) {
           result = await indexProjectWithProgress({
-            repoPath: resolvedPath,
-            provider: options.provider,
-            encryptMode: options.encrypt,
-            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
+            repoPath: String(resolvedPath),
+            provider: String(options.provider),
+            encryptMode: String(options.encrypt),
+            concurrency: options.concurrency ? parseInt(String(options.concurrency), 10) : undefined,
             callbacks: {
             onScanComplete: (fileCount) => {
               ui.finishScanning(fileCount, 25);
@@ -106,17 +113,17 @@ export function registerIndexCommand(program: Command): void {
             totalChunks: result.totalChunks,
             dbSize,
             codemapSize,
-            tokenStats: result.tokenStats
+            tokenStats: result.tokenStats as { total: number; min: number; max: number; avg: number } | undefined
           });
 
           delete process.env.CODEVAULT_QUIET;
           delete process.env.CODEVAULT_MODEL_PROFILE_CACHED;
         } else {
           result = await indexProject({
-            repoPath: resolvedPath,
-            provider: options.provider,
-            encryptMode: options.encrypt,
-            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
+            repoPath: String(resolvedPath),
+            provider: String(options.provider),
+            encryptMode: String(options.encrypt),
+            concurrency: options.concurrency ? parseInt(String(options.concurrency), 10) : undefined
           });
           console.log('Indexing completed successfully');
         }

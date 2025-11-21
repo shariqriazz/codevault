@@ -115,7 +115,7 @@ export class SearchService {
       }
 
       // Apply scope filtering
-      const scopedChunks = applyScope(chunks, normalizedScope) as any[];
+      const scopedChunks = applyScope(chunks, normalizedScope) as Array<{ id: string; sha: string; file_path: string; symbol: string; lang: string; embedding: number[] | null }>;
       const selectionBudget = Math.max(limit, RRF_K);
       const bm25CandidateLimit = Math.max(
         selectionBudget,
@@ -277,7 +277,7 @@ export class SearchService {
           boosted:
             symbolBoostEnabled &&
             results.some(
-              (result: any) =>
+              (result: Record<string, unknown>) =>
                 typeof result.symbolBoost === 'number' && result.symbolBoost > 0
             )
         },
@@ -337,17 +337,18 @@ export class SearchService {
         return { success: false, error: 'Chunk not found' };
       }
       return { success: true, code: result.code };
-    } catch (error: any) {
-      if (error && error.code === 'ENCRYPTION_KEY_REQUIRED') {
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err && err.code === 'ENCRYPTION_KEY_REQUIRED') {
         return { success: false, error: 'Chunk is encrypted. Configure CODEVAULT_ENCRYPTION_KEY.' };
       }
-      return { success: false, error: error.message };
+      return { success: false, error: err.message || 'Unknown error' };
     }
   }
 
   // Helpers
 
-  private createErrorResult(error: string, message: string, provider: string, scope: any, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
+  private createErrorResult(error: string, message: string, provider: string, scope: ScopeFilters, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
     return {
       success: false,
       error,

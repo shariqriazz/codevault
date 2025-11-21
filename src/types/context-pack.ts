@@ -44,9 +44,11 @@ export function extractScopeFromPackDefinition(definition: ContextPack): Record<
 
   const scope = { ...scopeCandidate };
 
+  const defObj = definition as Record<string, unknown>;
+  const scopeObj = scope as Record<string, unknown>;
   for (const key of ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost']) {
-    if (Object.prototype.hasOwnProperty.call(definition, key) && typeof (definition as any)[key] !== 'undefined') {
-      (scope as any)[key] = (definition as any)[key];
+    if (Object.prototype.hasOwnProperty.call(definition, key) && typeof defObj[key] !== 'undefined') {
+      scopeObj[key] = defObj[key];
     }
   }
 

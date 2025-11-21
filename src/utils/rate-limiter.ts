@@ -5,7 +5,7 @@ interface TokenUsageEntry {
 
 interface QueueItem<T> {
   fn: () => Promise<T>;
-  resolve: (value: T) => void;
+  resolve: (value: T | PromiseLike<T>) => void;
   reject: (error: Error) => void;
   retryCount: number;
   estimatedTokens: number;
@@ -14,6 +14,7 @@ interface QueueItem<T> {
 export class RateLimiter {
   private rpm: number | null;
   private tpm: number | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private queue: QueueItem<any>[] = [];
   private processing = false;
   private requestTimes: number[] = [];
@@ -139,11 +140,14 @@ export class RateLimiter {
       this.queue.shift();
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const result = await fn();
-        
-        const tokensUsed = estimatedTokens || (result)?.usage?.total_tokens || 0;
+
+        const resultObj = result as Record<string, unknown> | null | undefined;
+        const usageObj = resultObj?.usage as Record<string, unknown> | undefined;
+        const tokensUsed = estimatedTokens || (typeof usageObj?.total_tokens === 'number' ? usageObj.total_tokens : 0);
         this.recordRequest(tokensUsed);
-        
+
         resolve(result);
       } catch (error) {
         if (this.isRateLimitError(error)) {
@@ -170,12 +174,13 @@ export class RateLimiter {
 
   private isRateLimitError(error: unknown): boolean {
     if (!error) return false;
-    
-    const message = (error as any).message || '';
-    const status = (error as any).status || (error as any).statusCode || 0;
-    
-    return status === 429 || 
-           message.includes('429') || 
+
+    const errorObj = error as Record<string, unknown>;
+    const message = typeof errorObj.message === 'string' ? errorObj.message : '';
+    const status = typeof errorObj.status === 'number' ? errorObj.status : (typeof errorObj.statusCode === 'number' ? errorObj.statusCode : 0);
+
+    return status === 429 ||
+           message.includes('429') ||
            message.includes('rate limit') ||
            message.includes('too many requests');
   }

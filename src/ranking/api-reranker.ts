@@ -90,22 +90,22 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error(`Rerank API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as Record<string, unknown>;
 
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
   if (data.results && Array.isArray(data.results)) {
-    return data.results;
+    return data.results as RerankResult[];
   }
 
   // Alternative response format (some providers use data array)
   if (data.data && Array.isArray(data.data)) {
-    return data.data;
+    return data.data as RerankResult[];
   }
 
   // Fallback for direct array response
   if (Array.isArray(data)) {
-    return data;
+    return data as RerankResult[];
   }
 
   throw new Error(`Unexpected rerank API response format. Expected {results: [...]} but got: ${JSON.stringify(data).slice(0, 200)}`);
@@ -114,7 +114,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
 interface Candidate {
   rerankerScore?: number;
   rerankerRank?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface RerankOptions {

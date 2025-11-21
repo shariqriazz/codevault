@@ -1,11 +1,11 @@
 import { saveMerkleAsync } from '../../indexer/merkle.js';
 import { writeCodemapAsync } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
-import { getTokenCountStats } from '../../chunking/token-counter.js';
+import { getTokenCountStats, type TokenCountStats } from '../../chunking/token-counter.js';
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
-import type { IndexProjectResult } from '../types.js';
+import type { IndexProjectResult, ProgressEvent } from '../types.js';
 import { PersistManager } from './PersistManager.js';
 import fs from 'fs';
 import path from 'path';
@@ -23,7 +23,7 @@ export class IndexFinalizationStage {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null,
+    private onProgress: ((event: ProgressEvent) => void) | null,
     private persistManager: PersistManager
   ) {}
 
@@ -105,7 +105,7 @@ export class IndexFinalizationStage {
   /**
    * Build the final result object
    */
-  private buildResult(tokenStats: any): IndexProjectResult {
+  private buildResult(tokenStats: TokenCountStats): IndexProjectResult {
     return {
       success: true,
       processedChunks: this.state.processedChunks,
@@ -145,7 +145,8 @@ export class IndexFinalizationStage {
     for (const rel of orphaned) {
       this.context.db.deleteChunksByFilePath(rel);
       for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
-        if ((meta as any)?.file === rel) {
+        const metaObj = meta as Record<string, unknown> | null | undefined;
+        if (metaObj && typeof metaObj === 'object' && metaObj.file === rel) {
           delete this.state.codemap[chunkId];
         }
       }

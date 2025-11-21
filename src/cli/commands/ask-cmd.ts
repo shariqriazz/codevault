@@ -29,39 +29,40 @@ export function registerAskCommand(program: Command): void {
     .option('--stream', 'stream the response in real-time')
     .option('--citations', 'add citation footer')
     .option('--no-metadata', 'hide search metadata')
-    .action(async (question, options) => {
+    .action(async (question, options: Record<string, unknown>) => {
       try {
         // Suppress verbose logs
         process.env.CODEVAULT_QUIET = 'true';
-        
-        const resolvedPath = options.project || options.directory || options.path || '.';
-        const maxChunks = parseInt(options.maxChunks, 10);
-        const temperature = parseFloat(options.temperature);
-        const useReranking = options.reranker !== 'off';
-        
+
+        const opts = options as Record<string, unknown>;
+        const resolvedPath = opts.project || opts.directory || opts.path || '.';
+        const maxChunks = parseInt(String(opts.maxChunks), 10);
+        const temperature = parseFloat(String(opts.temperature));
+        const useReranking = opts.reranker !== 'off';
+
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
-            path_glob: options.path_glob,
-            tags: options.tags,
-            lang: options.lang
+            path_glob: opts.path_glob,
+            tags: opts.tags,
+            lang: opts.lang
           },
-          { basePath: resolvedPath }
+          { basePath: String(resolvedPath) }
         );
 
         // Streaming mode
-        if (options.stream) {
+        if (opts.stream) {
           const spinner = ora({
             text: chalk.cyan('🔍 Searching...'),
             color: 'cyan'
           }).start();
 
           let firstChunk = true;
-          
+
           try {
             for await (const chunk of synthesizeAnswerStreaming(question, {
-              provider: options.provider,
-              chatProvider: options.chatProvider,
-              workingPath: resolvedPath,
+              provider: String(opts.provider),
+              chatProvider: String(opts.chatProvider),
+              workingPath: String(resolvedPath),
               scope: scopeFilters,
               maxChunks,
               useReranking,
@@ -95,13 +96,13 @@ export function registerAskCommand(program: Command): void {
         }).start();
 
         const result = await synthesizeAnswer(question, {
-          provider: options.provider,
-          chatProvider: options.chatProvider,
-          workingPath: resolvedPath,
+          provider: String(opts.provider),
+          chatProvider: String(opts.chatProvider),
+          workingPath: String(resolvedPath),
           scope: scopeFilters,
           maxChunks,
           useReranking,
-          useMultiQuery: options.multiQuery,
+          useMultiQuery: Boolean(opts.multiQuery),
           temperature
         });
 
@@ -132,7 +133,7 @@ export function registerAskCommand(program: Command): void {
           includeStats: false
         });
 
-        if (options.citations && result.answer) {
+        if (opts.citations && result.answer) {
           output = addCitationFooter(output);
         }
 

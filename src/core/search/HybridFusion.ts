@@ -238,7 +238,7 @@ export class HybridFusion {
       return undefined;
     }
 
-    const reasons: any = {};
+    const reasons: Record<string, number> = {};
     for (const [reason, count] of this.chunkLoadingStats.reasons.entries()) {
       reasons[reason] = count;
     }
@@ -374,17 +374,18 @@ export class HybridFusion {
       }
 
       return code;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.chunkLoadingStats.failed++;
-      const reason = error.code ? String(error.code).toLowerCase() : 'unknown_error';
+      const err = error as { code?: string; message?: string };
+      const reason = err.code ? String(err.code).toLowerCase() : 'unknown_error';
       this.chunkLoadingStats.reasons.set(
         reason,
         (this.chunkLoadingStats.reasons.get(reason) || 0) + 1
       );
 
       logger.warn(`Failed to load chunk ${sha}`, {
-        error: error.message,
-        code: error.code
+        error: err.message || 'Unknown error',
+        code: err.code
       });
 
       this.chunkCache.set(cacheKey, null);
@@ -392,14 +393,14 @@ export class HybridFusion {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
+  private buildBm25Document(chunk: DatabaseChunk, codeText: string | null): string {
     if (!chunk) return '';
 
     const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
+      String(chunk.symbol || ''),
+      String(chunk.file_path || ''),
+      String(chunk.codevault_description || ''),
+      String(chunk.codevault_intent || ''),
       codeText
     ].filter(value => typeof value === 'string' && value.trim().length > 0);
 

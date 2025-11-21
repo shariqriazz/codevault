@@ -19,16 +19,24 @@ export function registerSearchWithCodeCommand(program: Command): void {
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
     .option('--max-code-size <bytes>', 'max code size to display per chunk', '100000')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query, projectPath = '.', options: Record<string, unknown>) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath = options.project || options.directory || projectPath || '.';
-        const limit = parseInt(options.limit);
-        const maxCodeSize = parseInt(options.maxCodeSize || '100000');
+        let resolvedPath = '.';
+        if (typeof options.project === 'string') {
+          resolvedPath = options.project;
+        } else if (typeof options.directory === 'string') {
+          resolvedPath = options.directory;
+        } else if (typeof projectPath === 'string' && projectPath) {
+          resolvedPath = projectPath;
+        }
+        const limit = parseInt(String(options.limit));
+        const maxCodeSize = parseInt(typeof options.maxCodeSize === 'string' ? options.maxCodeSize : '100000');
 
-        const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
+        const scopeResult = resolveScopeWithPack(options, { basePath: resolvedPath });
+        const scopeFilters: Record<string, unknown> = scopeResult.scope as Record<string, unknown>;
+        const results = await searchCode(query, limit, String(options.provider), resolvedPath, scopeFilters);
 
         if (!results.success) {
           console.log(chalk.yellow(`\nNo results found for "${query}"`));

@@ -135,9 +135,9 @@ export function parseMultiQueryResponse(response: string): string[] {
     if (!jsonMatch) {
       return [];
     }
-    
-    const queries = JSON.parse(jsonMatch[0]);
-    
+
+    const queries = JSON.parse(jsonMatch[0]) as unknown;
+
     if (!Array.isArray(queries)) {
       return [];
     }

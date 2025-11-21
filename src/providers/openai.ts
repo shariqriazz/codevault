@@ -177,16 +177,13 @@ export class OpenAIProvider extends EmbeddingProvider {
           console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
         }
 
-        const batchEmbeddings = await this.rateLimiter.execute(async () => {
-          const requestBody: any = {
+        const limiter = this.rateLimiter as { execute: <T>(fn: () => Promise<T>, ...args: unknown[]) => Promise<T> };
+        const batchEmbeddings = await limiter.execute(async () => {
+          const requestBody = {
             model: this.model,
-            input: currentBatch
+            input: currentBatch,
+            ...(this.routingConfig && this.isOpenRouter() ? { provider: this.routingConfig } : {})
           };
-
-          // Add provider routing for OpenRouter if configured
-          if (this.routingConfig && this.isOpenRouter()) {
-            requestBody.provider = this.routingConfig;
-          }
 
           const response = await this.openai!.embeddings.create(requestBody);
 

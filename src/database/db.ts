@@ -46,7 +46,7 @@ function tryParseJsonEmbedding(buffer: Buffer): Float32Array | null {
   }
 
   try {
-    const parsed = JSON.parse(buffer.toString('utf8'));
+    const parsed = JSON.parse(buffer.toString('utf8')) as unknown;
     if (!Array.isArray(parsed)) {
       return null;
     }

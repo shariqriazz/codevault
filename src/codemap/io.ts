@@ -17,7 +17,7 @@ export function readCodemap(filePath?: string): Codemap {
 
   try {
     const raw = fs.readFileSync(resolvedPath, 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as unknown;
     return normalizeCodemapRecord(parsed);
   } catch (error) {
     console.warn(`Failed to read codemap at ${resolvedPath}:`, (error as Error).message);
@@ -57,7 +57,7 @@ export async function readCodemapAsync(filePath?: string): Promise<Codemap> {
     }
 
     const raw = await fs.promises.readFile(resolvedPath, 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as unknown;
     return normalizeCodemapRecord(parsed);
   } catch (error) {
     console.warn(`Failed to read codemap at ${resolvedPath}:`, (error as Error).message);

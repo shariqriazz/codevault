@@ -11,21 +11,28 @@ export function registerWatchCommand(program: Command): void {
     .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
-      const debounceMs = parseInt(options.debounce, 10);
+    .action(async (projectPath = '.', options: Record<string, unknown>) => {
+      let resolvedPath = '.';
+      if (typeof options.project === 'string') {
+        resolvedPath = options.project;
+      } else if (typeof options.directory === 'string') {
+        resolvedPath = options.directory;
+      } else if (typeof projectPath === 'string' && projectPath) {
+        resolvedPath = projectPath;
+      }
+      const debounceMs = parseInt(String(options.debounce), 10);
 
-      console.log(`👀 Watching ${resolvedPath} for changes...`);
-      console.log(`Provider: ${options.provider}`);
+      console.log(`👀 Watching ${String(resolvedPath)} for changes...`);
+      console.log(`Provider: ${String(options.provider)}`);
       console.log(`Debounce: ${debounceMs}ms`);
 
       try {
         const controller = startWatch({
-          repoPath: resolvedPath,
-          provider: options.provider,
+          repoPath: String(resolvedPath),
+          provider: String(options.provider),
           debounceMs,
-          encrypt: options.encrypt,
-          concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
+          encrypt: String(options.encrypt),
+          concurrency: options.concurrency ? parseInt(String(options.concurrency), 10) : undefined,
           onBatch: ({ changed, deleted }) => {
             console.log(`🔁 Indexed ${changed.length} changed / ${deleted.length} deleted files`);
           }

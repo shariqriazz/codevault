@@ -1,6 +1,6 @@
 import type { Codemap } from '../../codemap/io.js';
 import type { MerkleTree } from '../../indexer/merkle.js';
-import type { ChunkingStats } from '../types.js';
+import type { ChunkingStats, IndexError } from '../types.js';
 
 /**
  * IndexState tracks mutable state during the indexing process
@@ -11,7 +11,7 @@ export class IndexState {
   merkleDirty = false;
   indexMutated = false;
   processedChunks = 0;
-  errors: any[] = [];
+  errors: IndexError[] = [];
   chunkingStats: ChunkingStats = {
     totalNodes: 0,
     skippedSmall: 0,

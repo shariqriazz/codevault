@@ -10,16 +10,23 @@ export function registerUpdateCommand(program: Command): void {
     .option('--directory <path>', 'alias for project directory')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
-    .action(async (projectPath = '.', options) => {
-      const resolvedPath = options.project || options.directory || projectPath || '.';
+    .action(async (projectPath = '.', options: Record<string, unknown>) => {
+      let resolvedPath = '.';
+      if (typeof options.project === 'string') {
+        resolvedPath = options.project;
+      } else if (typeof options.directory === 'string') {
+        resolvedPath = options.directory;
+      } else if (typeof projectPath === 'string' && projectPath) {
+        resolvedPath = projectPath;
+      }
       console.log('🔄 Updating project index...');
-      console.log(`Provider: ${options.provider}`);
+      console.log(`Provider: ${String(options.provider)}`);
       try {
         await indexProject({
-          repoPath: resolvedPath,
-          provider: options.provider,
-          encryptMode: options.encrypt,
-          concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
+          repoPath: String(resolvedPath),
+          provider: String(options.provider),
+          encryptMode: String(options.encrypt),
+          concurrency: options.concurrency ? parseInt(String(options.concurrency), 10) : undefined
         });
         console.log('✅ Index updated successfully');
       } catch (error) {

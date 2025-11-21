@@ -8,16 +8,16 @@ const CONTEXT_PACK_DIR = '.codevault/contextpacks';
 const ACTIVE_STATE_FILENAME = 'active-pack.json';
 const PACK_SCOPE_KEYS = ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost'];
 
-interface PackInfo {
+export interface PackInfo {
   key: string;
   name: string;
   description: string | null;
-  scope: Record<string, any>;
+  scope: Record<string, unknown>;
   path: string;
   invalid?: boolean;
 }
 
-interface SessionPack extends PackInfo {
+export interface SessionPack extends PackInfo {
   basePath: string;
 }
 
@@ -47,7 +47,7 @@ function buildCacheKey(filePath: string): string {
   return path.resolve(filePath);
 }
 
-function readJsonFile(filePath: string): any {
+function readJsonFile(filePath: string): unknown {
   const content = fs.readFileSync(filePath, 'utf8');
   try {
     return JSON.parse(content);
@@ -56,7 +56,7 @@ function readJsonFile(filePath: string): any {
   }
 }
 
-function toContextPackObject(key: string, filePath: string, data: any): PackInfo {
+function toContextPackObject(key: string, filePath: string, data: unknown): PackInfo {
   const parsed = ContextPackSchema.parse(data);
   const scope = extractScopeFromPackDefinition(parsed);
   const packName = typeof parsed.name === 'string' && parsed.name.trim().length > 0
@@ -67,10 +67,11 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
     ? parsed.description.trim()
     : undefined;
 
-  const scopeDefinition: Record<string, any> = {};
+  const scopeObj = scope as Record<string, unknown>;
+  const scopeDefinition: Record<string, unknown> = {};
   for (const scopeKey of PACK_SCOPE_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(scope, scopeKey) && typeof scope[scopeKey] !== 'undefined') {
-      scopeDefinition[scopeKey] = scope[scopeKey];
+    if (Object.prototype.hasOwnProperty.call(scopeObj, scopeKey) && typeof scopeObj[scopeKey] !== 'undefined') {
+      scopeDefinition[scopeKey] = scopeObj[scopeKey];
     }
   }
 
@@ -156,7 +157,8 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
       return null;
     }
 
-    const key = typeof rawState.key === 'string' ? rawState.key : null;
+    const stateObj = rawState as Record<string, unknown>;
+    const key = typeof stateObj.key === 'string' ? stateObj.key : null;
     if (!key) {
       return null;
     }
@@ -164,7 +166,7 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
     const pack = loadContextPack(key, basePath);
     return {
       ...pack,
-      appliedAt: rawState.appliedAt || null
+      appliedAt: (typeof stateObj.appliedAt === 'string' ? stateObj.appliedAt : null)
     };
   } catch (error) {
     return null;
@@ -185,7 +187,7 @@ export function setActiveContextPack(name: string, basePath = '.'): PackInfo {
 }
 
 export function resolveScopeWithPack(
-  overrides: any = {},
+  overrides: Record<string, unknown> = {},
   options: { basePath?: string; sessionPack?: SessionPack | null } = {}
 ): { scope: ScopeFilters; pack: { key: string; name: string; description: string | null } | null } {
   const basePath = options.basePath || '.';
@@ -204,7 +206,7 @@ export function resolveScopeWithPack(
     basePack = getActiveContextPack(basePath);
   }
 
-  const combined: any = {};
+  const combined: Record<string, unknown> = {};
 
   if (basePack && basePack.scope) {
     for (const key of PACK_SCOPE_KEYS) {

@@ -29,8 +29,8 @@ export const askCodebaseResultSchema = z.object({
 });
 
 interface CreateHandlerOptions {
-  sessionPack?: any;
-  errorLogger?: any;
+  sessionPack?: Record<string, unknown>;
+  errorLogger?: Record<string, unknown>;
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
@@ -70,8 +70,9 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
         lang: Array.isArray(lang) ? lang : lang ? [lang] : undefined
       };
 
-      if (errorLogger?.debugLog) {
-        errorLogger.debugLog('ask_codebase called', {
+      const logger = errorLogger as { debugLog?: (msg: string, data: unknown) => void };
+      if (logger?.debugLog) {
+        logger.debugLog('ask_codebase called', {
           question,
           provider,
           chat_provider,
@@ -122,14 +123,15 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
       };
 
     } catch (error) {
-      if (errorLogger?.log) {
-        errorLogger.log(error, {
+      const logger = errorLogger as { log?: (err: unknown, data: unknown) => void };
+      if (logger?.log) {
+        logger.log(error, {
           operation: 'ask_codebase',
           question,
           path: workingPath
         });
       }
-      
+
       return {
         success: false,
         content: formatErrorMessage((error as Error).message, question)
@@ -138,7 +140,7 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
   };
 }
 
-export function registerAskCodebaseTool(server: any, options: CreateHandlerOptions = {}) {
+export function registerAskCodebaseTool(server: { tool: (name: string, schema: Record<string, unknown>, handler: (params: unknown) => Promise<{ content: Array<{ type: string; text: string }> }>) => void }, options: CreateHandlerOptions = {}) {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(
@@ -156,8 +158,8 @@ export function registerAskCodebaseTool(server: any, options: CreateHandlerOptio
       multi_query: z.boolean().optional().describe('Break complex questions into sub-queries'),
       temperature: z.number().min(0).max(2).optional().describe('LLM temperature (default: 0.7)')
     },
-    async (params: any) => {
-      const result = await handler(params);
+    async (params: unknown) => {
+      const result = await handler(params as Parameters<typeof handler>[0]);
       return {
         content: [
           {

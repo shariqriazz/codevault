@@ -21,7 +21,7 @@ export abstract class ChatLLMProvider {
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
 
-  rateLimiter?: any;
+  rateLimiter?: unknown;
 }
 
 export class OpenAIChatProvider extends ChatLLMProvider {
@@ -32,7 +32,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   private maxTokensOverride?: number;
   private temperatureOverride?: number;
   private routingConfig?: ProviderRoutingConfig;
-  rateLimiter: any;
+  rateLimiter: unknown;
 
   constructor(options: ChatOptions = {}) {
     super();
@@ -51,16 +51,16 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: any = {};
-      
+      const config: Record<string, unknown> = {};
+
       if (this.apiKey) {
         config.apiKey = this.apiKey;
       }
-      
+
       if (this.baseUrl) {
         config.baseURL = this.baseUrl;
       }
-      
+
       this.openai = new OpenAI(config);
     }
   }
@@ -75,21 +75,18 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ?? this.maxTokensOverride
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
-    return await this.rateLimiter.execute(async () => {
-      const requestBody: any = {
+    const limiter = this.rateLimiter as { execute: <T>(fn: () => Promise<T>, ...args: unknown[]) => Promise<T> };
+    return await limiter.execute(async () => {
+      const requestBody = {
         model: this.model,
         messages: messages.map(msg => ({
           role: msg.role,
           content: msg.content
         })),
         temperature,
-        max_tokens: maxTokens
+        max_tokens: maxTokens,
+        ...(this.routingConfig && this.isOpenRouter() ? { provider: this.routingConfig } : {})
       };
-
-      // Add provider routing for OpenRouter if configured
-      if (this.routingConfig && this.isOpenRouter()) {
-        requestBody.provider = this.routingConfig;
-      }
 
       const completion = await this.openai!.chat.completions.create(requestBody);
 
@@ -108,9 +105,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '256000', 10);
 
     // Apply rate limiting to streaming requests to prevent overwhelming the provider
-    await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
+    const limiter = this.rateLimiter as { execute: <T>(fn: () => Promise<T>, ...args: unknown[]) => Promise<T> };
+    await limiter.execute(async () => Promise.resolve(), 0, 0);
 
-    const requestBody: any = {
+    const requestBody = {
       model: this.model,
       messages: messages.map(msg => ({
         role: msg.role,
@@ -118,15 +116,11 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       })),
       temperature,
       max_tokens: maxTokens,
-      stream: true as const
+      stream: true as const,
+      ...(this.routingConfig && this.isOpenRouter() ? { provider: this.routingConfig } : {})
     };
 
-    // Add provider routing for OpenRouter if configured
-    if (this.routingConfig && this.isOpenRouter()) {
-      requestBody.provider = this.routingConfig;
-    }
-
-    const stream = await (this.openai!.chat.completions.create as any)(requestBody);
+    const stream = await this.openai!.chat.completions.create(requestBody);
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;

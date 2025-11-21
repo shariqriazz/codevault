@@ -60,7 +60,7 @@ const KNOWN_FIELDS = new Set([
   'encrypted'
 ]);
 
-function sanitizeStringArray(value: any, options: { lowercase?: boolean } = {}): string[] {
+function sanitizeStringArray(value: unknown, options: { lowercase?: boolean } = {}): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -83,7 +83,7 @@ function sanitizeStringArray(value: any, options: { lowercase?: boolean } = {}):
   return Array.from(unique.values());
 }
 
-function sanitizeOptionalString(value: any): string | undefined {
+function sanitizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
@@ -92,7 +92,7 @@ function sanitizeOptionalString(value: any): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function sanitizePathWeight(value: any): number {
+function sanitizePathWeight(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return DEFAULT_PATH_WEIGHT;
   }
@@ -102,7 +102,7 @@ function sanitizePathWeight(value: any): number {
   return value;
 }
 
-function sanitizeSuccessRate(value: any): number {
+function sanitizeSuccessRate(value: unknown): number {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return DEFAULT_SUCCESS_RATE;
   }
@@ -115,7 +115,7 @@ function sanitizeSuccessRate(value: any): number {
   return value;
 }
 
-function sanitizeLastUsed(value: any): string | undefined {
+function sanitizeLastUsed(value: unknown): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -128,7 +128,7 @@ function sanitizeLastUsed(value: any): string | undefined {
   return date.toISOString();
 }
 
-function sanitizeVariableCount(value: any): number {
+function sanitizeVariableCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return 0;
   }
@@ -136,8 +136,8 @@ function sanitizeVariableCount(value: any): number {
   return rounded < 0 ? 0 : rounded;
 }
 
-function extractExtras(source: any): Record<string, any> {
-  const extras: Record<string, any> = {};
+function extractExtras(source: unknown): Record<string, unknown> {
+  const extras: Record<string, unknown> = {};
   if (!source || typeof source !== 'object') {
     return extras;
   }
@@ -151,50 +151,52 @@ function extractExtras(source: any): Record<string, any> {
   return extras;
 }
 
-function internalNormalize(raw: any): CodemapChunk {
+function internalNormalize(raw: unknown): CodemapChunk {
   const fallback = raw && typeof raw === 'object' ? raw : {};
   const parsed = CodemapChunkSchema.safeParse(fallback);
-  const data = parsed.success ? parsed.data : fallback;
+  const data = parsed.success ? parsed.data : (fallback as Record<string, unknown>);
   const extras = extractExtras(data);
 
-  const file = typeof data.file === 'string' && data.file.trim().length > 0 ? data.file : 'unknown';
-  const sha = typeof data.sha === 'string' && data.sha.trim().length > 0 ? data.sha : 'unknown';
-  const lang = typeof data.lang === 'string' && data.lang.trim().length > 0 ? data.lang : 'unknown';
-  const chunkType = typeof data.chunkType === 'string' && data.chunkType.trim().length > 0 ? data.chunkType : undefined;
-  const provider = typeof data.provider === 'string' && data.provider.trim().length > 0 ? data.provider : undefined;
-  const dimensions = typeof data.dimensions === 'number' && Number.isFinite(data.dimensions) ? data.dimensions : undefined;
-  const hasCodevaultTags = typeof data.hasCodevaultTags === 'boolean' ? data.hasCodevaultTags : false;
-  const hasIntent = typeof data.hasIntent === 'boolean' ? data.hasIntent : false;
-  const hasDocumentation = typeof data.hasDocumentation === 'boolean' ? data.hasDocumentation : false;
-  const variableCount = sanitizeVariableCount(data.variableCount);
-  const synonyms = sanitizeStringArray(data.synonyms);
-  const pathWeight = sanitizePathWeight(data.path_weight);
-  const lastUsed = sanitizeLastUsed(data.last_used_at);
-  const successRate = sanitizeSuccessRate(data.success_rate);
-  const encrypted = typeof data.encrypted === 'boolean' ? data.encrypted : false;
-  const symbolSignature = sanitizeOptionalString(data.symbol_signature);
-  const symbolParameters = Array.isArray(data.symbol_parameters)
-    ? sanitizeStringArray(data.symbol_parameters)
+  const dataObj = data as Record<string, unknown>;
+
+  const file = typeof dataObj.file === 'string' && dataObj.file.trim().length > 0 ? dataObj.file : 'unknown';
+  const sha = typeof dataObj.sha === 'string' && dataObj.sha.trim().length > 0 ? dataObj.sha : 'unknown';
+  const lang = typeof dataObj.lang === 'string' && dataObj.lang.trim().length > 0 ? dataObj.lang : 'unknown';
+  const chunkType = typeof dataObj.chunkType === 'string' && dataObj.chunkType.trim().length > 0 ? dataObj.chunkType : undefined;
+  const provider = typeof dataObj.provider === 'string' && dataObj.provider.trim().length > 0 ? dataObj.provider : undefined;
+  const dimensions = typeof dataObj.dimensions === 'number' && Number.isFinite(dataObj.dimensions) ? dataObj.dimensions : undefined;
+  const hasCodevaultTags = typeof dataObj.hasCodevaultTags === 'boolean' ? dataObj.hasCodevaultTags : false;
+  const hasIntent = typeof dataObj.hasIntent === 'boolean' ? dataObj.hasIntent : false;
+  const hasDocumentation = typeof dataObj.hasDocumentation === 'boolean' ? dataObj.hasDocumentation : false;
+  const variableCount = sanitizeVariableCount(dataObj.variableCount);
+  const synonyms = sanitizeStringArray(dataObj.synonyms);
+  const pathWeight = sanitizePathWeight(dataObj.path_weight);
+  const lastUsed = sanitizeLastUsed(dataObj.last_used_at);
+  const successRate = sanitizeSuccessRate(dataObj.success_rate);
+  const encrypted = typeof dataObj.encrypted === 'boolean' ? dataObj.encrypted : false;
+  const symbolSignature = sanitizeOptionalString(dataObj.symbol_signature);
+  const symbolParameters = Array.isArray(dataObj.symbol_parameters)
+    ? sanitizeStringArray(dataObj.symbol_parameters)
     : [];
-  const symbolReturn = sanitizeOptionalString(data.symbol_return);
-  const symbolCalls = Array.isArray(data.symbol_calls)
-    ? sanitizeStringArray(data.symbol_calls)
+  const symbolReturn = sanitizeOptionalString(dataObj.symbol_return);
+  const symbolCalls = Array.isArray(dataObj.symbol_calls)
+    ? sanitizeStringArray(dataObj.symbol_calls)
     : [];
-  const symbolCallTargets = Array.isArray(data.symbol_call_targets)
-    ? sanitizeStringArray(data.symbol_call_targets)
+  const symbolCallTargets = Array.isArray(dataObj.symbol_call_targets)
+    ? sanitizeStringArray(dataObj.symbol_call_targets)
     : [];
-  const symbolCallers = Array.isArray(data.symbol_callers)
-    ? sanitizeStringArray(data.symbol_callers)
+  const symbolCallers = Array.isArray(dataObj.symbol_callers)
+    ? sanitizeStringArray(dataObj.symbol_callers)
     : [];
-  const symbolNeighbors = Array.isArray(data.symbol_neighbors)
-    ? sanitizeStringArray(data.symbol_neighbors)
+  const symbolNeighbors = Array.isArray(dataObj.symbol_neighbors)
+    ? sanitizeStringArray(dataObj.symbol_neighbors)
     : [];
 
-  const symbol = typeof data.symbol === 'string' && data.symbol.trim().length > 0
-    ? data.symbol
+  const symbol = typeof dataObj.symbol === 'string' && dataObj.symbol.trim().length > 0
+    ? dataObj.symbol
     : null;
 
-  const normalized: any = {
+  const normalized = {
     ...extras,
     file,
     symbol,
@@ -214,36 +216,24 @@ function internalNormalize(raw: any): CodemapChunk {
     symbol_calls: symbolCalls,
     symbol_call_targets: symbolCallTargets,
     symbol_callers: symbolCallers,
-    symbol_neighbors: symbolNeighbors
-  };
-
-  if (lastUsed) {
-    normalized.last_used_at = lastUsed;
-  }
-
-  if (symbolSignature) {
-    normalized.symbol_signature = symbolSignature;
-  }
-
-  if (symbolParameters.length > 0) {
-    normalized.symbol_parameters = symbolParameters;
-  }
-
-  if (symbolReturn) {
-    normalized.symbol_return = symbolReturn;
-  }
+    symbol_neighbors: symbolNeighbors,
+    ...(lastUsed ? { last_used_at: lastUsed } : {}),
+    ...(symbolSignature ? { symbol_signature: symbolSignature } : {}),
+    ...(symbolParameters.length > 0 ? { symbol_parameters: symbolParameters } : {}),
+    ...(symbolReturn ? { symbol_return: symbolReturn } : {})
+  } as CodemapChunk;
 
   return normalized;
 }
 
-export function normalizeChunkMetadata(raw: any, previous?: CodemapChunk): CodemapChunk {
+export function normalizeChunkMetadata(raw: unknown, previous?: CodemapChunk): CodemapChunk {
   const base = previous ? internalNormalize(previous) : undefined;
   const incoming = raw && typeof raw === 'object' ? raw : {};
   const merged = base ? { ...base, ...incoming } : incoming;
   return internalNormalize(merged);
 }
 
-export function normalizeCodemapRecord(raw: any): Codemap {
+export function normalizeCodemapRecord(raw: unknown): Codemap {
   if (!raw || typeof raw !== 'object') {
     return {};
   }

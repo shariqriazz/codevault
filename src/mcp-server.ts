@@ -27,6 +27,7 @@ import { clearSearchCaches } from './core/search.js';
 import { clearTokenCache } from './chunking/token-counter.js';
 import { logger } from './utils/logger.js';
 import { ZodError } from 'zod';
+import type { SessionPack } from './context/packs.js';
 
 type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
 
@@ -50,7 +51,8 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   const normalizedError = error instanceof Error ? error : new Error(String(error));
-  const code = (error as any)?.code;
+  const errorObj = typeof error === 'object' && error !== null ? error as Record<string, unknown> : {};
+  const code = typeof errorObj.code === 'string' ? errorObj.code : '';
 
   if (code === 'ENCRYPTION_KEY_REQUIRED') {
     return {
@@ -83,7 +85,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
     code: code || 'RUNTIME_ERROR',
     type: 'runtime',
     message: normalizedError.message,
-    details: normalizedError.stack ? { stack: normalizedError.stack } : undefined
+    details: normalizedError.stack ? { stack: normalizedError.stack } as Record<string, unknown> : undefined
   };
 }
 
@@ -103,7 +105,7 @@ function buildMcpErrorResponse(error: unknown) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as Record<string, unknown>;
 
 /**
  * Minimal MCP server exposing CodeVault tools over stdio for AI assistants.
@@ -113,14 +115,14 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: any = null;
+  private sessionContextPack: SessionPack | null = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.server = new Server(
       {
         name: 'codevault-code-memory',
-        version: packageJson.version,
+        version: String(packageJson.version),
       },
       {
         capabilities: {
@@ -297,8 +299,8 @@ export class McpServer {
 
           case 'use_context_pack': {
             const validArgs = UseContextPackArgsSchema.parse(rawArgs);
-            return await handlers.handleUseContextPack(validArgs, (pack) => {
-              this.sessionContextPack = pack;
+            return await handlers.handleUseContextPack(validArgs, (pack: Record<string, unknown> | null) => {
+              this.sessionContextPack = pack as SessionPack | null;
             });
           }
 
@@ -311,12 +313,21 @@ export class McpServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as any).issues)) {
-          const validationError = `Validation Error: ${(error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
-          return {
-            content: [{ type: 'text', text: validationError }],
-            isError: true,
-          };
+        if (error && typeof error === 'object' && 'issues' in error) {
+          const errorObj = error as Record<string, unknown>;
+          const issues = errorObj.issues;
+          if (Array.isArray(issues)) {
+            const validationError = `Validation Error: ${issues.map((i: unknown) => {
+              const issue = typeof i === 'object' && i !== null ? i as Record<string, unknown> : {};
+              const pathArr = Array.isArray(issue.path) ? issue.path : [];
+              const message = typeof issue.message === 'string' ? issue.message : 'unknown error';
+              return `${pathArr.join('.')}: ${message}`;
+            }).join(', ')}`;
+            return {
+              content: [{ type: 'text', text: validationError }],
+              isError: true,
+            };
+          }
         }
 
         return {
@@ -329,8 +340,8 @@ export class McpServer {
   public async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    logger.info('CodeVault MCP Server started', { version: packageJson.version });
+
+    logger.info('CodeVault MCP Server started', { version: String(packageJson.version) });
     
     this.scheduleCacheCleanup();
     this.setupShutdownHandlers();

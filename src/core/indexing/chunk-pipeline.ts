@@ -5,13 +5,16 @@ import Parser from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
 import { extractSymbolName } from '../symbol-extractor.js';
-import { extractDocComments, generateEnhancedEmbeddingText } from '../metadata.js';
+import { extractDocComments, generateEnhancedEmbeddingText, type CodevaultMetadata, type ImportantVariable } from '../metadata.js';
 import { computeFastHash } from '../../indexer/merkle.js';
 import { SIZE_THRESHOLD, CHUNK_SIZE } from '../../config/constants.js';
 import type { TreeSitterNode } from '../../types/ast.js';
 import type { LanguageRule } from '../../languages/rules.js';
 import type { ModelProfile } from '../../providers/base.js';
 import { extractUnifiedMetadata } from '../unified-metadata.js';
+import type { ChunkingStats } from '../types.js';
+import type { SymbolMetadata } from '../../symbols/extract.js';
+import type { CodemapChunk } from '../../types/codemap.js';
 
 type SizeLimits = {
   optimal: number;
@@ -28,10 +31,10 @@ export interface OversizedChunk {
 
 interface ExistingChunks {
   staleChunkIds: Set<string>;
-  existingChunks: Map<string, any>;
+  existingChunks: Map<string, CodemapChunk>;
 }
 
-interface EmbedStoreParams {
+export interface EmbedStoreParams {
   code: string;
   enhancedEmbeddingText: string;
   chunkId: string;
@@ -40,11 +43,11 @@ interface EmbedStoreParams {
   rel: string;
   symbol: string;
   chunkType: string;
-  codevaultMetadata: any;
-  importantVariables: any[];
+  codevaultMetadata: CodevaultMetadata;
+  importantVariables: ImportantVariable[];
   docComments: string | null;
-  contextInfo: any;
-  symbolData: any;
+  contextInfo: Record<string, unknown>;
+  symbolData: SymbolMetadata;
 }
 
 /**
@@ -188,9 +191,9 @@ export class ChunkPipeline {
     rel: string,
     existing: ExistingChunks,
     chunkMerkleHashes: string[],
-    onProgress: any,
+    onProgress: unknown,
     embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-    chunkingStats: any
+    chunkingStats: ChunkingStats
   ): Promise<void> {
     this.processedNodes = new Set<number>();
 
@@ -224,17 +227,17 @@ export class ChunkPipeline {
   }
 
   private async yieldChunk(
-      node: TreeSitterNode, 
-      source: string, 
-      rule: LanguageRule, 
-      limits: SizeLimits, 
-      modelProfile: ModelProfile, 
+      node: TreeSitterNode,
+      source: string,
+      rule: LanguageRule,
+      limits: SizeLimits,
+      modelProfile: ModelProfile,
       rel: string,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: unknown,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any,
+      chunkingStats: ChunkingStats,
       parentNode: TreeSitterNode | null = null
   ): Promise<void> {
     chunkingStats.totalNodes++;
@@ -257,12 +260,12 @@ export class ChunkPipeline {
         true
       );
       
-      const smallChunks: any[] = [];
-      
+      const smallChunks: Array<{ node: TreeSitterNode; code: string; size: number }> = [];
+
       for (let i = 0; i < subAnalyses.length; i++) {
         const subAnalysis = subAnalyses[i];
         const subNode = subAnalysis.node;
-        
+
         if (subAnalysis.size < limits.min) {
           const subCode = source.slice(subNode.startIndex, subNode.endIndex);
           smallChunks.push({
@@ -280,12 +283,12 @@ export class ChunkPipeline {
           await this.yieldChunk(subNode, source, rule, limits, modelProfile, rel, existing, chunkMerkleHashes, onProgress, embedAndStore, chunkingStats, node);
         }
       }
-      
+
       if (smallChunks.length > 0) {
-        const totalSmallSize = smallChunks.reduce((sum: number, c: any) => sum + c.size, 0);
-        
+        const totalSmallSize = smallChunks.reduce((sum: number, c) => sum + c.size, 0);
+
         if (totalSmallSize >= limits.min || smallChunks.length >= 3) {
-          const mergedCode = smallChunks.map((c: any) => c.code).join('\n\n');
+          const mergedCode = smallChunks.map((c) => c.code).join('\n\n');
           const mergedNode: TreeSitterNode = {
             ...node,
             type: `${node.type}_merged`,
@@ -293,14 +296,14 @@ export class ChunkPipeline {
             endIndex: smallChunks[smallChunks.length - 1].node.endIndex
           };
           const suffix = `small_methods_${smallChunks.length}`;
-          
+
           chunkingStats.mergedSmall++;
           await this.processChunk(mergedNode, mergedCode, suffix, parentNode, source, rel, rule, existing, chunkMerkleHashes, onProgress, embedAndStore, chunkingStats);
         } else {
           chunkingStats.skippedSmall += smallChunks.length;
         }
       }
-      
+
       return;
     } else if (analysis.size > limits.max) {
       chunkingStats.statementFallback++;
@@ -336,18 +339,18 @@ export class ChunkPipeline {
   }
 
   private async processChunk(
-      node: TreeSitterNode, 
-      code: string, 
-      suffix: string | null, 
+      node: TreeSitterNode,
+      code: string,
+      suffix: string | null,
       parentNode: TreeSitterNode | null,
       source: string,
       rel: string,
       rule: LanguageRule,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: unknown,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any
+      chunkingStats: ChunkingStats
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
     if (!symbol) return;
@@ -417,8 +420,8 @@ export class ChunkPipeline {
     
     existing.staleChunkIds.delete(chunkId);
     chunkMerkleHashes.push(chunkMerkleHash);
-    if (onProgress) {
-      onProgress({ type: 'chunk_processed', file: rel, symbol, chunkId });
+    if (onProgress && typeof onProgress === 'function') {
+      (onProgress as (event: { type: string; file: string; symbol: string; chunkId: string }) => void)({ type: 'chunk_processed', file: rel, symbol, chunkId });
     }
   }
 }

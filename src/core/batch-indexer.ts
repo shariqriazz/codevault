@@ -3,6 +3,7 @@ import type { EmbeddingProvider } from '../providers/base.js';
 import type { Database } from '../database/db.js';
 import { Mutex } from '../utils/mutex.js';
 import { log, type LogValue } from '../utils/logger.js';
+import type { CodevaultMetadata, ImportantVariable } from './metadata.js';
 
 const MAX_BATCH_RETRIES = 3;
 const MAX_TRANSIENT_RETRIES = 3;
@@ -19,11 +20,12 @@ const backoffWithCap = (attempt: number): number => {
   return Math.min(base, 30000); // cap at 30s
 };
 
-function isRateLimitError(error: any): boolean {
-  const message = error?.message || String(error);
+function isRateLimitError(error: unknown): boolean {
+  const errorObj = error as Record<string, unknown>;
+  const message = typeof errorObj?.message === 'string' ? errorObj.message : String(error);
   return (
-    error?.status === 429 ||
-    error?.statusCode === 429 ||
+    errorObj?.status === 429 ||
+    errorObj?.statusCode === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -31,10 +33,11 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-function isBatchSizeError(error: any): boolean {
-  const message = error?.message || String(error);
+function isBatchSizeError(error: unknown): boolean {
+  const errorObj = error as Record<string, unknown>;
+  const message = typeof errorObj?.message === 'string' ? errorObj.message : String(error);
   return (
-    error?.status === 413 ||
+    errorObj?.status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -42,9 +45,10 @@ function isBatchSizeError(error: any): boolean {
   );
 }
 
-function isTransientApiError(error: any): boolean {
-  const status = error?.status || error?.statusCode;
-  const message = error?.message || String(error);
+function isTransientApiError(error: unknown): boolean {
+  const errorObj = error as Record<string, unknown>;
+  const status = errorObj?.status || errorObj?.statusCode;
+  const message = typeof errorObj?.message === 'string' ? errorObj.message : String(error);
 
   // Upstream 5xx/gateway and common flaky transport signals
   return (
@@ -71,17 +75,20 @@ const backoffWithCapEmbed = (attempt: number): number => {
   return Math.min(base, 20000); // cap at 20s
 };
 
-function serializeErrorForLog(error: any): { [key: string]: LogValue } {
+function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
 
+  const errorObj = error as Record<string, unknown>;
   const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
   for (const key of candidates) {
-    if (error[key] !== undefined) info[key] = String(error[key]);
+    if (errorObj[key] !== undefined) info[key] = String(errorObj[key]);
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const responseObj = errorObj?.response as Record<string, unknown> | undefined;
+  const errorObjNested = errorObj?.error as Record<string, unknown> | undefined;
+  const responseData = responseObj?.data ?? errorObjNested?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -104,10 +111,10 @@ interface ChunkToEmbed {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: CodevaultMetadata;
+    importantVariables: ImportantVariable[];
     docComments: string | null;
-    contextInfo: any;
+    contextInfo: Record<string, unknown>;
   };
 }
 
@@ -348,7 +355,7 @@ export class BatchEmbeddingProcessor {
         codevault_intent: chunk.params.codevaultMetadata.intent,
         codevault_description: chunk.params.codevaultMetadata.description,
         doc_comments: chunk.params.docComments,
-        variables_used: chunk.params.importantVariables,
+        variables_used: chunk.params.importantVariables.map(v => v.name),
         context_info: chunk.params.contextInfo
       };
     });
@@ -388,7 +395,7 @@ export class BatchEmbeddingProcessor {
           codevault_intent: chunk.params.codevaultMetadata.intent,
           codevault_description: chunk.params.codevaultMetadata.description,
           doc_comments: chunk.params.docComments,
-          variables_used: chunk.params.importantVariables,
+          variables_used: chunk.params.importantVariables.map(v => v.name),
           context_info: chunk.params.contextInfo
         });
       } catch (individualError) {
@@ -429,12 +436,16 @@ interface RetryState {
  * Treat responses that return an error without data as fatal (deterministic) so we don't waste
  * transient retries on them.
  */
-function isFatalApiResponse(error: any): boolean {
+function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const msg = error?.message || '';
-  const status = error?.status || error?.statusCode;
-  const hasErrorKey = Array.isArray((error as any)?.topLevelKeys) && (error as any).topLevelKeys.includes('error');
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const errorObj = error as Record<string, unknown>;
+  const msg = typeof errorObj?.message === 'string' ? errorObj.message : '';
+  const status = errorObj?.status || errorObj?.statusCode;
+  const topLevelKeys = errorObj?.topLevelKeys;
+  const hasErrorKey = Array.isArray(topLevelKeys) && (topLevelKeys as unknown[]).includes('error');
+  const responseObj = errorObj?.response as Record<string, unknown> | undefined;
+  const errorObjNested = errorObj?.error as Record<string, unknown> | undefined;
+  const responseData = responseObj?.data ?? errorObjNested?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;

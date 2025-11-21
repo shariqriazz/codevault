@@ -1,8 +1,8 @@
-import { RESOLVED_LANGUAGES } from './tree-sitter-loader.js';
+import { RESOLVED_LANGUAGES, TreeSitterLanguage } from './tree-sitter-loader.js';
 
 export interface LanguageRule {
   lang: string;
-  ts: any;
+  ts: TreeSitterLanguage | null;
   nodeTypes: string[];
   subdivisionTypes?: Record<string, string[]>;
   variableTypes?: string[];

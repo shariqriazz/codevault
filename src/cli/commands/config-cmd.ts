@@ -77,9 +77,10 @@ export function registerConfigCommands(program: Command): void {
     .command('set <key> <value>')
     .description('Set a configuration value')
     .option('-l, --local [path]', 'Save to project config instead of global')
-    .action((key, value, options) => {
-      const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+    .action((key: string, value: string, options: Record<string, unknown>) => {
+      const opts = options as Record<string, unknown>;
+      const isLocal = opts.local !== undefined;
+      const basePath = typeof opts.local === 'string' ? opts.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -90,25 +91,25 @@ export function registerConfigCommands(program: Command): void {
 
       // Parse key path (e.g., "openai.apiKey" -> ["openai", "apiKey"])
       const keyPath = key.split('.');
-      
+
       // Set the value
-      let current: any = config;
+      let current: Record<string, unknown> = config as Record<string, unknown>;
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
         if (!current[part]) {
           current[part] = {};
         }
-        current = current[part];
+        current = current[part] as Record<string, unknown>;
       }
-      
+
       const lastKey = keyPath[keyPath.length - 1];
-      
+
       // Try to parse value as JSON, otherwise use as string
-      let parsedValue: any = value;
+      let parsedValue: unknown = value;
       if (value === 'true') parsedValue = true;
       else if (value === 'false') parsedValue = false;
       else if (!isNaN(Number(value))) parsedValue = Number(value);
-      
+
       current[lastKey] = parsedValue;
 
       // Save config
@@ -127,13 +128,14 @@ export function registerConfigCommands(program: Command): void {
     .description('Get a configuration value')
     .option('-g, --global', 'Get from global config only')
     .option('-l, --local [path]', 'Get from project config only')
-    .action((key, options) => {
+    .action((key: string, options: Record<string, unknown>) => {
+      const opts = options as Record<string, unknown>;
       let config: CodevaultConfig;
-      
-      if (options.global) {
+
+      if (opts.global) {
         config = readGlobalConfig() || {};
-      } else if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+      } else if (opts.local !== undefined) {
+        const basePath = typeof opts.local === 'string' ? opts.local : '.';
         config = readProjectConfig(basePath) || {};
       } else {
         config = loadConfig();
@@ -141,11 +143,11 @@ export function registerConfigCommands(program: Command): void {
 
       // Navigate key path
       const keyPath = key.split('.');
-      let value: any = config;
-      
+      let value: unknown = config;
+
       for (const part of keyPath) {
         if (value && typeof value === 'object') {
-          value = value[part];
+          value = (value as Record<string, unknown>)[part];
         } else {
           value = undefined;
           break;
@@ -169,11 +171,12 @@ export function registerConfigCommands(program: Command): void {
     .option('-g, --global', 'Show global config only')
     .option('-l, --local [path]', 'Show project config only')
     .option('-s, --sources', 'Show all configuration sources')
-    .action((options) => {
-      if (options.sources) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+    .action((options: Record<string, unknown>) => {
+      const opts = options as Record<string, unknown>;
+      if (opts.sources) {
+        const basePath = typeof opts.local === 'string' ? opts.local : '.';
         const sources = getConfigSources(basePath);
-        
+
         console.log(chalk.bold('Configuration Sources:\n'));
         displayConfig(sources.global, 'Global (~/.codevault/config.json)');
         console.log('');
@@ -185,7 +188,7 @@ export function registerConfigCommands(program: Command): void {
         return;
       }
 
-      if (options.global) {
+      if (opts.global) {
         const config = readGlobalConfig();
         console.log(chalk.bold('Global Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
@@ -198,8 +201,8 @@ export function registerConfigCommands(program: Command): void {
         return;
       }
 
-      if (options.local !== undefined) {
-        const basePath = typeof options.local === 'string' ? options.local : '.';
+      if (opts.local !== undefined) {
+        const basePath = typeof opts.local === 'string' ? opts.local : '.';
         const config = readProjectConfig(basePath);
         console.log(chalk.bold('Project Configuration:\n'));
         if (!config || Object.keys(config).length === 0) {
@@ -223,9 +226,10 @@ export function registerConfigCommands(program: Command): void {
     .command('unset <key>')
     .description('Remove a configuration value')
     .option('-l, --local [path]', 'Remove from project config instead of global')
-    .action((key, options) => {
-      const isLocal = options.local !== undefined;
-      const basePath = typeof options.local === 'string' ? options.local : '.';
+    .action((key: string, options: Record<string, unknown>) => {
+      const opts = options as Record<string, unknown>;
+      const isLocal = opts.local !== undefined;
+      const basePath = typeof opts.local === 'string' ? opts.local : '.';
 
       let config: CodevaultConfig;
       if (isLocal) {
@@ -236,15 +240,15 @@ export function registerConfigCommands(program: Command): void {
 
       // Parse and navigate to parent of key
       const keyPath = key.split('.');
-      let current: any = config;
-      
+      let current: Record<string, unknown> = config as Record<string, unknown>;
+
       for (let i = 0; i < keyPath.length - 1; i++) {
         const part = keyPath[i];
         if (!current[part]) {
           console.log(chalk.yellow(`Key '${key}' not found`));
           return;
         }
-        current = current[part];
+        current = current[part] as Record<string, unknown>;
       }
 
       const lastKey = keyPath[keyPath.length - 1];
