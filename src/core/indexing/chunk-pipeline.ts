@@ -4,20 +4,14 @@ import fs from 'fs';
 import Parser from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
-import { extractSymbolMetadata } from '../../symbols/extract.js';
 import { extractSymbolName } from '../symbol-extractor.js';
-import {
-  extractCodevaultMetadata,
-  extractSemanticTags,
-  extractImportantVariables,
-  extractDocComments,
-  generateEnhancedEmbeddingText
-} from '../metadata.js';
+import { extractDocComments, generateEnhancedEmbeddingText } from '../metadata.js';
 import { computeFastHash } from '../../indexer/merkle.js';
 import { SIZE_THRESHOLD, CHUNK_SIZE } from '../../config/constants.js';
 import type { TreeSitterNode } from '../../types/ast.js';
 import type { LanguageRule } from '../../languages/rules.js';
 import type { ModelProfile } from '../../providers/base.js';
+import { extractUnifiedMetadata } from '../unified-metadata.js';
 
 type SizeLimits = {
   optimal: number;
@@ -363,13 +357,16 @@ export class ChunkPipeline {
     }
 
     const docComments = extractDocComments(source, node, rule);
-    const codevaultMetadata = extractCodevaultMetadata(docComments);
-    const automaticTags = extractSemanticTags(rel, symbol, code);
-    const allTags = [...new Set([...codevaultMetadata.tags, ...automaticTags])];
-    codevaultMetadata.tags = allTags;
-
-    const importantVariables = extractImportantVariables(node, source, rule);
-    const symbolData = extractSymbolMetadata({ node, source, symbol });
+    const unifiedMetadata = extractUnifiedMetadata({
+      node,
+      source,
+      rule,
+      rel,
+      code,
+      docComments,
+      symbol
+    });
+    const { codevaultMetadata, importantVariables, symbolData } = unifiedMetadata;
 
     const enhancedEmbeddingText = generateEnhancedEmbeddingText(
       code,

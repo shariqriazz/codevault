@@ -100,7 +100,7 @@ export function extractSemanticTags(filePath: string, symbolName: string | null,
   return Array.from(tags).slice(0, 10);
 }
 
-interface ImportantVariable {
+export interface ImportantVariable {
   type: string;
   name: string;
   value: string;
@@ -134,7 +134,7 @@ export function extractImportantVariables(node: TreeSitterNode, source: string, 
   return variables;
 }
 
-function isImportantVariable(varText: string, nodeType: string): boolean {
+export function isImportantVariable(varText: string, nodeType: string): boolean {
   const importantPatterns = [
     /const\s+\w*(config|setting|option|endpoint|url|key|secret|token)\w*/i,
     /const\s+\w*(api|service|client|provider)\w*/i,
@@ -146,7 +146,7 @@ function isImportantVariable(varText: string, nodeType: string): boolean {
   return importantPatterns.some(pattern => pattern.test(varText));
 }
 
-function extractVariableName(node: TreeSitterNode, source: string): string {
+export function extractVariableName(node: TreeSitterNode, source: string): string {
   function findIdentifier(n: TreeSitterNode): string | null {
     if (n.type === 'identifier' || n.type === 'type_identifier') {
       return source.slice(n.startIndex, n.endIndex);

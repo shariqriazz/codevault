@@ -125,7 +125,7 @@ function extractReturnType(snippet: string, closeIndex: number): string | null {
   return null;
 }
 
-function buildSignature(symbol: string, snippet: string, node: TreeSitterNode): {
+export function buildSignature(symbol: string, snippet: string, node: TreeSitterNode): {
   signature: string;
   parameters: string[];
   returnType: string | null;
@@ -151,7 +151,7 @@ function buildSignature(symbol: string, snippet: string, node: TreeSitterNode): 
   return { signature, parameters, returnType };
 }
 
-function extractCallNameFromSnippet(snippet: string): string | null {
+export function extractCallNameFromSnippet(snippet: string): string | null {
   const trimmed = snippet.trim();
   if (!trimmed.includes('(')) {
     return null;
@@ -190,7 +190,7 @@ function collectCalls(node: TreeSitterNode, source: string, calls: Set<string>):
   }
 }
 
-function splitSymbolWords(symbol: string): string[] {
+export function splitSymbolWords(symbol: string): string[] {
   if (!symbol) {
     return [];
   }
