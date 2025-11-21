@@ -16,6 +16,7 @@ export function registerIndexCommand(program: Command): void {
     .option('--project <path>', 'alias for project path')
     .option('--directory <path>', 'alias for project directory')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
+    .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
     .action(async (projectPath = '.', options) => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
@@ -66,6 +67,7 @@ export function registerIndexCommand(program: Command): void {
             repoPath: resolvedPath,
             provider: options.provider,
             encryptMode: options.encrypt,
+            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
             callbacks: {
             onScanComplete: (fileCount) => {
               ui.finishScanning(fileCount, 25);
@@ -113,7 +115,8 @@ export function registerIndexCommand(program: Command): void {
           result = await indexProject({
             repoPath: resolvedPath,
             provider: options.provider,
-            encryptMode: options.encrypt
+            encryptMode: options.encrypt,
+            concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined
           });
           console.log('Indexing completed successfully');
         }

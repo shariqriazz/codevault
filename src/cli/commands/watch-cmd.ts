@@ -10,6 +10,7 @@ export function registerWatchCommand(program: Command): void {
     .option('--directory <path>', 'alias for project directory')
     .option('-d, --debounce <ms>', 'debounce interval (default 500)', '500')
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
+    .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .action(async (projectPath = '.', options) => {
       const resolvedPath = options.project || options.directory || projectPath || '.';
       const debounceMs = parseInt(options.debounce, 10);
@@ -24,6 +25,7 @@ export function registerWatchCommand(program: Command): void {
           provider: options.provider,
           debounceMs,
           encrypt: options.encrypt,
+          concurrency: options.concurrency ? parseInt(options.concurrency, 10) : undefined,
           onBatch: ({ changed, deleted }) => {
             console.log(`🔁 Indexed ${changed.length} changed / ${deleted.length} deleted files`);
           }

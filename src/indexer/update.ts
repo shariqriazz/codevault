@@ -29,6 +29,7 @@ export interface UpdateIndexOptions {
   onProgress?: ((event: ProgressEvent) => void) | null;
   embeddingProvider?: EmbeddingProvider | null;
   encrypt?: string;
+  concurrency?: number;
 }
 
 export interface UpdateIndexResult {
@@ -57,7 +58,8 @@ export async function updateIndex({
   deletedFiles = [],
   onProgress = null,
   embeddingProvider = null,
-  encrypt = undefined
+  encrypt = undefined,
+  concurrency = undefined
 }: UpdateIndexOptions = {}): Promise<UpdateIndexResult> {
   const root = path.resolve(repoPath);
   const normalizedChanged = normalizeList(root, changedFiles);
@@ -80,6 +82,7 @@ export async function updateIndex({
     changedFiles: normalizedChanged,
     deletedFiles: normalizedDeleted,
     embeddingProviderOverride: embeddingProvider,
-    encryptMode: encrypt
+    encryptMode: encrypt,
+    concurrency
   });
 }

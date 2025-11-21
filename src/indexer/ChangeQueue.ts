@@ -7,6 +7,7 @@ export interface ChangeQueueOptions {
   provider: string;
   debounceMs: number;
   encrypt?: string;
+  concurrency?: number;
   logger?: Console;
   onBatch?: ((event: { changed: string[]; deleted: string[] }) => void | Promise<void>) | null;
   providerGetter?: () => Promise<EmbeddingProvider | null>;
@@ -105,7 +106,8 @@ export class ChangeQueue {
         changedFiles: changed,
         deletedFiles: deleted,
         embeddingProvider: embeddingProviderOverride,
-        encrypt: this.options.encrypt
+        encrypt: this.options.encrypt,
+        concurrency: this.options.concurrency
       });
 
       // Notify callback or log

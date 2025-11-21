@@ -26,6 +26,7 @@ export interface WatchServiceOptions {
   onBatch?: ((event: { changed: string[]; deleted: string[] }) => void) | null;
   logger?: Console;
   encrypt?: string;
+  concurrency?: number;
 }
 
 export interface WatchController {
@@ -75,6 +76,7 @@ export class WatchService {
       provider: options.provider || 'auto',
       debounceMs: effectiveDebounce,
       encrypt: options.encrypt,
+      concurrency: options.concurrency,
       logger: options.logger || console,
       onBatch: options.onBatch,
       providerGetter: () => this.providerManager.getProviderSafe()
