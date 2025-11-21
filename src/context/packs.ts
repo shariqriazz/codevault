@@ -167,7 +167,7 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
     }
 
     const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
-    const pack = loadContextPack(key as string, basePathStr);
+    const pack = loadContextPack(key, basePathStr);
     return {
       ...pack,
       appliedAt: rawState.appliedAt || null
