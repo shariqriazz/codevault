@@ -1,4 +1,5 @@
 import { loadConfig } from './loader.js';
+import type { ProviderRoutingConfig } from './types.js';
 
 export interface EmbeddingOptions {
   apiKey?: string;
@@ -8,6 +9,7 @@ export interface EmbeddingOptions {
   maxTokens?: number;
   rpm?: number | null;
   tpm?: number | null;
+  routing?: ProviderRoutingConfig;
 }
 
 export interface ChatOptions {
@@ -16,6 +18,7 @@ export interface ChatOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  routing?: ProviderRoutingConfig;
 }
 
 export interface RerankerOptions {
@@ -42,7 +45,8 @@ export function resolveProviderContext(basePath = '.'): ProviderContext {
     dimensions: config.providers?.openai?.dimensions,
     maxTokens: config.maxTokens,
     rpm: config.rateLimit?.rpm ?? null,
-    tpm: config.rateLimit?.tpm ?? null
+    tpm: config.rateLimit?.tpm ?? null,
+    routing: config.providers?.openai?.routing
   };
 
   const chat: ChatOptions = {
@@ -50,7 +54,8 @@ export function resolveProviderContext(basePath = '.'): ProviderContext {
     baseUrl: config.chatLLM?.openai?.baseUrl,
     model: config.chatLLM?.openai?.model,
     maxTokens: config.chatLLM?.openai?.maxTokens,
-    temperature: config.chatLLM?.openai?.temperature
+    temperature: config.chatLLM?.openai?.temperature,
+    routing: config.chatLLM?.openai?.routing
   };
 
   const reranker: RerankerOptions = {
