@@ -42,7 +42,7 @@ function resolveTreeSitterLanguage(module: any, preferredKey: string | null = nu
       return module;
     }
 
-    const values = Object.values(module);
+    const values = Object.values(module as Record<string, unknown>);
     for (const value of values) {
       const resolved = resolveTreeSitterLanguage(value, null);
       if (resolved && resolved.language && typeof resolved.language === 'object') {
@@ -54,7 +54,7 @@ function resolveTreeSitterLanguage(module: any, preferredKey: string | null = nu
   return module;
 }
 
-export const RESOLVED_LANGUAGES = {
+export const RESOLVED_LANGUAGES: Record<string, any> = {
   bash: resolveTreeSitterLanguage(LangBash),
   c: resolveTreeSitterLanguage(LangC),
   csharp: resolveTreeSitterLanguage(LangCSharp),

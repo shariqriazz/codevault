@@ -68,7 +68,8 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
     : undefined;
 
   const scopeDefinition: Record<string, any> = {};
-  for (const scopeKey of PACK_SCOPE_KEYS) {
+  const scopeKeyArr: readonly string[] = PACK_SCOPE_KEYS;
+  for (const scopeKey of scopeKeyArr) {
     if (Object.prototype.hasOwnProperty.call(scope, scopeKey) && typeof scope[scopeKey] !== 'undefined') {
       scopeDefinition[scopeKey] = scope[scopeKey];
     }
@@ -84,20 +85,24 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
 }
 
 export function getContextPackDirectory(basePath = '.'): string {
-  return getPackDir(basePath);
+  const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
+  return getPackDir(basePathStr);
 }
 
 export function loadContextPack(name: string, basePath = '.'): PackInfo {
-  if (!name || typeof name !== 'string') {
+  const nameStr: string = typeof name === 'string' ? name : String(name);
+  const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
+
+  if (!nameStr || typeof nameStr !== 'string') {
     throw new Error('Context pack name must be a non-empty string');
   }
 
-  const packDir = getPackDir(basePath);
-  const fileName = `${name}.json`;
+  const packDir = getPackDir(basePathStr);
+  const fileName = `${nameStr}.json`;
   const filePath = path.join(packDir, fileName);
 
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Context pack "${name}" not found in ${packDir}`);
+    throw new Error(`Context pack "${nameStr}" not found in ${packDir}`);
   }
 
   const stats = fs.statSync(filePath);
@@ -109,7 +114,7 @@ export function loadContextPack(name: string, basePath = '.'): PackInfo {
   }
 
   const rawData = readJsonFile(filePath);
-  const pack = toContextPackObject(name, filePath, rawData);
+  const pack = toContextPackObject(nameStr, filePath, rawData);
 
   packCache.set(cacheKey, { pack, mtimeMs: stats.mtimeMs });
   return pack;
@@ -156,12 +161,13 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
       return null;
     }
 
-    const key = typeof rawState.key === 'string' ? rawState.key : null;
+    const key: string | null = typeof rawState.key === 'string' ? rawState.key : null;
     if (!key) {
       return null;
     }
 
-    const pack = loadContextPack(key, basePath);
+    const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
+    const pack = loadContextPack(key, basePathStr);
     return {
       ...pack,
       appliedAt: rawState.appliedAt || null
@@ -220,7 +226,8 @@ export function resolveScopeWithPack(
     }
   }
 
-  const scope = normalizeScopeFilters(combined);
+  const scopePartial: Partial<ScopeFilters> = combined;
+  const scope = normalizeScopeFilters(scopePartial);
   const packInfo = basePack
     ? { key: basePack.key, name: basePack.name, description: basePack.description || null }
     : null;

@@ -37,9 +37,10 @@ export class FileProcessor {
 
     if (!rule) return;
 
-    const existingChunks = new Map(
+    const existingChunks = new Map<string, any>(
       Object.entries(this.state.codemap)
-        .filter(([, metadata]) => metadata && (metadata as any).file === rel) as [string, any][]
+        .filter(([, metadata]) => metadata && typeof metadata === 'object' && 'file' in metadata && metadata.file === rel)
+        .map(([key, val]) => [key, val])
     );
     const staleChunkIds = new Set(existingChunks.keys());
     const chunkMerkleHashes: string[] = [];
@@ -63,20 +64,22 @@ export class FileProcessor {
 
       // Collect and group nodes
       const collectedNodes = this.chunkPipeline.collectNodesForFile(source, rule);
+      const modelProfile: import('../../providers/base.js').ModelProfile = this.context.modelProfile;
       const nodeGroups = await this.chunkPipeline.groupNodes(
         collectedNodes,
         source,
-        this.context.modelProfile,
+        modelProfile,
         rule
       );
 
       // Process groups
+      const limits = this.context.limits;
       await this.chunkPipeline.processGroups(
         nodeGroups,
         source,
         rule,
-        this.context.limits,
-        this.context.modelProfile,
+        limits,
+        modelProfile,
         rel,
         { staleChunkIds, existingChunks },
         chunkMerkleHashes,
@@ -310,8 +313,9 @@ export class FileProcessor {
 
     for (const chunkId of chunkIds) {
       const metadata = metadataLookup.get(chunkId) || this.state.codemap[chunkId];
-      if (metadata && metadata.sha) {
-        await removeChunkArtifacts(this.context.chunkDir, metadata.sha);
+      if (metadata && typeof metadata === 'object' && 'sha' in metadata && typeof metadata.sha === 'string') {
+        const sha: string = metadata.sha;
+        await removeChunkArtifacts(this.context.chunkDir, sha);
       }
       delete this.state.codemap[chunkId];
     }
@@ -326,10 +330,10 @@ export class FileProcessor {
    */
   async removeFileArtifacts(fileRel: string): Promise<void> {
     const entries = Object.entries(this.state.codemap)
-      .filter(([, metadata]) => metadata && (metadata as any).file === fileRel);
+      .filter(([, metadata]) => metadata && typeof metadata === 'object' && 'file' in metadata && metadata.file === fileRel);
 
     if (entries.length > 0) {
-      const metadataLookup = new Map(entries as [string, any][]);
+      const metadataLookup = new Map<string, any>(entries.map(([key, val]) => [key, val]));
       await this.deleteChunks(entries.map(([chunkId]) => chunkId), metadataLookup);
       this.state.markIndexMutated();
       this.persistManager.scheduleCodemapSave();

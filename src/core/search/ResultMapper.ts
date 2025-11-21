@@ -80,7 +80,8 @@ export class ResultMapper {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
         getTextAsync: async candidate => {
-          const codeText = (await this.readChunkText(candidate.sha, chunkDir)) || '';
+          const sha: string = typeof candidate.sha === 'string' ? candidate.sha : String(candidate.sha);
+          const codeText = (await this.readChunkText(sha, chunkDir)) || '';
           return this.buildBm25Document(candidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
@@ -140,16 +141,17 @@ export class ResultMapper {
     }
   }
 
-  private buildBm25Document(chunk: any, codeText: string | null): string {
-    if (!chunk) return '';
+  private buildBm25Document(chunk: unknown, codeText: string | null): string {
+    if (!chunk || typeof chunk !== 'object') return '';
 
-    const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
-      codeText
-    ].filter(value => typeof value === 'string' && value.trim().length > 0);
+    const chunkObj = chunk as Record<string, unknown>;
+    const parts: string[] = [
+      typeof chunkObj.symbol === 'string' ? chunkObj.symbol : '',
+      typeof chunkObj.file_path === 'string' ? chunkObj.file_path : '',
+      typeof chunkObj.codevault_description === 'string' ? chunkObj.codevault_description : '',
+      typeof chunkObj.codevault_intent === 'string' ? chunkObj.codevault_intent : '',
+      codeText || ''
+    ].filter(value => value.trim().length > 0);
 
     return parts.join('\n');
   }

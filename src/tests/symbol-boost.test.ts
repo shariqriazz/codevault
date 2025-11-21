@@ -14,13 +14,19 @@ test('applySymbolBoost caps total score at or below 1.0', () => {
     }
   };
 
-  const results = [
+  interface SearchResultWithBoost {
+    id: string;
+    score?: number;
+    symbol: string;
+    symbolBoost?: number;
+  }
+
+  const results: SearchResultWithBoost[] = [
     { id: 'chunk1', score: 0.9, symbol: 'processPayment', symbolBoost: 0 }
   ];
 
-  applySymbolBoost(results as any, { query: 'process payment', codemap });
+  applySymbolBoost(results, { query: 'process payment', codemap });
 
-  assert.ok(results[0].score <= 1, 'score should not exceed 1.0');
-  const symbolBoost = (results[0] as any).symbolBoost;
-  assert.ok(symbolBoost !== undefined && symbolBoost <= 0.45, 'boost should respect cap');
+  assert.ok(results[0].score !== undefined && results[0].score <= 1, 'score should not exceed 1.0');
+  assert.ok(results[0].symbolBoost !== undefined && results[0].symbolBoost <= 0.45, 'boost should respect cap');
 });

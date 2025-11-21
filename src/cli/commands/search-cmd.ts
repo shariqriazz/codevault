@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 import { print } from '../../utils/logger.js';
+import type { ScopeFilters } from '../../types/search.js';
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -23,11 +24,17 @@ export function registerSearchCommand(program: Command): void {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath = options.project || options.directory || projectPath || '.';
-        const limit = parseInt(options.limit);
+        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
+                                      (typeof options.directory === 'string' ? options.directory : null) ||
+                                      (typeof projectPath === 'string' ? projectPath : null) ||
+                                      '.';
+        const limitStr: string = typeof options.limit === 'string' ? options.limit : '10';
+        const limit = parseInt(limitStr);
 
+        const providerStr: string = typeof options.provider === 'string' ? options.provider : 'auto';
         const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
-        const results = await searchCode(query, limit, options.provider, resolvedPath, scopeFilters);
+        const scopeFiltersTyped: ScopeFilters = scopeFilters;
+        const results = await searchCode(query, limit, providerStr, resolvedPath, scopeFiltersTyped);
 
         if (!results.success) {
           print(chalk.yellow(`\nNo results found for "${query}"`));

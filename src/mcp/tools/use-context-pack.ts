@@ -19,9 +19,9 @@ export const useContextPackResultSchema = z.object({
 
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
-  setSessionPack: (pack: any) => void;
+  setSessionPack: (pack: unknown) => void;
   clearSessionPack: () => void;
-  errorLogger?: any;
+  errorLogger?: { log: (error: unknown, context: unknown) => void; debugLog: (message: string, context: unknown) => void };
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
@@ -95,8 +95,8 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    async (params: any) => {
-      const result = await Promise.resolve(handler(params));
+    async (params: { name: string; path?: string }) => {
+      const result = handler(params);
       return {
         success: result.success,
         message: result.message,

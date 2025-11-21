@@ -142,7 +142,8 @@ function extractExtras(source: any): Record<string, any> {
     return extras;
   }
 
-  for (const [key, val] of Object.entries(source)) {
+  const entries = Object.entries(source as Record<string, unknown>);
+  for (const [key, val] of entries) {
     if (!KNOWN_FIELDS.has(key)) {
       extras[key] = val;
     }
@@ -254,7 +255,8 @@ export function normalizeCodemapRecord(raw: any): Codemap {
     return {};
   }
 
-  const entries = Object.entries(raw)
+  const rawEntries = Object.entries(raw as Record<string, unknown>);
+  const entries = rawEntries
     .filter(([key]) => typeof key === 'string' && key.length > 0)
     .map(([chunkId, value]) => [chunkId, normalizeChunkMetadata(value)] as [string, CodemapChunk]);
 

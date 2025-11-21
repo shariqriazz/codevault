@@ -47,7 +47,8 @@ export function registerContextCommands(program: Command): void {
     .command('list [path]')
     .description('List available context packs')
     .action((projectPath = '.') => {
-      const resolvedPath = resolveProjectPath(projectPath);
+      const projectPathStr: string = typeof projectPath === 'string' ? projectPath : '.';
+      const resolvedPath = resolveProjectPath(projectPathStr);
       const packs = listContextPacks(resolvedPath);
       const active = getActiveContextPack(resolvedPath);
       const activeKey = active ? active.key : null;
@@ -59,7 +60,11 @@ export function registerContextCommands(program: Command): void {
 
       print(`Context packs in ${resolvedPath}:`);
       packs
-        .sort((a, b) => a.key.localeCompare(b.key))
+        .sort((a, b) => {
+          const aKey: string = typeof a.key === 'string' ? a.key : '';
+          const bKey: string = typeof b.key === 'string' ? b.key : '';
+          return aKey.localeCompare(bKey);
+        })
         .forEach(pack => {
           print(`  ${formatPackLine(pack, activeKey)}`);
         });
@@ -73,12 +78,14 @@ export function registerContextCommands(program: Command): void {
     .command('show <name> [path]')
     .description('Show context pack definition')
     .action((name, projectPath = '.') => {
-      const resolvedPath = resolveProjectPath(projectPath);
+      const nameStr: string = typeof name === 'string' ? name : String(name);
+      const projectPathStr: string = typeof projectPath === 'string' ? projectPath : '.';
+      const resolvedPath = resolveProjectPath(projectPathStr);
       try {
-        const pack = loadContextPack(name, resolvedPath);
+        const pack = loadContextPack(nameStr, resolvedPath);
         printPackDetails(pack);
       } catch (error) {
-        console.error(`Failed to load context pack "${name}": ${(error as Error).message}`);
+        console.error(`Failed to load context pack "${nameStr}": ${(error as Error).message}`);
         process.exitCode = 1;
       }
     });
@@ -87,9 +94,11 @@ export function registerContextCommands(program: Command): void {
     .command('use <name> [path]')
     .description('Activate a context pack')
     .action((name, projectPath = '.') => {
-      const resolvedPath = resolveProjectPath(projectPath);
+      const nameStr: string = typeof name === 'string' ? name : String(name);
+      const projectPathStr: string = typeof projectPath === 'string' ? projectPath : '.';
+      const resolvedPath = resolveProjectPath(projectPathStr);
       try {
-        const pack = setActiveContextPack(name, resolvedPath);
+        const pack = setActiveContextPack(nameStr, resolvedPath);
         print(`Activated context pack: ${pack.key}`);
         if (pack.name && pack.name !== pack.key) {
           print(`Display name: ${pack.name}`);
@@ -104,7 +113,7 @@ export function registerContextCommands(program: Command): void {
           }
         }
       } catch (error) {
-        console.error(`Failed to activate context pack "${name}": ${(error as Error).message}`);
+        console.error(`Failed to activate context pack "${nameStr}": ${(error as Error).message}`);
         process.exitCode = 1;
       }
     });
