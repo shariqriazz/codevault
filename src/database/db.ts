@@ -556,7 +556,7 @@ export class CodeVaultDatabase {
       return [];
     }
     const rows = this.getAllPathsStmt.all();
-    return Array.isArray(rows) ? rows.map((row: any) => row.file_path).filter(Boolean) : [];
+    return Array.isArray(rows) ? rows.map((row: any): string => row.file_path as string).filter(Boolean) : [];
   }
 
   deleteChunksByFilePath(filePath: string): void {

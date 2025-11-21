@@ -24,7 +24,7 @@ function makeNode(type: string, children: any[] = [], startIndex = 0, endIndex =
     startIndex,
     endIndex,
     childCount: children.length,
-    child: (idx: number) => children[idx] ?? null
+    child: (idx: number): any => children[idx] ?? null
   };
 }
 

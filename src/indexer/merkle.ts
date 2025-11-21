@@ -143,5 +143,5 @@ export function removeMerkleEntry(merkle: MerkleTree, relativePath: string): boo
 }
 
 export function cloneMerkle(merkle: MerkleTree): MerkleTree {
-  return JSON.parse(JSON.stringify(ensureObject(merkle)));
+  return JSON.parse(JSON.stringify(ensureObject(merkle))) as MerkleTree;
 }

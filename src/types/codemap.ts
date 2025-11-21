@@ -239,7 +239,7 @@ function internalNormalize(raw: any): CodemapChunk {
     normalized.symbol_return = symbolReturn;
   }
 
-  return normalized;
+  return normalized as CodemapChunk;
 }
 
 export function normalizeChunkMetadata(raw: any, previous?: CodemapChunk): CodemapChunk {

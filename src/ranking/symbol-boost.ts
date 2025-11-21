@@ -147,7 +147,7 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
 }
 
 function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: any }> {
-  const index = new Map();
+  const index = new Map<string, { chunkId: string; entry: any }>();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }

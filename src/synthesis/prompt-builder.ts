@@ -144,7 +144,7 @@ export function parseMultiQueryResponse(response: string): string[] {
 
     return queries
       .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
-      .map(q => q.trim())
+      .map((q): string => q.trim())
       .slice(0, 4); // Max 4 queries
   } catch (error) {
     console.error('Failed to parse multi-query response:', error);
