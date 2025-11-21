@@ -94,7 +94,7 @@ export class OpenAIProvider extends EmbeddingProvider {
       }
 
       return embedding;
-    }) as Promise<number[]>;
+    });
   }
 
   private isOpenRouter(): boolean {

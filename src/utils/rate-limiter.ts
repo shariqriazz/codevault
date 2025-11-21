@@ -178,8 +178,6 @@ export class RateLimiter {
            message.includes('429') ||
            message.includes('rate limit') ||
            message.includes('too many requests');
-    );
->>>>>>> 85b14ba (fix: resolve all @typescript-eslint/no-unsafe-return warnings)
   }
 
   getStats(): { rpm: number | null; tpm: number | null; queueLength: number; maxQueueSize: number; queueUtilization: string; requestsInLastMinute: number; tokensInLastMinute: number; isRpmLimited: boolean; isTpmLimited: boolean; isLimited: boolean } {

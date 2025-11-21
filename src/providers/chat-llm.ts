@@ -94,7 +94,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       const completion = await this.openai!.chat.completions.create(requestBody);
 
       return completion.choices[0]?.message?.content || '';
-    }) as Promise<string>;
+    });
   }
 
   private isOpenRouter(): boolean {
