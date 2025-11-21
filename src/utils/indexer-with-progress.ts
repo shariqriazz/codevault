@@ -31,6 +31,9 @@ export async function indexProjectWithProgress(
   const startTime = Date.now();
   let lastFileCompletion = startTime;
   let lastChunkBeat = startTime;
+  const pendingByFile = new Map<string, number>();
+  let totalPendingChunks = 0;
+  let lastEtaMs: number | null = null;
 
   const result = await indexProject({
     ...indexOptions,
@@ -43,30 +46,51 @@ export async function indexProjectWithProgress(
         return;
       }
 
-      if (event.type === 'file_completed' && event.file && callbacks?.onFileProgress) {
-        const isNewFile = !processedFiles.has(event.file);
-        if (!isNewFile) return;
-
-        processedFiles.add(event.file);
-        processedCount++;
-        lastFileCompletion = Date.now();
-
-        const elapsedMs = Date.now() - startTime;
-        const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
-        const remaining = totalFiles > 0 ? Math.max(totalFiles - processedCount, 0) : null;
-
-        let etaMs: number | null = null;
-        if (avgPerFile !== null && remaining !== null) {
-          etaMs = avgPerFile * remaining;
+      if (event.type === 'file_enqueued' && event.file !== undefined && typeof event.enqueuedChunks === 'number') {
+        pendingByFile.set(event.file, event.enqueuedChunks);
+        totalPendingChunks += event.enqueuedChunks;
+        if (event.enqueuedChunks === 0 && callbacks?.onFileProgress) {
+          // File with no work counts as completed immediately
+          const isNewFile = !processedFiles.has(event.file);
+          if (isNewFile) {
+            processedFiles.add(event.file);
+            processedCount++;
+          }
+          const elapsedMs = Date.now() - startTime;
+          const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
+          const remaining = totalFiles > 0 ? Math.max(totalFiles - processedCount, 0) : null;
+          const etaMs = avgPerFile !== null && remaining !== null ? avgPerFile * remaining : null;
+          lastEtaMs = etaMs;
+          callbacks.onFileProgress(processedCount, totalFiles || remaining || 0, event.file, etaMs, avgPerFile, true);
         }
+      }
 
-        callbacks.onFileProgress(processedCount, totalFiles || remaining || 0, event.file, etaMs, avgPerFile, true);
-        return;
+      if (event.type === 'chunk_embedded' && event.file) {
+        if (pendingByFile.has(event.file)) {
+          const next = Math.max(0, (pendingByFile.get(event.file) || 0) - 1);
+          pendingByFile.set(event.file, next);
+          totalPendingChunks = Math.max(0, totalPendingChunks - 1);
+          if (next === 0 && callbacks?.onFileProgress) {
+            const isNewFile = !processedFiles.has(event.file);
+            if (isNewFile) {
+              processedFiles.add(event.file);
+              processedCount++;
+              lastFileCompletion = Date.now();
+            }
+
+            const elapsedMs = Date.now() - startTime;
+            const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
+            const remaining = totalFiles > 0 ? Math.max(totalFiles - processedCount, 0) : null;
+            const etaMs = avgPerFile !== null && remaining !== null ? avgPerFile * remaining : null;
+            lastEtaMs = etaMs;
+            callbacks.onFileProgress(processedCount, totalFiles || remaining || 0, event.file, etaMs, avgPerFile, true);
+          }
+        }
       }
 
       if (event.type === 'chunk_processed' && callbacks?.onChunkHeartbeat) {
         lastChunkBeat = Date.now();
-        callbacks.onChunkHeartbeat(null);
+        callbacks.onChunkHeartbeat(lastEtaMs);
       }
       if (event.type === 'finalizing' && callbacks?.onFinalizing) {
         callbacks.onFinalizing();

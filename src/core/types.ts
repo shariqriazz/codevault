@@ -29,6 +29,7 @@ export interface ProgressEvent {
   fileCount?: number;
   totalFiles?: number;
   languages?: number;
+  enqueuedChunks?: number;
   stats?: {
     chunks?: number;
     merged?: number;

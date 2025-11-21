@@ -120,6 +120,7 @@ export class BatchEmbeddingProcessor {
   private batch: ChunkToEmbed[] = [];
   private batchSize: number;
   private mutex = new Mutex();
+  private onChunkEmbedded?: (info: { file: string; chunkId: string }) => void;
 
   constructor(
     private embeddingProvider: EmbeddingProvider,
@@ -127,6 +128,10 @@ export class BatchEmbeddingProcessor {
     batchSize: number = BATCH_SIZE
   ) {
     this.batchSize = batchSize;
+  }
+
+  setOnChunkEmbedded(cb: (info: { file: string; chunkId: string }) => void): void {
+    this.onChunkEmbedded = cb;
   }
 
   /**
@@ -342,6 +347,13 @@ export class BatchEmbeddingProcessor {
     });
 
     this.db.insertChunks(dbParams);
+
+    // Notify listeners that chunks are fully embedded and stored
+    if (this.onChunkEmbedded) {
+      for (const chunk of batch) {
+        this.onChunkEmbedded({ file: chunk.params.rel, chunkId: chunk.chunkId });
+      }
+    }
   }
 
   /**

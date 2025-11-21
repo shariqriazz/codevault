@@ -67,6 +67,11 @@ export class IndexerEngine {
 
     // Stage 1: Setup and initialization
     const context = await IndexContext.prepare(this.options);
+    if (onProgress && context.batchProcessor.setOnChunkEmbedded) {
+      context.batchProcessor.setOnChunkEmbedded(({ file, chunkId }) => {
+        onProgress({ type: 'chunk_embedded', file, chunkId });
+      });
+    }
     const state = new IndexState(context.codemap, context.updatedMerkle);
     const persistManager = new PersistManager(context, state, 1500);
     const fileProcessor = new FileProcessor(context, state, onProgress, persistManager);

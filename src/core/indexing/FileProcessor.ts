@@ -24,7 +24,7 @@ export class FileProcessor {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string; success?: boolean }) => void) | null,
+    private onProgress: ((event: { type: string; file?: string; symbol?: string; chunkId?: string; success?: boolean; enqueuedChunks?: number }) => void) | null,
     private persistManager: PersistManager
   ) {}
 
@@ -46,6 +46,7 @@ export class FileProcessor {
     const chunkMerkleHashes: string[] = [];
     let fileHash: string | null = null;
     let success = false;
+    let enqueuedChunks = 0;
 
     try {
       const source = await fs.promises.readFile(abs, 'utf8');
@@ -55,6 +56,9 @@ export class FileProcessor {
       const previousMerkle = this.context.merkle[rel];
       if (previousMerkle && previousMerkle.shaFile === fileHash) {
         success = true;
+        if (this.onProgress) {
+          this.onProgress({ type: 'file_enqueued', file: rel, enqueuedChunks: 0, success: true });
+        }
         return;
       }
 
@@ -78,7 +82,10 @@ export class FileProcessor {
         { staleChunkIds, existingChunks },
         chunkMerkleHashes,
         this.onProgress,
-        (params) => this.embedAndStore(params),
+        async (params) => {
+          await this.embedAndStore(params);
+          enqueuedChunks++;
+        },
         this.state.chunkingStats
       );
 
@@ -110,6 +117,9 @@ export class FileProcessor {
       await this.tryFallbackProcessing(rel, abs, rule, existingChunks, staleChunkIds, chunkMerkleHashes);
       success = true;
     } finally {
+      if (this.onProgress) {
+        this.onProgress({ type: 'file_enqueued', file: rel, enqueuedChunks, success });
+      }
       if (this.onProgress) {
         this.onProgress({ type: 'file_completed', file: rel, success });
       }
