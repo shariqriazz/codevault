@@ -18,7 +18,7 @@ export class OpenAIProvider extends EmbeddingProvider {
   private baseUrl?: string;
   private dimensionsOverride?: number;
   private routingConfig?: ProviderRoutingConfig;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: EmbeddingOptions = {}) {
     super();

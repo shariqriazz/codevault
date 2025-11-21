@@ -90,7 +90,8 @@ export function registerConfigCommands(program: Command): void {
       }
 
       // Parse key path (e.g., "openai.apiKey" -> ["openai", "apiKey"])
-      const keyPath = key.split('.');
+      const keyStr = String(key);
+      const keyPath = keyStr.split('.');
       
       // Set the value
       let current: any = config;
@@ -141,7 +142,8 @@ export function registerConfigCommands(program: Command): void {
       }
 
       // Navigate key path
-      const keyPath = key.split('.');
+      const keyStr = String(key);
+      const keyPath = keyStr.split('.');
       let value: any = config;
       
       for (const part of keyPath) {
@@ -236,7 +238,8 @@ export function registerConfigCommands(program: Command): void {
       }
 
       // Parse and navigate to parent of key
-      const keyPath = key.split('.');
+      const keyStr = String(key);
+      const keyPath = keyStr.split('.');
       let current: any = config;
       
       for (let i = 0; i < keyPath.length - 1; i++) {

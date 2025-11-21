@@ -137,13 +137,13 @@ export function parseMultiQueryResponse(response: string): string[] {
     }
     
     const queries = JSON.parse(jsonMatch[0]);
-    
+
     if (!Array.isArray(queries)) {
       return [];
     }
-    
+
     return queries
-      .filter(q => typeof q === 'string' && q.trim().length > 0)
+      .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
       .map(q => q.trim())
       .slice(0, 4); // Max 4 queries
   } catch (error) {

@@ -69,9 +69,11 @@ function computeSignatureMatchStrength(query: string, entry: any): number {
   }
 
   const queryLower = query.toLowerCase();
-  const rawSymbol = typeof entry.symbol === 'string' ? entry.symbol : '';
+  const symbolRaw = entry.symbol;
+  const rawSymbol = typeof symbolRaw === 'string' ? symbolRaw : '';
   const symbol = rawSymbol.toLowerCase();
-  const signature = typeof entry.symbol_signature === 'string' ? entry.symbol_signature.toLowerCase() : '';
+  const signatureRaw = entry.symbol_signature;
+  const signature = typeof signatureRaw === 'string' ? signatureRaw.toLowerCase() : '';
 
   let weight = 0;
   const matchedTokens = new Set<string>();

@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { createRateLimiter, type RateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
 
@@ -21,7 +21,7 @@ export abstract class ChatLLMProvider {
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
 
-  rateLimiter?: any;
+  rateLimiter?: RateLimiter;
 }
 
 export class OpenAIChatProvider extends ChatLLMProvider {
@@ -32,7 +32,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   private maxTokensOverride?: number;
   private temperatureOverride?: number;
   private routingConfig?: ProviderRoutingConfig;
-  rateLimiter: any;
+  rateLimiter: RateLimiter;
 
   constructor(options: ChatOptions = {}) {
     super();
@@ -126,9 +126,9 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       requestBody.provider = this.routingConfig;
     }
 
-    const stream = await (this.openai!.chat.completions.create as any)(requestBody);
+    const stream = await this.openai!.chat.completions.create(requestBody);
 
-    for await (const chunk of stream) {
+    for await (const chunk of stream as any) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
         yield content;

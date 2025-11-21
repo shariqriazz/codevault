@@ -311,12 +311,20 @@ export class McpServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as any).issues)) {
-          const validationError = `Validation Error: ${(error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
-          return {
-            content: [{ type: 'text', text: validationError }],
-            isError: true,
-          };
+        if (error && typeof error === 'object' && 'issues' in error) {
+          const issues = (error as any).issues;
+          if (Array.isArray(issues)) {
+            const validationError = `Validation Error: ${issues.map((i: any) => {
+              const path = i.path;
+              const pathArray: string[] = Array.isArray(path) ? path : [];
+              const pathStr = pathArray.join('.');
+              return `${pathStr}: ${i.message}`;
+            }).join(', ')}`;
+            return {
+              content: [{ type: 'text', text: validationError }],
+              isError: true,
+            };
+          }
         }
 
         return {

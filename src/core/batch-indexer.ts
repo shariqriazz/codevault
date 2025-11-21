@@ -19,11 +19,11 @@ const backoffWithCap = (attempt: number): number => {
   return Math.min(base, 30000); // cap at 30s
 };
 
-function isRateLimitError(error: any): boolean {
-  const message = error?.message || String(error);
+function isRateLimitError(error: unknown): boolean {
+  const message = String((error as any)?.message || error);
   return (
-    error?.status === 429 ||
-    error?.statusCode === 429 ||
+    (error as any)?.status === 429 ||
+    (error as any)?.statusCode === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -31,10 +31,10 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-function isBatchSizeError(error: any): boolean {
-  const message = error?.message || String(error);
+function isBatchSizeError(error: unknown): boolean {
+  const message = String((error as any)?.message || error);
   return (
-    error?.status === 413 ||
+    (error as any)?.status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -42,9 +42,9 @@ function isBatchSizeError(error: any): boolean {
   );
 }
 
-function isTransientApiError(error: any): boolean {
-  const status = error?.status || error?.statusCode;
-  const message = error?.message || String(error);
+function isTransientApiError(error: unknown): boolean {
+  const status = (error as any)?.status || (error as any)?.statusCode;
+  const message = String((error as any)?.message || error);
 
   // Upstream 5xx/gateway and common flaky transport signals
   return (
@@ -71,17 +71,23 @@ const backoffWithCapEmbed = (attempt: number): number => {
   return Math.min(base, 20000); // cap at 20s
 };
 
-function serializeErrorForLog(error: any): { [key: string]: LogValue } {
+function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
 
   const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
   for (const key of candidates) {
-    if (error[key] !== undefined) info[key] = String(error[key]);
+    const value = (error as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      info[key] = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? value
+        : JSON.stringify(value);
+    }
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = error?.response?.data ?? error?.error?.data;
+  const errObj = error as { response?: { data?: unknown }; error?: { data?: unknown } };
+  const responseData = errObj.response?.data ?? errObj.error?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -283,6 +289,7 @@ export class BatchEmbeddingProcessor {
         );
         return;
       }
+
     }
   }
 
@@ -416,12 +423,21 @@ interface RetryState {
  * Treat responses that return an error without data as fatal (deterministic) so we don't waste
  * transient retries on them.
  */
-function isFatalApiResponse(error: any): boolean {
+function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const msg = error?.message || '';
-  const status = error?.status || error?.statusCode;
-  const hasErrorKey = Array.isArray(error?.topLevelKeys) && error.topLevelKeys.includes('error');
-  const responseData = error?.response?.data ?? error?.error?.data;
+  const err = error as {
+    message?: string;
+    status?: number;
+    statusCode?: number;
+    topLevelKeys?: string[];
+    response?: { data?: unknown };
+    error?: { data?: unknown };
+  };
+
+  const msg = String(err.message || '');
+  const status = err.status ?? err.statusCode;
+  const hasErrorKey = Array.isArray(err.topLevelKeys) && err.topLevelKeys.includes('error');
+  const responseData = err.response?.data ?? err.error?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;

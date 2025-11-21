@@ -1,5 +1,5 @@
 import cliProgress from 'cli-progress';
-import ora from 'ora';
+import ora, { type Ora } from 'ora';
 import chalk from 'chalk';
 import { print } from './logger.js';
 
@@ -24,7 +24,7 @@ function formatEta(ms: number | null): string {
 
 export class IndexerUI {
   private progressBar: cliProgress.SingleBar | null = null;
-  private spinner: any = null;
+  private spinner: Ora | null = null;
   private startTime: number = 0;
   private totalFiles: number = 0;
   private processedFiles: number = 0;

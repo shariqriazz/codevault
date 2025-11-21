@@ -170,12 +170,12 @@ export class RateLimiter {
 
   private isRateLimitError(error: unknown): boolean {
     if (!error) return false;
-    
-    const message = (error as any).message || '';
+
+    const message = String((error as any).message || '');
     const status = (error as any).status || (error as any).statusCode || 0;
-    
-    return status === 429 || 
-           message.includes('429') || 
+
+    return status === 429 ||
+           message.includes('429') ||
            message.includes('rate limit') ||
            message.includes('too many requests');
   }

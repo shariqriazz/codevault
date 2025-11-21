@@ -47,6 +47,13 @@ interface EmbedStoreParams {
   symbolData: any;
 }
 
+type ProgressCallback = (event: {
+  type: 'chunk_processed';
+  file: string;
+  symbol: string;
+  chunkId: string;
+}) => void;
+
 /**
  * Collects candidate AST nodes for chunking using a reusable parser instance.
  */
@@ -188,7 +195,7 @@ export class ChunkPipeline {
     rel: string,
     existing: ExistingChunks,
     chunkMerkleHashes: string[],
-    onProgress: any,
+    onProgress: ProgressCallback | null,
     embedAndStore: (params: EmbedStoreParams) => Promise<void>,
     chunkingStats: any
   ): Promise<void> {
@@ -232,7 +239,7 @@ export class ChunkPipeline {
       rel: string,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: ProgressCallback | null,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
       chunkingStats: any,
       parentNode: TreeSitterNode | null = null
@@ -345,7 +352,7 @@ export class ChunkPipeline {
       rule: LanguageRule,
       existing: ExistingChunks,
       chunkMerkleHashes: string[],
-      onProgress: any,
+      onProgress: ProgressCallback | null,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
       chunkingStats: any
   ): Promise<void> {
