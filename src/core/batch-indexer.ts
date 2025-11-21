@@ -71,17 +71,23 @@ const backoffWithCapEmbed = (attempt: number): number => {
   return Math.min(base, 20000); // cap at 20s
 };
 
-function serializeErrorForLog(error: any): { [key: string]: LogValue } {
+function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
 
   const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
   for (const key of candidates) {
-    if (error[key] !== undefined) info[key] = String(error[key]);
+    const value = (error as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      info[key] = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? value
+        : JSON.stringify(value);
+    }
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const errObj = error as { response?: { data?: unknown }; error?: { data?: unknown } };
+  const responseData = errObj.response?.data ?? errObj.error?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -284,18 +290,6 @@ export class BatchEmbeddingProcessor {
         return;
       }
 
-      // Other errors or max retries reached - fall back to individual processing
-      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
-      log.debug(
-        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
-        {
-          batchSize: currentBatch.length,
-          error: serializeErrorForLog(error)
-        }
-      );
-      log.info('Falling back to individual processing (this will be slower)');
-
-      await this.fallbackToIndividualProcessing(currentBatch);
     }
   }
 
@@ -431,11 +425,19 @@ interface RetryState {
  */
 function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const msg = String((error as any)?.message || '');
-  const status = (error as any)?.status || (error as any)?.statusCode;
-  const topLevelKeys = (error as any)?.topLevelKeys;
-  const hasErrorKey = Array.isArray(topLevelKeys) && topLevelKeys.includes('error');
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const err = error as {
+    message?: string;
+    status?: number;
+    statusCode?: number;
+    topLevelKeys?: string[];
+    response?: { data?: unknown };
+    error?: { data?: unknown };
+  };
+
+  const msg = String(err.message || '');
+  const status = err.status ?? err.statusCode;
+  const hasErrorKey = Array.isArray(err.topLevelKeys) && err.topLevelKeys.includes('error');
+  const responseData = err.response?.data ?? err.error?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;

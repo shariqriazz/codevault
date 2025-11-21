@@ -126,7 +126,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       requestBody.provider = this.routingConfig;
     }
 
-    const stream = await this.openai!.chat.completions.create(requestBody as any);
+    const stream = await this.openai!.chat.completions.create(requestBody);
 
     for await (const chunk of stream as any) {
       const content = chunk.choices[0]?.delta?.content;
