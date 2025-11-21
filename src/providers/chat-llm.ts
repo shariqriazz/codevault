@@ -1,6 +1,7 @@
 import { OpenAI } from 'openai';
 import { createRateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
+import type { ProviderRoutingConfig } from '../config/types.js';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -19,7 +20,7 @@ export abstract class ChatLLMProvider {
   abstract getName(): string;
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
-  
+
   rateLimiter?: any;
 }
 
@@ -30,6 +31,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
   private baseUrl?: string;
   private maxTokensOverride?: number;
   private temperatureOverride?: number;
+  private routingConfig?: ProviderRoutingConfig;
   rateLimiter: any;
 
   constructor(options: ChatOptions = {}) {
@@ -42,6 +44,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
     this.baseUrl = options.baseUrl || process.env.CODEVAULT_CHAT_BASE_URL || process.env.OPENAI_BASE_URL;
     this.maxTokensOverride = options.maxTokens;
     this.temperatureOverride = options.temperature;
+    this.routingConfig = options.routing;
     // Use 'OpenAI' to match rate limiter defaults (rpm: 50)
     this.rateLimiter = createRateLimiter('OpenAI');
   }
@@ -64,16 +67,16 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   async generateCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): Promise<string> {
     await this.init();
-    
+
     const temperature = options.temperature
       ?? this.temperatureOverride
       ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
     const maxTokens = options.maxTokens
       ?? this.maxTokensOverride
       ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
-    
+
     return await this.rateLimiter.execute(async () => {
-      const completion = await this.openai!.chat.completions.create({
+      const requestBody: any = {
         model: this.model,
         messages: messages.map(msg => ({
           role: msg.role,
@@ -81,22 +84,33 @@ export class OpenAIChatProvider extends ChatLLMProvider {
         })),
         temperature,
         max_tokens: maxTokens
-      });
-      
+      };
+
+      // Add provider routing for OpenRouter if configured
+      if (this.routingConfig && this.isOpenRouter()) {
+        requestBody.provider = this.routingConfig;
+      }
+
+      const completion = await this.openai!.chat.completions.create(requestBody);
+
       return completion.choices[0]?.message?.content || '';
     });
   }
 
+  private isOpenRouter(): boolean {
+    return this.baseUrl?.includes('openrouter.ai') ?? false;
+  }
+
   async *generateStreamingCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): AsyncGenerator<string> {
     await this.init();
-    
+
     const temperature = options.temperature ?? parseFloat(process.env.CODEVAULT_CHAT_TEMPERATURE || '0.7');
     const maxTokens = options.maxTokens ?? parseInt(process.env.CODEVAULT_CHAT_MAX_TOKENS || '4096', 10);
-    
+
     // Apply rate limiting to streaming requests to prevent overwhelming the provider
     await this.rateLimiter.execute(async () => Promise.resolve(), 0, 0);
-    
-    const stream = await this.openai!.chat.completions.create({
+
+    const requestBody: any = {
       model: this.model,
       messages: messages.map(msg => ({
         role: msg.role,
@@ -104,9 +118,16 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       })),
       temperature,
       max_tokens: maxTokens,
-      stream: true
-    });
-    
+      stream: true as const
+    };
+
+    // Add provider routing for OpenRouter if configured
+    if (this.routingConfig && this.isOpenRouter()) {
+      requestBody.provider = this.routingConfig;
+    }
+
+    const stream = await (this.openai!.chat.completions.create as any)(requestBody);
+
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {

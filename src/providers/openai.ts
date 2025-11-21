@@ -9,6 +9,7 @@ import {
   estimateTokens
 } from './base.js';
 import type { EmbeddingOptions } from '../config/resolver.js';
+import type { ProviderRoutingConfig } from '../config/types.js';
 
 export class OpenAIProvider extends EmbeddingProvider {
   private openai: OpenAI | null = null;
@@ -16,6 +17,7 @@ export class OpenAIProvider extends EmbeddingProvider {
   private apiKey?: string;
   private baseUrl?: string;
   private dimensionsOverride?: number;
+  private routingConfig?: ProviderRoutingConfig;
   rateLimiter: any;
 
   constructor(options: EmbeddingOptions = {}) {
@@ -28,6 +30,7 @@ export class OpenAIProvider extends EmbeddingProvider {
     this.apiKey = options.apiKey || process.env.CODEVAULT_EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
     this.baseUrl = options.baseUrl || process.env.CODEVAULT_EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL;
     this.dimensionsOverride = options.dimensions;
+    this.routingConfig = options.routing;
     this.rateLimiter = createRateLimiter('OpenAI');
   }
 
@@ -49,18 +52,29 @@ export class OpenAIProvider extends EmbeddingProvider {
 
   async generateEmbedding(text: string): Promise<number[]> {
     await this.init();
-    
+
     const profile = await getModelProfile(this.getName(), this.model);
     const limits = getSizeLimits(profile);
     const maxChars = profile.maxChunkChars || 8000;
-    
+
     return await this.rateLimiter.execute(async () => {
-      const { data } = await this.openai!.embeddings.create({
+      const requestBody: any = {
         model: this.model,
         input: text.slice(0, maxChars)
-      });
+      };
+
+      // Add provider routing for OpenRouter if configured
+      if (this.routingConfig && this.isOpenRouter()) {
+        requestBody.provider = this.routingConfig;
+      }
+
+      const { data } = await this.openai!.embeddings.create(requestBody);
       return data[0].embedding;
     });
+  }
+
+  private isOpenRouter(): boolean {
+    return this.baseUrl?.includes('openrouter.ai') ?? false;
   }
 
   getDimensions(): number {
@@ -140,10 +154,17 @@ export class OpenAIProvider extends EmbeddingProvider {
         }
         
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
-          const { data } = await this.openai!.embeddings.create({
+          const requestBody: any = {
             model: this.model,
             input: currentBatch
-          });
+          };
+
+          // Add provider routing for OpenRouter if configured
+          if (this.routingConfig && this.isOpenRouter()) {
+            requestBody.provider = this.routingConfig;
+          }
+
+          const { data } = await this.openai!.embeddings.create(requestBody);
           return data.map(item => item.embedding);
         });
         
