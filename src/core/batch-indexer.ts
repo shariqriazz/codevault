@@ -285,8 +285,15 @@ export class BatchEmbeddingProcessor {
       }
 
       // Other errors or max retries reached - fall back to individual processing
-      log.error(`Batch processing failed for ${currentBatch.length} chunks`, error);
-      log.warn('Falling back to individual processing (this will be slower)');
+      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
+      log.debug(
+        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
+        {
+          batchSize: currentBatch.length,
+          error: serializeErrorForLog(error)
+        }
+      );
+      log.info('Falling back to individual processing (this will be slower)');
 
       await this.fallbackToIndividualProcessing(currentBatch);
     }
