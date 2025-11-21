@@ -1,7 +1,8 @@
 import { saveMerkleAsync } from '../../indexer/merkle.js';
 import { writeCodemapAsync } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
-import { getTokenCountStats } from '../../chunking/token-counter.js';
+import { getTokenCountStats, type TokenCountStats } from '../../chunking/token-counter.js';
+type TokenStats = TokenCountStats;
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
@@ -9,6 +10,11 @@ import type { IndexProjectResult } from '../types.js';
 import { PersistManager } from './PersistManager.js';
 import fs from 'fs';
 import path from 'path';
+
+interface IndexProgressEvent {
+  type: string;
+  [key: string]: unknown;
+}
 
 /**
  * IndexFinalizationStage handles the finalization of the indexing process:
@@ -23,7 +29,7 @@ export class IndexFinalizationStage {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null,
+    private onProgress: ((event: IndexProgressEvent) => void) | null,
     private persistManager: PersistManager
   ) {}
 
@@ -60,7 +66,7 @@ export class IndexFinalizationStage {
       }
 
       // Get token statistics
-      const tokenStats = getTokenCountStats();
+      const tokenStats: TokenStats = getTokenCountStats();
 
       // Log statistics
       this.logStatistics();
@@ -105,15 +111,15 @@ export class IndexFinalizationStage {
   /**
    * Build the final result object
    */
-  private buildResult(tokenStats: any): IndexProjectResult {
+  private buildResult(tokenStats: TokenStats | undefined): IndexProjectResult {
     return {
       success: true,
       processedChunks: this.state.processedChunks,
       totalChunks: Object.keys(this.state.codemap).length,
       provider: this.context.providerInstance.getName(),
-      errors: this.state.errors,
+      errors: this.state.errors as Array<{ type: string; file?: string; chunkId?: string; error: string }>,
       chunkingStats: this.state.chunkingStats,
-      tokenStats: this.context.modelProfile.useTokens ? tokenStats : undefined
+      tokenStats: this.context.modelProfile.useTokens ? (tokenStats as any) : undefined
     };
   }
 
@@ -145,7 +151,7 @@ export class IndexFinalizationStage {
     for (const rel of orphaned) {
       this.context.db.deleteChunksByFilePath(rel);
       for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
-        if ((meta as any)?.file === rel) {
+        if (meta && typeof meta === 'object' && 'file' in meta && meta.file === rel) {
           delete this.state.codemap[chunkId];
         }
       }

@@ -2,14 +2,13 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { synthesizeAnswer, synthesizeAnswerStreaming } from '../../synthesis/synthesizer.js';
-import {
-  formatSynthesisResult,
-  formatErrorMessage,
+import { 
+  formatSynthesisResult, 
+  formatErrorMessage, 
   formatNoResultsMessage,
-  addCitationFooter
+  addCitationFooter 
 } from '../../synthesis/markdown-formatter.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
-import { print } from '../../utils/logger.js';
 
 export function registerAskCommand(program: Command): void {
   program
@@ -30,32 +29,24 @@ export function registerAskCommand(program: Command): void {
     .option('--stream', 'stream the response in real-time')
     .option('--citations', 'add citation footer')
     .option('--no-metadata', 'hide search metadata')
-    .action(async (question, options) => {
+    .action(async (question: string, options: Record<string, unknown>) => {
       try {
         // Suppress verbose logs
         process.env.CODEVAULT_QUIET = 'true';
-
-        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
-                                      (typeof options.directory === 'string' ? options.directory : null) ||
-                                      (typeof options.path === 'string' ? options.path : null) ||
-                                      '.';
-        const maxChunksStr: string = typeof options.maxChunks === 'string' ? options.maxChunks : '10';
-        const maxChunks = parseInt(maxChunksStr, 10);
-        const temperatureStr: string = typeof options.temperature === 'string' ? options.temperature : '0.7';
-        const temperature = parseFloat(temperatureStr);
+        
+        const resolvedPath = (options.project || options.directory || options.path || '.') as string;
+        const maxChunks = parseInt(options.maxChunks as string, 10);
+        const temperature = parseFloat(options.temperature as string);
         const useReranking = options.reranker !== 'off';
 
         const { scope: scopeFilters } = resolveScopeWithPack(
           {
-            path_glob: options.path_glob,
-            tags: options.tags,
-            lang: options.lang
+            path_glob: options.path_glob as string | undefined,
+            tags: options.tags as string | undefined,
+            lang: options.lang as string | undefined
           },
           { basePath: resolvedPath }
         );
-        const scopeFiltersTyped: import('../../types/search.js').ScopeFilters = scopeFilters;
-        const providerStr: string = typeof options.provider === 'string' ? options.provider : 'auto';
-        const chatProviderStr: string = typeof options.chatProvider === 'string' ? options.chatProvider : 'auto';
 
         // Streaming mode
         if (options.stream) {
@@ -65,28 +56,28 @@ export function registerAskCommand(program: Command): void {
           }).start();
 
           let firstChunk = true;
-
+          
           try {
             for await (const chunk of synthesizeAnswerStreaming(question, {
-              provider: providerStr,
-              chatProvider: chatProviderStr,
+              provider: options.provider as string | undefined,
+              chatProvider: options.chatProvider as string | undefined,
               workingPath: resolvedPath,
-              scope: scopeFiltersTyped,
+              scope: scopeFilters,
               maxChunks,
               useReranking,
               temperature
             })) {
               if (firstChunk) {
                 spinner.succeed(chalk.cyan('🔍 Searching...  ✓'));
-                print(chalk.cyan('🤖 Generating answer...\n'));
-                print(chalk.gray('━'.repeat(80)));
-                print('');
+                console.log(chalk.cyan('🤖 Generating answer...\n'));
+                console.log(chalk.gray('━'.repeat(80)));
+                console.log();
                 firstChunk = false;
               }
               process.stdout.write(chunk);
             }
-
-            print('\n');
+            
+            console.log('\n');
           } catch (error) {
             spinner.fail(chalk.red('Error generating answer'));
             console.error(chalk.red(`\n${(error as Error).message}\n`));
@@ -104,13 +95,13 @@ export function registerAskCommand(program: Command): void {
         }).start();
 
         const result = await synthesizeAnswer(question, {
-          provider: providerStr,
-          chatProvider: chatProviderStr,
+          provider: options.provider as string | undefined,
+          chatProvider: options.chatProvider as string | undefined,
           workingPath: resolvedPath,
-          scope: scopeFiltersTyped,
+          scope: scopeFilters,
           maxChunks,
           useReranking,
-          useMultiQuery: options.multiQuery,
+          useMultiQuery: options.multiQuery as boolean | undefined,
           temperature
         });
 
@@ -125,16 +116,16 @@ export function registerAskCommand(program: Command): void {
 
         if (!result.success) {
           if (result.error === 'no_results') {
-            print(formatNoResultsMessage(result.query, result.queriesUsed));
+            console.log(formatNoResultsMessage(result.query, result.queriesUsed));
           } else {
-            print(formatErrorMessage(result.error || 'Unknown error', result.query));
+            console.log(formatErrorMessage(result.error || 'Unknown error', result.query));
           }
           process.exit(1);
         }
 
-        print('');
-        print(chalk.gray('━'.repeat(80)));
-        print('');
+        console.log();
+        console.log(chalk.gray('━'.repeat(80)));
+        console.log();
 
         let output = formatSynthesisResult(result, {
           includeMetadata: false,  // Hide verbose metadata by default
@@ -145,15 +136,15 @@ export function registerAskCommand(program: Command): void {
           output = addCitationFooter(output);
         }
 
-        print(output);
-
+        console.log(output);
+        
         // Show concise footer
-        print('');
-        print(chalk.gray('━'.repeat(80)));
+        console.log();
+        console.log(chalk.gray('━'.repeat(80)));
         const searchType = result.metadata?.searchType || 'hybrid';
         const provider = result.chatProvider || 'auto';
-        print(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
-        print('');
+        console.log(chalk.gray(`ℹ️  ${result.chunksAnalyzed || maxChunks} code chunks analyzed • ${searchType} search • ${provider}`));
+        console.log();
 
         delete process.env.CODEVAULT_QUIET;
 

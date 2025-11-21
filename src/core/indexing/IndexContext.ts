@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits, type EmbeddingProvider } from '../../providers/index.js';
 import { BATCH_SIZE } from '../../providers/base.js';
+import type { ModelProfile } from '../../providers/base.js';
 import { readCodemap, type Codemap } from '../../codemap/io.js';
 import { loadMerkle, cloneMerkle, type MerkleTree } from '../../indexer/merkle.js';
 import { resolveEncryptionPreference } from '../../storage/encrypted-chunks.js';
@@ -18,12 +19,12 @@ export interface IndexContextData {
   providerInstance: EmbeddingProvider;
   providerName: string;
   modelName: string | null;
-  modelProfile: any;
-  limits: any;
+  modelProfile: ModelProfile;
+  limits: ReturnType<typeof getSizeLimits>;
   codemapPath: string;
   chunkDir: string;
   dbPath: string;
-  encryptionPreference: any;
+  encryptionPreference: ReturnType<typeof resolveEncryptionPreference>;
   codemap: Codemap;
   merkle: MerkleTree;
   updatedMerkle: MerkleTree;
@@ -85,7 +86,7 @@ export class IndexContext {
     }
 
     // Initialize database
-    initDatabase(providerInstance.getDimensions(), repo);
+    void initDatabase(providerInstance.getDimensions(), repo);
 
     // Setup paths
     const codemapPath = path.join(repo, 'codevault.codemap.json');
@@ -151,15 +152,16 @@ export class IndexContext {
 
     const db = new Database(dbPath);
     try {
-      const existingDimensions = db.getExistingDimensions();
+      const existingDimensions = await db.getExistingDimensions();
 
       if (existingDimensions.length > 0) {
         const currentProvider = embeddingProvider.getName();
         const currentDimensions = embeddingProvider.getDimensions();
 
         const hasMismatch = existingDimensions.some(
-          row => row.embedding_provider !== currentProvider ||
-                 row.embedding_dimensions !== currentDimensions
+          (row: { embedding_provider: string; embedding_dimensions: number }) =>
+            row.embedding_provider !== currentProvider ||
+            row.embedding_dimensions !== currentDimensions
         );
 
         if (hasMismatch) {

@@ -152,7 +152,7 @@ export function registerChatCommand(program: Command): void {
             }
 
           } catch (error) {
-            if ((error as any).code === 'ERR_USE_AFTER_CLOSE') {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_USE_AFTER_CLOSE') {
               // User pressed Ctrl+C
               isRunning = false;
               break;

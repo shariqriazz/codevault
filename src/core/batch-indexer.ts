@@ -3,27 +3,42 @@ import type { EmbeddingProvider } from '../providers/base.js';
 import type { Database } from '../database/db.js';
 import { Mutex } from '../utils/mutex.js';
 import { log, type LogValue } from '../utils/logger.js';
+import type { CodevaultMetadata, ImportantVariable } from './metadata.js';
+
+interface ErrorLike {
+  message?: string;
+  status?: number;
+  statusCode?: number;
+  response?: {
+    data?: unknown;
+  };
+  error?: {
+    data?: unknown;
+  };
+  topLevelKeys?: unknown;
+}
 
 const MAX_BATCH_RETRIES = 3;
 const MAX_TRANSIENT_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
-const _MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
-const _MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
-const _MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
+const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
+const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
+const MAX_FATAL_SUBDIVISION_DEPTH = 1; // After a fatal API response, only split once before fallback
 const MAX_FATAL_RETRIES = 1; // Try fatal batch once more, then per-chunk
 const MAX_ANY_RETRIES = 6; // Upper cap for repeated full-batch retries on transient/provider errors
 
-const _backoffWithCap = (attempt: number): number => {
+const backoffWithCap = (attempt: number): number => {
   const base = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
   return Math.min(base, 30000); // cap at 30s
 };
 
 function isRateLimitError(error: unknown): boolean {
-  const message = String((error as any)?.message || error);
+  const errorLike = error as ErrorLike;
+  const message = errorLike?.message || String(error);
   return (
-    (error as any)?.status === 429 ||
-    (error as any)?.statusCode === 429 ||
+    errorLike?.status === 429 ||
+    errorLike?.statusCode === 429 ||
     message.includes('rate limit') ||
     message.includes('Rate limit') ||
     message.includes('too many requests') ||
@@ -32,9 +47,10 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 function isBatchSizeError(error: unknown): boolean {
-  const message = String((error as any)?.message || error);
+  const errorLike = error as ErrorLike;
+  const message = errorLike?.message || String(error);
   return (
-    (error as any)?.status === 413 ||
+    errorLike?.status === 413 ||
     message.includes('too large') ||
     message.includes('payload') ||
     message.includes('request size') ||
@@ -43,11 +59,12 @@ function isBatchSizeError(error: unknown): boolean {
 }
 
 function isTransientApiError(error: unknown): boolean {
-  const status = (error as any)?.status || (error as any)?.statusCode;
-  const message = String((error as any)?.message || error);
+  const errorLike = error as ErrorLike;
+  const status = errorLike?.status || errorLike?.statusCode;
+  const message = errorLike?.message || String(error);
 
   // Upstream 5xx/gateway and common flaky transport signals
-  return Boolean(
+  return (
     (typeof status === 'number' && status >= 500 && status < 600) ||
     message.includes('Invalid API response') ||
     message.includes('Bad Gateway') ||
@@ -75,19 +92,20 @@ function serializeErrorForLog(error: unknown): { [key: string]: LogValue } {
   const info: { [key: string]: LogValue } = {};
   if (!error) return { message: 'unknown error' };
 
-  const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'];
+  const errorLike = error as ErrorLike & Record<string, unknown>;
+  const candidates = ['message', 'name', 'code', 'status', 'statusCode', 'type'] as const;
   for (const key of candidates) {
-    const value = (error as Record<string, unknown>)[key];
-    if (value !== undefined) {
-      info[key] = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-        ? value
-        : JSON.stringify(value);
+    if (errorLike[key] !== undefined) {
+      const value = errorLike[key];
+      info[key] =
+        typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+          ? value
+          : JSON.stringify(value);
     }
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const errObj = error as { response?: { data?: unknown }; error?: { data?: unknown } };
-  const responseData = errObj.response?.data ?? errObj.error?.data;
+  const responseData = errorLike?.response?.data ?? errorLike?.error?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -110,10 +128,10 @@ interface ChunkToEmbed {
     rel: string;
     symbol: string;
     chunkType: string;
-    codevaultMetadata: any;
-    importantVariables: any[];
+    codevaultMetadata: CodevaultMetadata;
+    importantVariables: ImportantVariable[];
     docComments: string | null;
-    contextInfo: any;
+    contextInfo: Record<string, unknown>;
   };
 }
 
@@ -146,7 +164,7 @@ export class BatchEmbeddingProcessor {
   async addChunk(chunk: ChunkToEmbed): Promise<void> {
     let batchToProcess: ChunkToEmbed[] | null = null;
 
-    await this.mutex.runExclusive(() => {
+    await this.mutex.runExclusive(async () => {
       this.batch.push(chunk);
 
       // Snapshot the batch when it reaches the threshold; process it outside the lock
@@ -154,7 +172,6 @@ export class BatchEmbeddingProcessor {
         batchToProcess = this.batch;
         this.batch = [];
       }
-      return Promise.resolve();
     });
 
     if (batchToProcess) {
@@ -168,12 +185,11 @@ export class BatchEmbeddingProcessor {
   async flush(): Promise<void> {
     let batchToProcess: ChunkToEmbed[] | null = null;
 
-    await this.mutex.runExclusive(() => {
+    await this.mutex.runExclusive(async () => {
       if (this.batch.length > 0) {
         batchToProcess = this.batch;
         this.batch = [];
       }
-      return Promise.resolve();
     });
 
     if (batchToProcess) {
@@ -289,9 +305,22 @@ export class BatchEmbeddingProcessor {
           depth,
           fatalApi || fatalSeen
         );
-        return;
       }
 
+      // Other errors or max retries reached - fall back to individual processing
+      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
+      // eslint-disable-next-line no-unreachable
+      log.debug(
+        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
+        {
+          batchSize: currentBatch.length,
+          error: serializeErrorForLog(error)
+        }
+      );
+      log.info('Falling back to individual processing (this will be slower)');
+
+      await this.fallbackToIndividualProcessing(currentBatch);
+      return;
     }
   }
 
@@ -344,7 +373,7 @@ export class BatchEmbeddingProcessor {
         codevault_intent: chunk.params.codevaultMetadata.intent,
         codevault_description: chunk.params.codevaultMetadata.description,
         doc_comments: chunk.params.docComments,
-        variables_used: chunk.params.importantVariables,
+        variables_used: chunk.params.importantVariables.map(v => v.name),
         context_info: chunk.params.contextInfo
       };
     });
@@ -384,7 +413,7 @@ export class BatchEmbeddingProcessor {
           codevault_intent: chunk.params.codevaultMetadata.intent,
           codevault_description: chunk.params.codevaultMetadata.description,
           doc_comments: chunk.params.docComments,
-          variables_used: chunk.params.importantVariables,
+          variables_used: chunk.params.importantVariables.map(v => v.name),
           context_info: chunk.params.contextInfo
         });
       } catch (individualError) {
@@ -427,23 +456,15 @@ interface RetryState {
  */
 function isFatalApiResponse(error: unknown): boolean {
   if (!error) return false;
-  const err = error as {
-    message?: string;
-    status?: number;
-    statusCode?: number;
-    topLevelKeys?: string[];
-    response?: { data?: unknown };
-    error?: { data?: unknown };
-  };
-
-  const msg = String(err.message || '');
-  const status = err.status ?? err.statusCode;
-  const hasErrorKey = Array.isArray(err.topLevelKeys) && err.topLevelKeys.includes('error');
-  const responseData = err.response?.data ?? err.error?.data;
+  const errorLike = error as ErrorLike & { topLevelKeys?: unknown[] };
+  const msg = errorLike?.message || '';
+  const status = errorLike?.status || errorLike?.statusCode;
+  const hasErrorKey = Array.isArray(errorLike?.topLevelKeys) && errorLike.topLevelKeys.includes('error');
+  const responseData = errorLike?.response?.data ?? errorLike?.error?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;
   const noProvider = msg.includes('No successful provider responses') || status === 404;
 
-  return Boolean(invalidApi || hasErrorKey || clientError || noProvider || !!responseData);
+  return invalidApi || hasErrorKey || clientError || noProvider || !!responseData;
 }

@@ -50,7 +50,8 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   }
 
   const normalizedError = error instanceof Error ? error : new Error(String(error));
-  const code = (error as any)?.code;
+  const errorObj = error as Record<string, unknown>;
+  const code = typeof errorObj?.code === 'string' ? errorObj.code : undefined;
 
   if (code === 'ENCRYPTION_KEY_REQUIRED') {
     return {
@@ -87,7 +88,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   };
 }
 
-function buildMcpErrorResponse(error: unknown): { content: Array<{ type: string; text: string }>; isError: boolean } {
+function buildMcpErrorResponse(error: unknown) {
   const payload = formatMcpError(error);
   return {
     content: [
@@ -113,7 +114,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: any = null;
+  private sessionContextPack: unknown = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -132,8 +133,8 @@ export class McpServer {
     this.setupHandlers();
   }
 
-  private setupHandlers(): void {
-    this.server.setRequestHandler(ListToolsRequestSchema, () => {
+  private setupHandlers() {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: Tool[] = [
         {
           name: 'search_code',
@@ -311,20 +312,13 @@ export class McpServer {
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        if (error && typeof error === 'object' && 'issues' in error) {
-          const issues = (error as any).issues;
-          if (Array.isArray(issues)) {
-            const validationError = `Validation Error: ${issues.map((i: any) => {
-              const path = i.path;
-              const pathArray: string[] = Array.isArray(path) ? path : [];
-              const pathStr = pathArray.join('.');
-              return `${pathStr}: ${i.message}`;
-            }).join(', ')}`;
-            return {
-              content: [{ type: 'text', text: validationError }],
-              isError: true,
-            };
-          }
+        if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as Record<string, unknown>).issues)) {
+          const issues = (error as Record<string, unknown>).issues as Array<{ path: string[]; message: string }>;
+          const validationError = `Validation Error: ${issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+          return {
+            content: [{ type: 'text', text: validationError }],
+            isError: true,
+          };
         }
 
         return {
@@ -334,53 +328,51 @@ export class McpServer {
     });
   }
 
-  public async start(): Promise<void> {
+  public async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-
+    
     logger.info('CodeVault MCP Server started', { version: packageJson.version });
-
+    
     this.scheduleCacheCleanup();
     this.setupShutdownHandlers();
   }
 
-  private scheduleCacheCleanup(): void {
+  private scheduleCacheCleanup() {
     if (this.cacheCleanupTimer) {
       clearInterval(this.cacheCleanupTimer);
     }
-
+    
     this.cacheCleanupTimer = setInterval(() => {
       try {
         clearSearchCaches();
         clearTokenCache();
-
+        
         logger.debug('Cache cleared periodically');
-      } catch {
+      } catch (error) {
         // Ignore errors during cleanup
       }
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
   }
 
-  private setupShutdownHandlers(): void {
-    const cleanup = () => {
+  private setupShutdownHandlers() {
+    const cleanup = async () => {
       if (this.cacheCleanupTimer) {
         clearInterval(this.cacheCleanupTimer);
         this.cacheCleanupTimer = null;
       }
-
+      
       this.sessionContextPack = null;
       clearSearchCaches();
       clearTokenCache();
     };
-
+    
     process.on('SIGINT', () => {
-      cleanup();
-      process.exit(0);
+      void cleanup().then(() => process.exit(0));
     });
 
     process.on('SIGTERM', () => {
-      cleanup();
-      process.exit(0);
+      void cleanup().then(() => process.exit(0));
     });
   }
 }

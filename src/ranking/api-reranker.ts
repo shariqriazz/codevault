@@ -55,6 +55,24 @@ interface RerankResult {
   logit?: number;
 }
 
+function isResultsResponse(data: unknown): data is { results: RerankResult[] } {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    'results' in data &&
+    Array.isArray((data as { results?: unknown }).results)
+  );
+}
+
+function hasDataArray(data: unknown): data is { data: RerankResult[] } {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    'data' in data &&
+    Array.isArray((data as { data?: unknown }).data)
+  );
+}
+
 async function callRerankAPI(query: string, documents: string[], config: RerankAPIConfig = {}): Promise<RerankResult[]> {
   const apiUrl = config.apiUrl || getAPIUrl();
   const apiKey = config.apiKey || getAPIKey();
@@ -90,22 +108,22 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     throw new Error(`Rerank API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json();
 
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
-  if (data.results && Array.isArray(data.results)) {
-    return data.results as RerankResult[];
+  if (isResultsResponse(data)) {
+    return data.results;
   }
 
   // Alternative response format (some providers use data array)
-  if (data.data && Array.isArray(data.data)) {
-    return data.data as RerankResult[];
+  if (hasDataArray(data)) {
+    return data.data;
   }
 
   // Fallback for direct array response
   if (Array.isArray(data)) {
-    return data as RerankResult[];
+    return data;
   }
 
   throw new Error(`Unexpected rerank API response format. Expected {results: [...]} but got: ${JSON.stringify(data).slice(0, 200)}`);
@@ -114,7 +132,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
 interface Candidate {
   rerankerScore?: number;
   rerankerRank?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface RerankOptions {

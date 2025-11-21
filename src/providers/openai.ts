@@ -1,10 +1,9 @@
 import { OpenAI } from 'openai';
-import type { ClientOptions } from 'openai';
-import type { EmbeddingCreateParams } from 'openai/resources/embeddings';
 import { createRateLimiter, RateLimiter } from '../utils/rate-limiter.js';
 import {
   EmbeddingProvider,
   getModelProfile,
+  getSizeLimits,
   MAX_BATCH_TOKENS,
   MAX_ITEM_TOKENS,
   estimateTokens
@@ -41,9 +40,9 @@ export class OpenAIProvider extends EmbeddingProvider {
     }
   }
 
-  init(): Promise<void> {
+  async init(): Promise<void> {
     if (!this.openai) {
-      const config: ClientOptions = {};
+      const config: { apiKey?: string; baseURL?: string } = {};
 
       if (this.apiKey) {
         config.apiKey = this.apiKey;
@@ -55,42 +54,40 @@ export class OpenAIProvider extends EmbeddingProvider {
 
       this.openai = new OpenAI(config);
     }
-    return Promise.resolve();
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     await this.init();
 
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
-    }
-
-    const openai = this.openai;
     const profile = await getModelProfile(this.getName(), this.model);
+    const limits = getSizeLimits(profile);
     const maxChars = profile.maxChunkChars || 8000;
 
-    return await this.rateLimiter.execute(async (): Promise<number[]> => {
-      const requestBody: EmbeddingCreateParams = {
+    return await this.rateLimiter.execute(async () => {
+      const requestBody: {
+        model: string;
+        input: string;
+        provider?: ProviderRoutingConfig;
+      } = {
         model: this.model,
         input: text.slice(0, maxChars)
       };
 
       // Add provider routing for OpenRouter if configured
       if (this.routingConfig && this.isOpenRouter()) {
-        (requestBody as any).provider = this.routingConfig;
+        requestBody.provider = this.routingConfig;
       }
 
-      const response = await openai.embeddings.create(requestBody);
+      const response = await this.openai!.embeddings.create(requestBody);
 
       // Validate response structure
       if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
         const meta = {
-          topLevelKeys: response ? Object.keys(response) : [],
+          topLevelKeys: response ? Object.keys(response as unknown as Record<string, unknown>) : [],
           dataType: typeof response?.data,
           dataLength: Array.isArray(response?.data) ? response.data.length : undefined
         };
-        const { log } = await import('../utils/logger.js');
-        log.debug('[codevault] Invalid API response (single)', meta);
+        console.debug('[codevault] Invalid API response (single)', meta);
         throw new Error(`Invalid API response: expected data array with at least one item, got ${typeof response?.data}`);
       }
 
@@ -134,11 +131,6 @@ export class OpenAIProvider extends EmbeddingProvider {
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     await this.init();
 
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
-    }
-
-    const openai = this.openai;
     const profile = await getModelProfile(this.getName(), this.model);
     const maxChars = profile.maxChunkChars || 8000;
     const maxItemTokens = profile.maxTokens || MAX_ITEM_TOKENS;
@@ -186,35 +178,38 @@ export class OpenAIProvider extends EmbeddingProvider {
       // Process current batch if not empty
       if (currentBatch.length > 0) {
         if (!process.env.CODEVAULT_QUIET) {
-          const { log } = await import('../utils/logger.js');
-          log.debug(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
+          console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
         }
 
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
-          const requestBody: EmbeddingCreateParams = {
+          const requestBody: {
+            model: string;
+            input: string[];
+            provider?: ProviderRoutingConfig;
+          } = {
             model: this.model,
             input: currentBatch
           };
 
           // Add provider routing for OpenRouter if configured
           if (this.routingConfig && this.isOpenRouter()) {
-            (requestBody as any).provider = this.routingConfig;
+            requestBody.provider = this.routingConfig;
           }
 
-          const response = await openai.embeddings.create(requestBody);
+          const response = await this.openai!.embeddings.create(requestBody);
 
           // Validate response structure
           if (!response || !response.data || !Array.isArray(response.data)) {
+            const responseObj = response as unknown as Record<string, unknown>;
             const meta = {
-              topLevelKeys: response ? Object.keys(response) : [],
+              topLevelKeys: response ? Object.keys(responseObj) : [],
               dataType: typeof response?.data,
               dataLength: Array.isArray(response?.data) ? response.data.length : undefined,
-              errorPayload: (response as any)?.error ? JSON.stringify((response as any).error).slice(0, 200) : undefined
+              errorPayload: responseObj?.error ? JSON.stringify(responseObj.error).slice(0, 200) : undefined
             };
             // Surface only at debug level; normal runs stay clean
             if (process.env.CODEVAULT_LOG_LEVEL === 'debug') {
-              const { log } = await import('../utils/logger.js');
-              log.debug('[codevault] Invalid API response (batch)', meta);
+              console.warn('[codevault] Invalid API response (batch)', meta);
             }
             throw new Error(`Invalid API response: expected data array, got ${typeof response?.data}`);
           }
@@ -235,14 +230,12 @@ export class OpenAIProvider extends EmbeddingProvider {
           return embeddings;
         });
 
-        const batchEmbeddingsTyped: number[][] = batchEmbeddings;
-        allEmbeddings.push(...batchEmbeddingsTyped);
+        allEmbeddings.push(...batchEmbeddings);
       }
     }
-
+    
     if (!process.env.CODEVAULT_QUIET) {
-      const { log } = await import('../utils/logger.js');
-      log.debug(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
+      console.log(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
     }
 
     return allEmbeddings;

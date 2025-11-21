@@ -11,7 +11,7 @@ export class IndexState {
   merkleDirty = false;
   indexMutated = false;
   processedChunks = 0;
-  errors: any[] = [];
+  errors: unknown[] = [];
   chunkingStats: ChunkingStats = {
     totalNodes: 0,
     skippedSmall: 0,

@@ -28,13 +28,18 @@ export const askCodebaseResultSchema = z.object({
   error: z.string().optional()
 });
 
+interface ErrorLogger {
+  log?: (error: unknown, context: Record<string, unknown>) => void;
+  debugLog?: (message: string, context: Record<string, unknown>) => void;
+}
+
 interface CreateHandlerOptions {
-  sessionPack?: any;
-  errorLogger?: any;
+  sessionPack?: unknown;
+  errorLogger?: ErrorLogger;
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
-  const { errorLogger } = options;
+  const { sessionPack, errorLogger } = options;
 
   return async (params: {
     question: string;
@@ -138,7 +143,11 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
   };
 }
 
-export function registerAskCodebaseTool(server: any, options: CreateHandlerOptions = {}): (params: any) => Promise<{ success: boolean; answer?: string; message?: string; content?: string; query?: string; queriesUsed?: string[]; error?: string }> {
+interface MCPServer {
+  tool: (name: string, schema: Record<string, unknown>, handler: (params: unknown) => Promise<unknown>) => void;
+}
+
+export function registerAskCodebaseTool(server: MCPServer, options: CreateHandlerOptions = {}) {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(
@@ -156,20 +165,8 @@ export function registerAskCodebaseTool(server: any, options: CreateHandlerOptio
       multi_query: z.boolean().optional().describe('Break complex questions into sub-queries'),
       temperature: z.number().min(0).max(2).optional().describe('LLM temperature (default: 0.7)')
     },
-    async (params: {
-      question: string;
-      provider?: string;
-      chat_provider?: string;
-      path?: string;
-      max_chunks?: number;
-      path_glob?: string | string[];
-      tags?: string | string[];
-      lang?: string | string[];
-      reranker?: 'on' | 'off';
-      multi_query?: boolean;
-      temperature?: number;
-    }) => {
-      const result = await handler(params);
+    async (params: unknown) => {
+      const result = await handler(params as Parameters<typeof handler>[0]);
       return {
         content: [
           {

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ContextPackSchema, extractScopeFromPackDefinition } from '../types/context-pack.js';
+import { ContextPackSchema, extractScopeFromPackDefinition, type ContextPack } from '../types/context-pack.js';
 import { normalizeScopeFilters } from '../search/scope.js';
 import type { ScopeFilters } from '../types/search.js';
 
@@ -12,7 +12,7 @@ interface PackInfo {
   key: string;
   name: string;
   description: string | null;
-  scope: Record<string, any>;
+  scope: Record<string, unknown>;
   path: string;
   invalid?: boolean;
 }
@@ -47,7 +47,7 @@ function buildCacheKey(filePath: string): string {
   return path.resolve(filePath);
 }
 
-function readJsonFile(filePath: string): any {
+function readJsonFile(filePath: string): unknown {
   const content = fs.readFileSync(filePath, 'utf8');
   try {
     return JSON.parse(content);
@@ -56,7 +56,7 @@ function readJsonFile(filePath: string): any {
   }
 }
 
-function toContextPackObject(key: string, filePath: string, data: any): PackInfo {
+function toContextPackObject(key: string, filePath: string, data: unknown): PackInfo {
   const parsed = ContextPackSchema.parse(data);
   const scope = extractScopeFromPackDefinition(parsed);
   const packName = typeof parsed.name === 'string' && parsed.name.trim().length > 0
@@ -67,9 +67,8 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
     ? parsed.description.trim()
     : undefined;
 
-  const scopeDefinition: Record<string, any> = {};
-  const scopeKeyArr: readonly string[] = PACK_SCOPE_KEYS;
-  for (const scopeKey of scopeKeyArr) {
+  const scopeDefinition: Record<string, unknown> = {};
+  for (const scopeKey of PACK_SCOPE_KEYS) {
     if (Object.prototype.hasOwnProperty.call(scope, scopeKey) && typeof scope[scopeKey] !== 'undefined') {
       scopeDefinition[scopeKey] = scope[scopeKey];
     }
@@ -85,24 +84,20 @@ function toContextPackObject(key: string, filePath: string, data: any): PackInfo
 }
 
 export function getContextPackDirectory(basePath = '.'): string {
-  const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
-  return getPackDir(basePathStr);
+  return getPackDir(basePath);
 }
 
 export function loadContextPack(name: string, basePath = '.'): PackInfo {
-  const nameStr: string = typeof name === 'string' ? name : String(name);
-  const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
-
-  if (!nameStr || typeof nameStr !== 'string') {
+  if (!name || typeof name !== 'string') {
     throw new Error('Context pack name must be a non-empty string');
   }
 
-  const packDir = getPackDir(basePathStr);
-  const fileName = `${nameStr}.json`;
+  const packDir = getPackDir(basePath);
+  const fileName = `${name}.json`;
   const filePath = path.join(packDir, fileName);
 
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Context pack "${nameStr}" not found in ${packDir}`);
+    throw new Error(`Context pack "${name}" not found in ${packDir}`);
   }
 
   const stats = fs.statSync(filePath);
@@ -114,7 +109,7 @@ export function loadContextPack(name: string, basePath = '.'): PackInfo {
   }
 
   const rawData = readJsonFile(filePath);
-  const pack = toContextPackObject(nameStr, filePath, rawData);
+  const pack = toContextPackObject(name, filePath, rawData);
 
   packCache.set(cacheKey, { pack, mtimeMs: stats.mtimeMs });
   return pack;
@@ -161,18 +156,18 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
       return null;
     }
 
-    const key: string | null = typeof rawState.key === 'string' ? rawState.key : null;
+    const state = rawState as Record<string, unknown>;
+    const key = typeof state.key === 'string' ? state.key : null;
     if (!key) {
       return null;
     }
 
-    const basePathStr: string = typeof basePath === 'string' ? basePath : '.';
-    const pack = loadContextPack(key, basePathStr);
+    const pack = loadContextPack(key, basePath);
     return {
       ...pack,
-      appliedAt: rawState.appliedAt || null
+      appliedAt: (state.appliedAt as string | null) || null
     };
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -191,7 +186,7 @@ export function setActiveContextPack(name: string, basePath = '.'): PackInfo {
 }
 
 export function resolveScopeWithPack(
-  overrides: any = {},
+  overrides: Record<string, unknown> = {},
   options: { basePath?: string; sessionPack?: SessionPack | null } = {}
 ): { scope: ScopeFilters; pack: { key: string; name: string; description: string | null } | null } {
   const basePath = options.basePath || '.';
@@ -210,7 +205,7 @@ export function resolveScopeWithPack(
     basePack = getActiveContextPack(basePath);
   }
 
-  const combined: any = {};
+  const combined: Record<string, unknown> = {};
 
   if (basePack && basePack.scope) {
     for (const key of PACK_SCOPE_KEYS) {
@@ -226,8 +221,7 @@ export function resolveScopeWithPack(
     }
   }
 
-  const scopePartial: Partial<ScopeFilters> = combined;
-  const scope = normalizeScopeFilters(scopePartial);
+  const scope = normalizeScopeFilters(combined);
   const packInfo = basePack
     ? { key: basePack.key, name: basePack.name, description: basePack.description || null }
     : null;
