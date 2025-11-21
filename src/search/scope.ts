@@ -85,13 +85,14 @@ export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): D
   let filtered = chunks;
 
   if (normalized.path_glob && normalized.path_glob.length > 0) {
+    const pathGlobs = normalized.path_glob;
     filtered = filtered.filter(chunk => {
       const filePath = chunk.file_path || '';
       if (!filePath) {
         return false;
       }
 
-      return micromatch.isMatch(filePath, normalized.path_glob!, { dot: true });
+      return micromatch.isMatch(filePath, pathGlobs, { dot: true });
     });
   }
 

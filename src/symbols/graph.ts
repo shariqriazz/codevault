@@ -27,12 +27,15 @@ function buildSymbolIndex(codemap: Codemap): Map<string, SymbolCandidate[]> {
     if (!index.has(key)) {
       index.set(key, []);
     }
-    index.get(key)!.push({
-      chunkId,
-      sha: entry.sha,
-      file: entry.file,
-      symbol
-    });
+    const candidates = index.get(key);
+    if (candidates) {
+      candidates.push({
+        chunkId,
+        sha: entry.sha,
+        file: entry.file,
+        symbol
+      });
+    }
   }
   
   return index;
@@ -97,7 +100,10 @@ export function attachSymbolGraphToCodemap(codemap: Codemap): Codemap {
       if (!incoming.has(targetSha)) {
         incoming.set(targetSha, new Set());
       }
-      incoming.get(targetSha)!.add(fromSha);
+      const incomingSet = incoming.get(targetSha);
+      if (incomingSet) {
+        incomingSet.add(fromSha);
+      }
     }
   }
 

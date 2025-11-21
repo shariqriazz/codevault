@@ -21,5 +21,6 @@ test('applySymbolBoost caps total score at or below 1.0', () => {
   applySymbolBoost(results as any, { query: 'process payment', codemap });
 
   assert.ok(results[0].score <= 1, 'score should not exceed 1.0');
-  assert.ok((results[0] as any).symbolBoost! <= 0.45, 'boost should respect cap');
+  const symbolBoost = (results[0] as any).symbolBoost;
+  assert.ok(symbolBoost !== undefined && symbolBoost <= 0.45, 'boost should respect cap');
 });

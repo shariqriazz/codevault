@@ -38,8 +38,10 @@ export class Mutex {
    */
   release(): void {
     if (this.queue.length > 0) {
-      const resolve = this.queue.shift()!;
-      resolve();
+      const resolve = this.queue.shift();
+      if (resolve) {
+        resolve();
+      }
     } else {
       this.locked = false;
     }
@@ -98,8 +100,10 @@ export class Semaphore {
    */
   release(): void {
     if (this.queue.length > 0) {
-      const resolve = this.queue.shift()!;
-      resolve();
+      const resolve = this.queue.shift();
+      if (resolve) {
+        resolve();
+      }
     } else {
       this.permits = Math.min(this.permits + 1, this.maxPermits);
     }

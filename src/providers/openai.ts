@@ -59,6 +59,11 @@ export class OpenAIProvider extends EmbeddingProvider {
   async generateEmbedding(text: string): Promise<number[]> {
     await this.init();
 
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const openai = this.openai;
     const profile = await getModelProfile(this.getName(), this.model);
     const maxChars = profile.maxChunkChars || 8000;
 
@@ -73,7 +78,7 @@ export class OpenAIProvider extends EmbeddingProvider {
         requestBody.provider = this.routingConfig;
       }
 
-      const response = await this.openai!.embeddings.create(requestBody);
+      const response = await openai.embeddings.create(requestBody);
 
       // Validate response structure
       if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
@@ -127,6 +132,11 @@ export class OpenAIProvider extends EmbeddingProvider {
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     await this.init();
 
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const openai = this.openai;
     const profile = await getModelProfile(this.getName(), this.model);
     const maxChars = profile.maxChunkChars || 8000;
     const maxItemTokens = profile.maxTokens || MAX_ITEM_TOKENS;
@@ -189,7 +199,7 @@ export class OpenAIProvider extends EmbeddingProvider {
             requestBody.provider = this.routingConfig;
           }
 
-          const response = await this.openai!.embeddings.create(requestBody);
+          const response = await openai.embeddings.create(requestBody);
 
           // Validate response structure
           if (!response || !response.data || !Array.isArray(response.data)) {
