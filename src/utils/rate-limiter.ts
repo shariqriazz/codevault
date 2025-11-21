@@ -180,13 +180,13 @@ export class RateLimiter {
            message.includes('too many requests');
   }
 
-  getStats() {
+  getStats(): { rpm: number | null; tpm: number | null; queueLength: number; maxQueueSize: number; queueUtilization: string; requestsInLastMinute: number; tokensInLastMinute: number; isRpmLimited: boolean; isTpmLimited: boolean; isLimited: boolean } {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     const tokensInLastMinute = this.tokenUsage
       .filter(entry => entry.time > oneMinuteAgo)
       .reduce((sum, entry) => sum + entry.tokens, 0);
-        
+
     return {
       rpm: this.rpm,
       tpm: this.tpm,

@@ -28,14 +28,9 @@ export const askCodebaseResultSchema = z.object({
   error: z.string().optional()
 });
 
-interface ErrorLogger {
-  debugLog?: (message: string, context?: Record<string, any>) => void;
-  log?: (error: unknown, context?: Record<string, any>) => void;
-}
-
 interface CreateHandlerOptions {
   sessionPack?: any;
-  errorLogger?: ErrorLogger;
+  errorLogger?: any;
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
@@ -143,15 +138,7 @@ export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
   };
 }
 
-interface MCPServer {
-  tool: (
-    name: string,
-    schema: Record<string, any>,
-    handler: (params: any) => Promise<any>
-  ) => void;
-}
-
-export function registerAskCodebaseTool(server: MCPServer, options: CreateHandlerOptions = {}) {
+export function registerAskCodebaseTool(server: any, options: CreateHandlerOptions = {}): (params: any) => Promise<{ success: boolean; answer?: string; message?: string; content?: string; query?: string; queriesUsed?: string[]; error?: string }> {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(

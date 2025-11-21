@@ -18,7 +18,7 @@ const dummyProfile: ModelProfile = {
   tokenizerType: 'estimate'
 };
 
-function makeNode(type: string, children: any[] = [], startIndex = 0, endIndex = 0) {
+function makeNode(type: string, children: any[] = [], startIndex = 0, endIndex = 0): { type: string; startIndex: number; endIndex: number; childCount: number; child: (idx: number) => any } {
   return {
     type,
     startIndex,
@@ -60,7 +60,7 @@ test('yieldStatementChunks batches token counting once per line', async () => {
   const node = makeNode('function', [], 0, source.length);
 
   let tokenCounterCalls = 0;
-  const tokenCounter = (text: string) => {
+  const tokenCounter = (text: string): number => {
     tokenCounterCalls++;
     return text.length;
   };

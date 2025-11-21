@@ -233,7 +233,7 @@ export class HybridFusion {
   /**
    * Get chunk loading failure statistics
    */
-  getChunkLoadingFailures() {
+  getChunkLoadingFailures(): { totalAttempted: number; failed: number; reasons: Record<string, number> } | undefined {
     if (this.chunkLoadingStats.failed === 0) {
       return undefined;
     }

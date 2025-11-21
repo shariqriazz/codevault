@@ -15,13 +15,13 @@ export function findSemanticSubdivisions(node: TreeSitterNode, rule: LanguageRul
   if (subdivisionTypes.length === 0) return [];
   
   const candidates: TreeSitterNode[] = [];
-  
-  function walk(n: TreeSitterNode, depth = 0) {
+
+  function walk(n: TreeSitterNode, depth = 0): void {
     if (depth > 0 && subdivisionTypes.includes(n.type)) {
       candidates.push(n);
       return;
     }
-    
+
     for (let i = 0; i < n.childCount; i++) {
       const child = n.child(i);
       if (child) {

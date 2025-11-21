@@ -27,7 +27,7 @@ export function reciprocalRankFusion({
 }: ReciprocalRankFusionOptions): FusedItem[] {
   const scores = new Map<string, FusedItem>();
 
-  const addScores = (items: SearchItem[], source: 'vector' | 'bm25') => {
+  const addScores = (items: SearchItem[], source: 'vector' | 'bm25'): void => {
     items.forEach((item, index) => {
       if (!item || typeof item.id === 'undefined') {
         return;

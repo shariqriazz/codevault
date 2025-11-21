@@ -85,7 +85,7 @@ class InteractivePrompt {
     }
   }
 
-  close() {
+  close(): void {
     this.rl.close();
   }
 }
