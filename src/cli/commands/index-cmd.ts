@@ -71,8 +71,8 @@ export function registerIndexCommand(program: Command): void {
                 ui.finishScanning(fileCount, 25);
                 ui.startIndexing();
               },
-              onFileProgress: (current, total, fileName) => {
-                ui.updateProgress(fileName);
+              onFileProgress: (current, total, fileName, etaMs) => {
+                ui.updateProgress(fileName, current, total, etaMs ?? null);
               },
               onFinalizing: () => {
                 ui.showFinalizing();

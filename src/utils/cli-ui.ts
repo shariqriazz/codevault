@@ -2,6 +2,22 @@ import cliProgress from 'cli-progress';
 import ora from 'ora';
 import chalk from 'chalk';
 
+function formatEta(ms: number | null): string {
+  if (ms === null || ms === undefined || ms < 0) return 'estimating…';
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
 export class IndexerUI {
   private progressBar: cliProgress.SingleBar | null = null;
   private spinner: any = null;
@@ -70,10 +86,15 @@ export class IndexerUI {
     }
   }
 
-  updateProgress(fileName: string) {
+  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null) {
     this.processedFiles++;
     if (this.progressBar) {
       this.progressBar.update(this.processedFiles);
+    }
+    if (this.spinner && etaMs !== undefined) {
+      const etaText = formatEta(etaMs ?? null);
+      const totals = current !== undefined && total !== undefined ? ` (${current}/${total})` : '';
+      this.spinner.text = chalk.white(`Indexing: ${fileName}${totals} — ETA ${etaText}`);
     }
   }
 

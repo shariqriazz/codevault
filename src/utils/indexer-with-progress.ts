@@ -8,7 +8,7 @@ import type { IndexProjectOptions, IndexProjectResult } from '../core/types.js';
 
 export interface IndexWithProgressCallbacks {
   onScanComplete?: (fileCount: number) => void;
-  onFileProgress?: (current: number, total: number, fileName: string) => void;
+  onFileProgress?: (current: number, total: number, fileName: string, etaMs: number | null, avgPerFileMs: number | null) => void;
   onFinalizing?: () => void;
 }
 
@@ -36,6 +36,7 @@ export async function indexProjectWithProgress(
   // Phase 2: Index with progress tracking
   let processedCount = 0;
   const processedFiles = new Set<string>();
+  const startTime = Date.now();
   const result = await indexProject({
     ...indexOptions,
     onProgress: (event) => {
@@ -44,7 +45,11 @@ export async function indexProjectWithProgress(
         if (!processedFiles.has(event.file)) {
           processedFiles.add(event.file);
           processedCount++;
-          callbacks.onFileProgress(processedCount, files.length, event.file);
+          const elapsedMs = Date.now() - startTime;
+          const avgPerFile = processedCount > 0 ? elapsedMs / processedCount : null;
+          const remaining = Math.max(files.length - processedCount, 0);
+          const etaMs = avgPerFile !== null ? avgPerFile * remaining : null;
+          callbacks.onFileProgress(processedCount, files.length, event.file, etaMs, avgPerFile);
         }
       }
       if (event.type === 'finalizing' && callbacks?.onFinalizing) {
