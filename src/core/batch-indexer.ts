@@ -81,7 +81,7 @@ function serializeErrorForLog(error: any): { [key: string]: LogValue } {
   }
 
   // OpenAI SDK sometimes nests response data on error.response or error.error
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const responseData = error?.response?.data ?? error?.error?.data;
   if (responseData !== undefined) {
     try {
       const json = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
@@ -283,19 +283,6 @@ export class BatchEmbeddingProcessor {
         );
         return;
       }
-
-      // Other errors or max retries reached - fall back to individual processing
-      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
-      log.debug(
-        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
-        {
-          batchSize: currentBatch.length,
-          error: serializeErrorForLog(error)
-        }
-      );
-      log.info('Falling back to individual processing (this will be slower)');
-
-      await this.fallbackToIndividualProcessing(currentBatch);
     }
   }
 
@@ -433,8 +420,8 @@ function isFatalApiResponse(error: any): boolean {
   if (!error) return false;
   const msg = error?.message || '';
   const status = error?.status || error?.statusCode;
-  const hasErrorKey = Array.isArray((error as any)?.topLevelKeys) && (error as any).topLevelKeys.includes('error');
-  const responseData = (error as any)?.response?.data ?? (error as any)?.error?.data;
+  const hasErrorKey = Array.isArray(error?.topLevelKeys) && error.topLevelKeys.includes('error');
+  const responseData = error?.response?.data ?? error?.error?.data;
 
   const invalidApi = msg.includes('Invalid API response');
   const clientError = status === 400 || status === 422;
