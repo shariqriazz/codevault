@@ -8,6 +8,8 @@ const MAX_BATCH_RETRIES = 3;
 const MAX_TRANSIENT_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const JITTER_FACTOR = 0.2; // ±20% jitter to avoid thundering herd
+const MAX_SUBDIVISION_DEPTH = 2; // Stop splitting after this depth and fallback to per-chunk
+const MIN_BATCH_BEFORE_FALLBACK = 8; // If below this size, go straight to per-chunk instead of more splits
 
 function isRateLimitError(error: any): boolean {
   const message = error?.message || String(error);
@@ -122,7 +124,8 @@ export class BatchEmbeddingProcessor {
    */
   private async processBatchWithRetry(
     currentBatch: ChunkToEmbed[],
-    retryState: RetryState = { rate: 0, transient: 0 }
+    retryState: RetryState = { rate: 0, transient: 0 },
+    depth: number = 0
   ): Promise<void> {
     try {
       await this.processBatchInternal(currentBatch);
@@ -136,8 +139,8 @@ export class BatchEmbeddingProcessor {
         const secondHalf = currentBatch.slice(mid);
 
         // Process both halves recursively
-        await this.processBatchWithRetry(firstHalf, retryState);
-        await this.processBatchWithRetry(secondHalf, retryState);
+        await this.processBatchWithRetry(firstHalf, retryState, depth + 1);
+        await this.processBatchWithRetry(secondHalf, retryState, depth + 1);
         return;
       } else if (isRateLimitError(error) && retryState.rate < MAX_BATCH_RETRIES) {
         // Rate limit error - exponential backoff
@@ -147,7 +150,8 @@ export class BatchEmbeddingProcessor {
 
         await this.processBatchWithRetry(
           currentBatch,
-          { ...retryState, rate: retryState.rate + 1 }
+          { ...retryState, rate: retryState.rate + 1 },
+          depth
         );
         return;
       } else if (isTransientApiError(error) && retryState.transient < MAX_TRANSIENT_RETRIES) {
@@ -160,17 +164,26 @@ export class BatchEmbeddingProcessor {
 
         await this.processBatchWithRetry(
           currentBatch,
-          { ...retryState, transient: retryState.transient + 1 }
+          { ...retryState, transient: retryState.transient + 1 },
+          depth
         );
         return;
       } else if (currentBatch.length > 1) {
+        if (depth >= MAX_SUBDIVISION_DEPTH || currentBatch.length <= MIN_BATCH_BEFORE_FALLBACK) {
+          log.warn(
+            `Reached subdivision limit (depth=${depth}, size=${currentBatch.length}), falling back to individual processing`
+          );
+          await this.fallbackToIndividualProcessing(currentBatch);
+          return;
+        }
+
         log.warn(`Batch failed after retries, subdividing to isolate issue (${currentBatch.length} chunks)`);
         const mid = Math.floor(currentBatch.length / 2);
         const firstHalf = currentBatch.slice(0, mid);
         const secondHalf = currentBatch.slice(mid);
 
-        await this.processBatchWithRetry(firstHalf, retryState);
-        await this.processBatchWithRetry(secondHalf, retryState);
+        await this.processBatchWithRetry(firstHalf, retryState, depth + 1);
+        await this.processBatchWithRetry(secondHalf, retryState, depth + 1);
         return;
       }
 
