@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { Database } from '../database/db.js';
-import type { DatabaseChunk } from '../database/db.js';
 import { normalizeScopeFilters, applyScope } from '../search/scope.js';
 import { applySymbolBoost } from '../ranking/symbol-boost.js';
 import { logger } from '../utils/logger.js';
@@ -101,7 +100,7 @@ export class SearchService {
       const context = await contextManager.warmup(effectiveProvider);
 
       // Fetch chunks from database
-      const chunks = contextManager.getChunks(context);
+      const chunks = await contextManager.getChunks(context);
 
       if (chunks.length === 0) {
         return this.createErrorResult(
@@ -116,7 +115,7 @@ export class SearchService {
       }
 
       // Apply scope filtering
-      const scopedChunks: any[] = applyScope(chunks, normalizedScope) as any[];
+      const scopedChunks = applyScope(chunks, normalizedScope);
       const selectionBudget = Math.max(limit, RRF_K);
       const bm25CandidateLimit = Math.max(
         selectionBudget,
@@ -141,10 +140,9 @@ export class SearchService {
 
         bm25PrefilterResults = prefilter.bm25Results;
         if (prefilter.candidateIds.size > 0) {
-          const filtered = scopedChunks.filter(chunk => {
-            const chunkId: string = typeof chunk.id === 'string' ? chunk.id : String(chunk.id);
-            return prefilter.candidateIds.has(chunkId);
-          });
+          const filtered = scopedChunks.filter(chunk =>
+            prefilter.candidateIds.has(chunk.id)
+          );
           if (filtered.length > 0) {
             vectorCandidates = filtered;
           }
@@ -153,7 +151,7 @@ export class SearchService {
 
       // Build vector pool
       const { chunkInfoById, vectorPool } = await this.retriever.buildVectorPool(
-        vectorCandidates as DatabaseChunk[],
+        vectorCandidates,
         context.provider,
         normalizedQuery
       );
@@ -217,10 +215,9 @@ export class SearchService {
       results = this.mapper.enforceScoreBounds(results);
 
       // Map to search results
-      const searchType: string = bm25Fused ? 'hybrid' : 'vector';
       const mappedResults = this.mapper.mapResults(
         results,
-        searchType
+        bm25Fused ? 'hybrid' : 'vector'
       );
 
       // Sort by score
@@ -244,7 +241,7 @@ export class SearchService {
         sortedResults.length > 0 &&
         sortedResults[0].meta.score > 0.8
       ) {
-        context.db.recordIntention(
+        await context.db.recordIntention(
           normalizedQuery,
           query,
           sortedResults[0].sha,
@@ -259,7 +256,7 @@ export class SearchService {
         .replace(/\b\w+Controller\b/gi, '[CONTROLLER]')
         .trim();
 
-      context.db.recordQueryPattern(pattern);
+      await context.db.recordQueryPattern(pattern);
 
       return {
         success: true,
@@ -280,7 +277,7 @@ export class SearchService {
           boosted:
             symbolBoostEnabled &&
             results.some(
-              (result: any) =>
+              (result) =>
                 typeof result.symbolBoost === 'number' && result.symbolBoost > 0
             )
         },
@@ -312,7 +309,7 @@ export class SearchService {
       }
 
       const db = new Database(dbPath);
-      const chunks = db.getOverviewChunks(limit);
+      const chunks = await db.getOverviewChunks(limit);
       db.close();
 
       const results: SearchResult[] = chunks.map(chunk => ({
@@ -340,17 +337,17 @@ export class SearchService {
         return { success: false, error: 'Chunk not found' };
       }
       return { success: true, code: result.code };
-    } catch (error: any) {
-      if (error && error.code === 'ENCRYPTION_KEY_REQUIRED') {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENCRYPTION_KEY_REQUIRED') {
         return { success: false, error: 'Chunk is encrypted. Configure CODEVAULT_ENCRYPTION_KEY.' };
       }
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
   // Helpers
 
-  private createErrorResult(error: string, message: string, provider: string, scope: any, hybrid: boolean, bm25: boolean, symbolBoost: boolean): { success: false; error: string; message: string; provider: string; scope: any; hybrid: { enabled: boolean; bm25Enabled: boolean }; symbolBoost: { enabled: boolean; boosted: false }; reranker: any; results: [] } {
+  private createErrorResult(error: string, message: string, provider: string, scope: ScopeFilters, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
     return {
       success: false,
       error,
@@ -366,7 +363,7 @@ export class SearchService {
 
   // Private helpers
 
-  private normalizeQuery(query: string): string {
+  public normalizeQuery(query: string): string {
     return query.toLowerCase().trim().replace(/[¿?]/g, '').replace(/\s+/g, ' ');
   }
 }

@@ -1,5 +1,3 @@
-import type { RateLimiter } from '../utils/rate-limiter.js';
-
 export interface ModelProfile {
   maxTokens: number;
   optimalTokens: number;
@@ -26,7 +24,7 @@ export abstract class EmbeddingProvider {
   abstract getName(): string;
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
-
+  
   // Batch processing support (optional - providers can override)
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     // Default implementation: process one by one (backward compatible)
@@ -37,8 +35,8 @@ export abstract class EmbeddingProvider {
     }
     return embeddings;
   }
-
-  rateLimiter?: RateLimiter;
+  
+  rateLimiter?: unknown;
 }
 
 // Batching constants
@@ -213,30 +211,28 @@ export async function getModelProfile(providerName: string, modelName: string | 
     if (!isNaN(maxTokens) && maxTokens > 0) {
       const originalMaxTokens = profile.maxTokens;
       const scalingRatio = maxTokens / originalMaxTokens;
-
+      
       profile.maxTokens = maxTokens;
       profile.optimalTokens = Math.floor(maxTokens * 0.82);
       profile.minChunkTokens = Math.max(Math.floor(profile.minChunkTokens * scalingRatio), 50);
       profile.maxChunkTokens = Math.floor(maxTokens * 0.95);
       profile.overlapTokens = Math.floor(profile.overlapTokens * scalingRatio);
-
+      
       if (!process.env.CODEVAULT_QUIET) {
-        const { log } = await import('../utils/logger.js');
-        log.debug(`Using custom max tokens: ${maxTokens}`);
-        log.debug(`Auto-scaled optimal tokens: ${profile.optimalTokens} (82% of max)`);
-        log.debug(`Auto-scaled min tokens: ${profile.minChunkTokens}`);
-        log.debug(`Auto-scaled max chunk tokens: ${profile.maxChunkTokens} (95% of max)`);
+        console.log(`Using custom max tokens: ${maxTokens}`);
+        console.log(`Auto-scaled optimal tokens: ${profile.optimalTokens} (82% of max)`);
+        console.log(`Auto-scaled min tokens: ${profile.minChunkTokens}`);
+        console.log(`Auto-scaled max chunk tokens: ${profile.maxChunkTokens} (95% of max)`);
       }
     }
   }
-
+  
   if (process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS) {
     const dimensions = parseInt(process.env.CODEVAULT_EMBEDDING_DIMENSIONS || process.env.CODEVAULT_DIMENSIONS || '0', 10);
     if (!isNaN(dimensions) && dimensions > 0) {
       profile.dimensions = dimensions;
       if (!process.env.CODEVAULT_QUIET) {
-        const { log } = await import('../utils/logger.js');
-        log.debug(`Using custom dimensions: ${dimensions}`);
+        console.log(`Using custom dimensions: ${dimensions}`);
       }
     }
   }

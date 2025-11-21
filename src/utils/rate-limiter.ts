@@ -14,7 +14,7 @@ interface QueueItem<T> {
 export class RateLimiter {
   private rpm: number | null;
   private tpm: number | null;
-  private queue: QueueItem<any>[] = [];
+  private queue: QueueItem<unknown>[] = [];
   private processing = false;
   private requestTimes: number[] = [];
   private tokenUsage: TokenUsageEntry[] = [];
@@ -141,16 +141,7 @@ export class RateLimiter {
       try {
         const result = await fn();
 
-        let tokensUsed = estimatedTokens || 0;
-        if (!tokensUsed && result && typeof result === 'object' && 'usage' in result) {
-          const usage = result.usage;
-          if (usage && typeof usage === 'object' && 'total_tokens' in usage) {
-            const totalTokens = (usage as Record<string, unknown>).total_tokens;
-            if (typeof totalTokens === 'number') {
-              tokensUsed = totalTokens;
-            }
-          }
-        }
+        const tokensUsed = estimatedTokens || (result && typeof result === 'object' && 'usage' in result && result.usage && typeof result.usage === 'object' && 'total_tokens' in result.usage ? Number(result.usage.total_tokens) : 0) || 0;
         this.recordRequest(tokensUsed);
 
         resolve(result);
@@ -180,8 +171,9 @@ export class RateLimiter {
   private isRateLimitError(error: unknown): boolean {
     if (!error) return false;
 
-    const message = String((error as any).message || '');
-    const status = (error as any).status || (error as any).statusCode || 0;
+    const errorObj = error as Record<string, unknown>;
+    const message = typeof errorObj.message === 'string' ? errorObj.message : '';
+    const status = typeof errorObj.status === 'number' ? errorObj.status : (typeof errorObj.statusCode === 'number' ? errorObj.statusCode : 0);
 
     return status === 429 ||
            message.includes('429') ||
@@ -189,13 +181,13 @@ export class RateLimiter {
            message.includes('too many requests');
   }
 
-  getStats(): { rpm: number | null; tpm: number | null; queueLength: number; maxQueueSize: number; queueUtilization: string; requestsInLastMinute: number; tokensInLastMinute: number; isRpmLimited: boolean; isTpmLimited: boolean; isLimited: boolean } {
+  getStats() {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     const tokensInLastMinute = this.tokenUsage
       .filter(entry => entry.time > oneMinuteAgo)
       .reduce((sum, entry) => sum + entry.tokens, 0);
-
+        
     return {
       rpm: this.rpm,
       tpm: this.tpm,

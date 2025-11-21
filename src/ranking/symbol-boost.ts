@@ -1,4 +1,4 @@
-import type { Codemap } from '../types/codemap.js';
+import type { Codemap, CodemapChunk } from '../types/codemap.js';
 import { SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
 
 const SIGNATURE_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.SIGNATURE_MATCH_BOOST;
@@ -63,16 +63,15 @@ function splitSymbolWords(symbol: string): string[] {
     .filter(word => word.length > 0);
 }
 
-function computeSignatureMatchStrength(query: string, entry: unknown): number {
-  if (!entry || typeof entry !== 'object') {
+function computeSignatureMatchStrength(query: string, entry: CodemapChunk): number {
+  if (!entry) {
     return 0;
   }
 
-  const entryObj = entry as Record<string, unknown>;
   const queryLower = query.toLowerCase();
-  const rawSymbol = typeof entryObj.symbol === 'string' ? entryObj.symbol : '';
+  const rawSymbol = typeof entry.symbol === 'string' ? entry.symbol : '';
   const symbol = rawSymbol.toLowerCase();
-  const signature = typeof entryObj.symbol_signature === 'string' ? entryObj.symbol_signature.toLowerCase() : '';
+  const signature = typeof entry.symbol_signature === 'string' ? entry.symbol_signature.toLowerCase() : '';
 
   let weight = 0;
   const matchedTokens = new Set<string>();
@@ -107,8 +106,8 @@ function computeSignatureMatchStrength(query: string, entry: unknown): number {
   }
 
   let parameterMatches = 0;
-  if (Array.isArray(entryObj.symbol_parameters)) {
-    for (const param of entryObj.symbol_parameters) {
+  if (Array.isArray(entry.symbol_parameters)) {
+    for (const param of entry.symbol_parameters) {
       if (typeof param !== 'string') {
         continue;
       }
@@ -145,14 +144,14 @@ function computeSignatureMatchStrength(query: string, entry: unknown): number {
   return Math.max(0, Math.min(weight / 4, 1));
 }
 
-function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: unknown }> {
-  const index = new Map<string, { chunkId: string; entry: unknown }>();
+function buildShaIndex(codemap: Codemap): Map<string, { chunkId: string; entry: CodemapChunk }> {
+  const index = new Map<string, { chunkId: string; entry: CodemapChunk }>();
   if (!codemap || typeof codemap !== 'object') {
     return index;
   }
 
   for (const [chunkId, entry] of Object.entries(codemap)) {
-    if (!entry || typeof entry !== 'object' || !('sha' in entry) || typeof entry.sha !== 'string') {
+    if (!entry || typeof entry.sha !== 'string') {
       continue;
     }
     index.set(entry.sha, { chunkId, entry });

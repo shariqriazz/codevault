@@ -1,7 +1,7 @@
 import { resolveProjectRoot } from '../../utils/path-helpers.js';
 import { UseContextPackArgs } from '../schemas.js';
 
-export async function handleUseContextPack(args: UseContextPackArgs, setSessionPack: (pack: any) => void): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+export async function handleUseContextPack(args: UseContextPackArgs, setSessionPack: (pack: unknown) => void) {
   const cleanPath = resolveProjectRoot(args);
   const name = args.name;
 

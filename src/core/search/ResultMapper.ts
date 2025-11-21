@@ -22,7 +22,7 @@ export class ResultMapper {
     searchType: string
   ): SearchResult[] {
     return candidates.map(result => {
-      const meta: any = {
+      const meta: SearchResult['meta'] = {
         id: result.id,
         symbol: result.symbol,
         score: Math.min(1, Math.max(result.score || 0, 0)),
@@ -80,8 +80,7 @@ export class ResultMapper {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
         getTextAsync: async candidate => {
-          const sha: string = typeof candidate.sha === 'string' ? candidate.sha : String(candidate.sha);
-          const codeText = (await this.readChunkText(sha, chunkDir)) || '';
+          const codeText = (await this.readChunkText(candidate.sha as string, chunkDir)) || '';
           return this.buildBm25Document(candidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
@@ -136,22 +135,21 @@ export class ResultMapper {
     try {
       const result = await readChunkFromDisk({ chunkDir, sha });
       return result ? result.code : null;
-    } catch {
+    } catch (error) {
       return null;
     }
   }
 
-  private buildBm25Document(chunk: unknown, codeText: string | null): string {
-    if (!chunk || typeof chunk !== 'object') return '';
+  private buildBm25Document(chunk: SearchCandidate, codeText: string | null): string {
+    if (!chunk) return '';
 
-    const chunkObj = chunk as Record<string, unknown>;
-    const parts: string[] = [
-      typeof chunkObj.symbol === 'string' ? chunkObj.symbol : '',
-      typeof chunkObj.file_path === 'string' ? chunkObj.file_path : '',
-      typeof chunkObj.codevault_description === 'string' ? chunkObj.codevault_description : '',
-      typeof chunkObj.codevault_intent === 'string' ? chunkObj.codevault_intent : '',
-      codeText || ''
-    ].filter(value => value.trim().length > 0);
+    const parts = [
+      chunk.symbol,
+      chunk.file_path,
+      chunk.codevault_description,
+      chunk.codevault_intent,
+      codeText
+    ].filter(value => typeof value === 'string' && value.trim().length > 0);
 
     return parts.join('\n');
   }

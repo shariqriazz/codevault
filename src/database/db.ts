@@ -196,7 +196,7 @@ export class CodeVaultDatabase {
     `);
   }
 
-  initialize(_dimensions: number): void {
+  async initialize(dimensions: number): Promise<void> {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS intention_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -368,7 +368,7 @@ export class CodeVaultDatabase {
     return this.db.prepare(`DELETE FROM code_chunks WHERE id IN (${placeholders})`);
   }
 
-  deleteChunks(chunkIds: string[]): void {
+  async deleteChunks(chunkIds: string[]): Promise<void> {
     if (!Array.isArray(chunkIds) || chunkIds.length === 0) {
       return;
     }
@@ -383,7 +383,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  getChunks(providerName: string, dimensions: number): DatabaseChunk[] {
+  async getChunks(providerName: string, dimensions: number): Promise<DatabaseChunk[]> {
     try {
       return this.getChunksStmt.all(providerName, dimensions) as DatabaseChunk[];
     } catch (error) {
@@ -392,7 +392,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  getExistingDimensions(): Array<{ embedding_provider: string; embedding_dimensions: number }> {
+  async getExistingDimensions(): Promise<Array<{ embedding_provider: string; embedding_dimensions: number }>> {
     try {
       const stmt = this.db.prepare(`
         SELECT DISTINCT embedding_provider, embedding_dimensions
@@ -406,7 +406,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  recordIntention(normalizedQuery: string, originalQuery: string, targetSha: string, confidence: number): void {
+  async recordIntention(normalizedQuery: string, originalQuery: string, targetSha: string, confidence: number): Promise<void> {
     try {
       const existing = this.db.prepare(`
         SELECT id, usage_count FROM intention_cache
@@ -434,7 +434,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  searchByIntention(normalizedQuery: string): any {
+  async searchByIntention(normalizedQuery: string): Promise<unknown> {
     try {
       return this.db.prepare(`
         SELECT
@@ -458,7 +458,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  recordQueryPattern(pattern: string): void {
+  async recordQueryPattern(pattern: string): Promise<void> {
     try {
       const existing = this.db.prepare(`
         SELECT id, frequency FROM query_patterns WHERE pattern = ?
@@ -481,7 +481,7 @@ export class CodeVaultDatabase {
     }
   }
 
-  getOverviewChunks(limit: number): Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }> {
+  async getOverviewChunks(limit: number): Promise<Array<{ id: string; file_path: string; symbol: string; sha: string; lang: string }>> {
     try {
       return this.db.prepare(`
         SELECT id, file_path, symbol, sha, lang
@@ -498,21 +498,21 @@ export class CodeVaultDatabase {
   /**
    * Begin a database transaction
    */
-  beginTransaction(): void {
+  async beginTransaction(): Promise<void> {
     this.db.prepare('BEGIN TRANSACTION').run();
   }
 
   /**
    * Commit the current transaction
    */
-  commit(): void {
+  async commit(): Promise<void> {
     this.db.prepare('COMMIT').run();
   }
 
   /**
    * Rollback the current transaction
    */
-  rollback(): void {
+  async rollback(): Promise<void> {
     this.db.prepare('ROLLBACK').run();
   }
 
@@ -530,7 +530,7 @@ export class CodeVaultDatabase {
   transaction<T>(fn: () => T): T {
     const wrapped = this.db.transaction(() => {
       const result = fn();
-      if (result && typeof (result as any).then === 'function') {
+      if (result && typeof result === 'object' && 'then' in result && typeof result.then === 'function') {
         throw new Error('better-sqlite3 transactions must be synchronous; avoid returning a Promise.');
       }
       return result;
@@ -556,7 +556,7 @@ export class CodeVaultDatabase {
       return [];
     }
     const rows = this.getAllPathsStmt.all();
-    return Array.isArray(rows) ? rows.map((row: any): string => row.file_path as string).filter(Boolean) : [];
+    return Array.isArray(rows) ? rows.map((row: unknown) => (row as { file_path: string }).file_path).filter(Boolean) : [];
   }
 
   deleteChunksByFilePath(filePath: string): void {
@@ -584,7 +584,7 @@ export class CodeVaultDatabase {
   }
 }
 
-export function initDatabase(dimensions: number, basePath = '.'): void {
+export async function initDatabase(dimensions: number, basePath = '.'): Promise<void> {
   const dbPath = path.join(path.resolve(basePath), '.codevault', 'codevault.db');
   const dbDir = path.dirname(dbPath);
 
@@ -593,7 +593,7 @@ export function initDatabase(dimensions: number, basePath = '.'): void {
   }
 
   const db = new CodeVaultDatabase(dbPath);
-  db.initialize(dimensions);
+  await db.initialize(dimensions);
   db.close();
 }
 

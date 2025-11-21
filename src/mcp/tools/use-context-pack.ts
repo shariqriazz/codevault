@@ -13,21 +13,26 @@ export const useContextPackResultSchema = z.object({
     key: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    scope: z.record(z.string(), z.any())
+    scope: z.record(z.string(), z.unknown())
   }).optional()
 });
+
+interface ErrorLogger {
+  log?: (error: unknown, context: Record<string, unknown>) => void;
+  debugLog?: (message: string, context: Record<string, unknown>) => void;
+}
 
 interface CreateHandlerOptions {
   getWorkingPath: () => string;
   setSessionPack: (pack: unknown) => void;
   clearSessionPack: () => void;
-  errorLogger?: { log: (error: unknown, context: unknown) => void; debugLog: (message: string, context: unknown) => void };
+  errorLogger?: ErrorLogger;
 }
 
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
   const { getWorkingPath, setSessionPack, clearSessionPack, errorLogger } = options;
 
-  return ({ name, path: explicitPath }: { name: string; path?: string }) => {
+  return async ({ name, path: explicitPath }: { name: string; path?: string }) => {
     const basePath = explicitPath && explicitPath.trim().length > 0
       ? explicitPath.trim()
       : (typeof getWorkingPath === 'function' ? getWorkingPath() : '.');
@@ -86,7 +91,11 @@ export function createUseContextPackHandler(options: CreateHandlerOptions) {
   };
 }
 
-export function registerUseContextPackTool(server: any, options: CreateHandlerOptions): ReturnType<typeof createUseContextPackHandler> {
+interface MCPServer {
+  tool: (name: string, schema: Record<string, unknown>, handler: (params: unknown) => Promise<unknown>) => void;
+}
+
+export function registerUseContextPackTool(server: MCPServer, options: CreateHandlerOptions) {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -95,11 +104,9 @@ export function registerUseContextPackTool(server: any, options: CreateHandlerOp
       name: z.string().min(1).describe('Context pack name (e.g., "test-pack", "stripe-backend") or "clear" to reset'),
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
-    async (params: { name: string; path?: string }) => {
-      const result = handler(params);
+    async (params: unknown) => {
+      const result = await handler(params);
       return {
-        success: result.success,
-        message: result.message,
         content: [
           {
             type: 'text',

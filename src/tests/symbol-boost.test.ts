@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { applySymbolBoost } from '../ranking/symbol-boost.js';
 import type { Codemap } from '../types/codemap.js';
 
+interface TestResult {
+  id: string;
+  score: number;
+  symbol: string;
+  symbolBoost: number;
+}
+
 test('applySymbolBoost caps total score at or below 1.0', () => {
   const codemap: Codemap = {
     chunk1: {
@@ -14,19 +21,12 @@ test('applySymbolBoost caps total score at or below 1.0', () => {
     }
   };
 
-  interface SearchResultWithBoost {
-    id: string;
-    score?: number;
-    symbol: string;
-    symbolBoost?: number;
-  }
-
-  const results: SearchResultWithBoost[] = [
+  const results: TestResult[] = [
     { id: 'chunk1', score: 0.9, symbol: 'processPayment', symbolBoost: 0 }
   ];
 
-  applySymbolBoost(results, { query: 'process payment', codemap });
+  applySymbolBoost(results as never, { query: 'process payment', codemap });
 
-  assert.ok(results[0].score !== undefined && results[0].score <= 1, 'score should not exceed 1.0');
-  assert.ok(results[0].symbolBoost !== undefined && results[0].symbolBoost <= 0.45, 'boost should respect cap');
+  assert.ok(results[0].score <= 1, 'score should not exceed 1.0');
+  assert.ok(results[0].symbolBoost <= 0.45, 'boost should respect cap');
 });

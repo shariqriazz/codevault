@@ -3,7 +3,7 @@ import LangC from 'tree-sitter-c';
 import LangCSharp from 'tree-sitter-c-sharp';
 import LangCpp from 'tree-sitter-cpp';
 import * as LangCSSModule from 'tree-sitter-css/bindings/node/index.js';
-const LangCSS = (LangCSSModule as any).default || LangCSSModule;
+const LangCSS = (LangCSSModule as Record<string, unknown>).default || LangCSSModule;
 import LangElixir from 'tree-sitter-elixir';
 import LangGo from 'tree-sitter-go';
 import LangHaskell from 'tree-sitter-haskell';
@@ -24,29 +24,34 @@ import LangSwift from 'tree-sitter-swift';
 import LangTSX from 'tree-sitter-typescript/bindings/node/tsx.js';
 import LangTS from 'tree-sitter-typescript/bindings/node/typescript.js';
 
-function resolveTreeSitterLanguage(module: any, preferredKey: string | null = null): any {
+function resolveTreeSitterLanguage(module: unknown, preferredKey: string | null = null): unknown {
   if (!module) {
     return null;
   }
 
-  if (module.default) {
-    return resolveTreeSitterLanguage(module.default, preferredKey);
-  }
-
-  if (preferredKey && module[preferredKey]) {
-    return resolveTreeSitterLanguage(module[preferredKey], null);
-  }
-
   if (typeof module === 'object' && module !== null) {
-    if (module.language && typeof module.language === 'object') {
+    const modObj = module as Record<string, unknown>;
+
+    if (modObj.default) {
+      return resolveTreeSitterLanguage(modObj.default, preferredKey);
+    }
+
+    if (preferredKey && modObj[preferredKey]) {
+      return resolveTreeSitterLanguage(modObj[preferredKey], null);
+    }
+
+    if (modObj.language && typeof modObj.language === 'object') {
       return module;
     }
 
-    const values = Object.values(module as Record<string, unknown>);
+    const values = Object.values(modObj);
     for (const value of values) {
       const resolved = resolveTreeSitterLanguage(value, null);
-      if (resolved && resolved.language && typeof resolved.language === 'object') {
-        return resolved;
+      if (resolved && typeof resolved === 'object' && resolved !== null) {
+        const resolvedObj = resolved as Record<string, unknown>;
+        if (resolvedObj.language && typeof resolvedObj.language === 'object') {
+          return resolved;
+        }
       }
     }
   }
@@ -54,7 +59,7 @@ function resolveTreeSitterLanguage(module: any, preferredKey: string | null = nu
   return module;
 }
 
-export const RESOLVED_LANGUAGES: Record<string, any> = {
+export const RESOLVED_LANGUAGES = {
   bash: resolveTreeSitterLanguage(LangBash),
   c: resolveTreeSitterLanguage(LangC),
   csharp: resolveTreeSitterLanguage(LangCSharp),

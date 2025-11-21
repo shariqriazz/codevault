@@ -53,8 +53,8 @@ export function registerIndexCommand(program: Command): void {
               max: limits.max,
               optimal: limits.optimal
             },
-            rateLimit: embeddingProvider.rateLimiter ? {
-              rpm: embeddingProvider.rateLimiter.getStats().rpm || 0
+            rateLimit: embeddingProvider.rateLimiter && typeof embeddingProvider.rateLimiter === 'object' && 'getStats' in embeddingProvider.rateLimiter ? {
+              rpm: (embeddingProvider.rateLimiter.getStats() as { rpm?: number }).rpm || 0
             } : undefined
           });
 
@@ -114,7 +114,7 @@ export function registerIndexCommand(program: Command): void {
             totalChunks: result.totalChunks,
             dbSize,
             codemapSize,
-            tokenStats: result.tokenStats
+            tokenStats: result.tokenStats as Record<string, unknown> | undefined
           });
 
           delete process.env.CODEVAULT_QUIET;

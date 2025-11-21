@@ -2,11 +2,12 @@ import { RESOLVED_LANGUAGES } from './tree-sitter-loader.js';
 
 export interface LanguageRule {
   lang: string;
-  ts: any;
+  ts: unknown;
   nodeTypes: string[];
   subdivisionTypes?: Record<string, string[]>;
   variableTypes?: string[];
   commentPattern: RegExp | null;
+  [key: string]: unknown;
 }
 
 export const LANG_RULES: Record<string, LanguageRule> = {

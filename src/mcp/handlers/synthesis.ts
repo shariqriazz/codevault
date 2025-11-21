@@ -4,7 +4,7 @@ import { resolveProjectRoot } from '../../utils/path-helpers.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { AskCodebaseArgs } from '../schemas.js';
 
-export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPack: any): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPack: unknown) {
   const cleanPath = resolveProjectRoot(args);
   
   // Use resolveScopeWithPack like other search tools for consistency

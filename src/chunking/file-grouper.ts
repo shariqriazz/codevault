@@ -5,7 +5,7 @@ import type { TreeSitterNode } from '../types/ast.js';
 
 interface LanguageRule {
   subdivisionTypes?: Record<string, string[]>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface NodeAnalysis {

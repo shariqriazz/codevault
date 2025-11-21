@@ -18,7 +18,7 @@ export const ContextPackScopeSchema = z.object({
 export const ContextPackSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   scope: ContextPackScopeSchema.optional(),
   path_glob: stringOrStringArray.optional(),
   tags: stringOrStringArray.optional(),
@@ -33,7 +33,7 @@ export const ContextPackSchema = z.object({
 export type ContextPackScope = z.infer<typeof ContextPackScopeSchema>;
 export type ContextPack = z.infer<typeof ContextPackSchema>;
 
-export function extractScopeFromPackDefinition(definition: ContextPack): Record<string, any> {
+export function extractScopeFromPackDefinition(definition: ContextPack): Record<string, unknown> {
   if (!definition || typeof definition !== 'object') {
     return {};
   }
@@ -45,8 +45,11 @@ export function extractScopeFromPackDefinition(definition: ContextPack): Record<
   const scope = { ...scopeCandidate };
 
   for (const key of ['path_glob', 'tags', 'lang', 'provider', 'reranker', 'hybrid', 'bm25', 'symbol_boost']) {
-    if (Object.prototype.hasOwnProperty.call(definition, key) && typeof (definition as any)[key] !== 'undefined') {
-      (scope as any)[key] = (definition as any)[key];
+    if (Object.prototype.hasOwnProperty.call(definition, key)) {
+      const value = definition[key as keyof ContextPack];
+      if (typeof value !== 'undefined') {
+        scope[key as keyof typeof scope] = value as never;
+      }
     }
   }
 

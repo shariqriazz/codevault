@@ -1,8 +1,6 @@
 import cliProgress from 'cli-progress';
 import ora from 'ora';
-import type { Ora } from 'ora';
 import chalk from 'chalk';
-import { print } from './logger.js';
 
 const STALLED_ETA_SENTINEL = -1;
 
@@ -25,7 +23,7 @@ function formatEta(ms: number | null): string {
 
 export class IndexerUI {
   private progressBar: cliProgress.SingleBar | null = null;
-  private spinner: Ora | null = null;
+  private spinner: ReturnType<typeof ora> | null = null;
   private startTime: number = 0;
   private totalFiles: number = 0;
   private processedFiles: number = 0;
@@ -36,8 +34,8 @@ export class IndexerUI {
     skipped: 0
   };
 
-  showHeader(): void {
-    print(chalk.cyan.bold('\n🔍 CodeVault Indexer'));
+  showHeader() {
+    console.log(chalk.cyan.bold('\n🔍 CodeVault Indexer'));
   }
 
   showConfiguration(config: {
@@ -46,24 +44,24 @@ export class IndexerUI {
     dimensions: number;
     chunkSize: { min: number; max: number; optimal: number };
     rateLimit?: { rpm: number; tpm?: number };
-  }): void {
-    print(chalk.white('\n📊 Configuration'));
-    print(chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`));
-    print(chalk.gray(`   Dimensions:  ${config.dimensions}`));
-    print(chalk.gray(`   Chunk size:  ${Math.floor(config.chunkSize.min / 1000)}K-${Math.floor(config.chunkSize.max / 1000)}K tokens (optimal: ${Math.floor(config.chunkSize.optimal / 1000)}K)`));
+  }) {
+    console.log(chalk.white('\n📊 Configuration'));
+    console.log(chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`));
+    console.log(chalk.gray(`   Dimensions:  ${config.dimensions}`));
+    console.log(chalk.gray(`   Chunk size:  ${Math.floor(config.chunkSize.min / 1000)}K-${Math.floor(config.chunkSize.max / 1000)}K tokens (optimal: ${Math.floor(config.chunkSize.optimal / 1000)}K)`));
     if (config.rateLimit) {
-      print(chalk.gray(`   Rate limit:  ${config.rateLimit.rpm.toLocaleString()} req/min`));
+      console.log(chalk.gray(`   Rate limit:  ${config.rateLimit.rpm.toLocaleString()} req/min`));
     }
   }
 
-  startScanning(): void {
+  startScanning() {
     this.spinner = ora({
       text: chalk.white('Scanning project...'),
       color: 'cyan'
     }).start();
   }
 
-  finishScanning(fileCount: number, languages: number): void {
+  finishScanning(fileCount: number, languages: number) {
     if (this.spinner) {
       this.spinner.succeed(chalk.white(`Found ${chalk.cyan(fileCount)} files across ${chalk.cyan(languages)}+ languages`));
       this.spinner = null;
@@ -71,27 +69,27 @@ export class IndexerUI {
     this.totalFiles = fileCount;
   }
 
-  startIndexing(): void {
+  startIndexing() {
     this.startTime = Date.now();
     this.processedFiles = 0;
-
-    print(chalk.white('\n⚡ Indexing files'));
-
+    
+    console.log(chalk.white('\n⚡ Indexing files'));
+    
     if (this.totalFiles > 0) {
       this.progressBar = new cliProgress.SingleBar({
         format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_manual}`,
+        barCompleteChar: '█',
+        barIncompleteChar: '░',
         hideCursor: true,
-        barCompleteChar: '\u2588',
-        barIncompleteChar: '\u2591',
-        clearOnComplete: false
+        clearOnComplete: false,
+        stopOnComplete: true
       });
-      this.progressBar.start(this.totalFiles, 0, {
-        eta_manual: 'estimating…'
-      });
+      
+      this.progressBar.start(this.totalFiles, 0, { eta_manual: 'estimating…' });
     }
   }
 
-  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true): void {
+  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true) {
     if (countFile) {
       this.processedFiles++;
     }
@@ -109,14 +107,14 @@ export class IndexerUI {
     }
   }
 
-  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }): void {
+  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }) {
     if (stats.chunks !== undefined) this.stats.chunks = stats.chunks;
     if (stats.merged !== undefined) this.stats.merged = stats.merged;
     if (stats.subdivided !== undefined) this.stats.subdivided = stats.subdivided;
     if (stats.skipped !== undefined) this.stats.skipped = stats.skipped;
   }
 
-  showFinalizing(): void {
+  showFinalizing() {
     if (this.progressBar) {
       this.progressBar.stop();
       this.progressBar = null;
@@ -128,7 +126,7 @@ export class IndexerUI {
     }).start();
   }
 
-  finishIndexing(): void {
+  finishIndexing() {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;
@@ -144,10 +142,10 @@ export class IndexerUI {
       const minutes = Math.floor(duration / 60000);
       const seconds = Math.floor((duration % 60000) / 1000);
       const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-
-      print(chalk.green(`\n✅ Indexing complete in ${timeStr}!`));
+      
+      console.log(chalk.green(`\n✅ Indexing complete in ${timeStr}!`));
     } else {
-      print(chalk.green(`\n✅ Indexing complete!`));
+      console.log(chalk.green(`\n✅ Indexing complete!`));
     }
   }
 
@@ -155,44 +153,44 @@ export class IndexerUI {
     totalChunks: number;
     dbSize?: string;
     codemapSize?: string;
-    tokenStats?: any;
-  }): void {
-    print(chalk.white('\n📊 Summary'));
-    print(chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`));
-
+    tokenStats?: Record<string, unknown>;
+  }) {
+    console.log(chalk.white('\n📊 Summary'));
+    console.log(chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`));
+    
     if (this.stats.merged > 0) {
-      print(chalk.gray(`   Merged small:      ${chalk.white(this.stats.merged)}`));
+      console.log(chalk.gray(`   Merged small:      ${chalk.white(this.stats.merged)}`));
     }
     if (this.stats.subdivided > 0) {
-      print(chalk.gray(`   Subdivided large:  ${chalk.white(this.stats.subdivided)}`));
+      console.log(chalk.gray(`   Subdivided large:  ${chalk.white(this.stats.subdivided)}`));
     }
     if (this.stats.skipped > 0) {
-      print(chalk.gray(`   Skipped (small):   ${chalk.white(this.stats.skipped)}`));
+      console.log(chalk.gray(`   Skipped (small):   ${chalk.white(this.stats.skipped)}`));
     }
-
+    
     if (summary.dbSize) {
-      print(chalk.gray(`   Database:          ${chalk.white(summary.dbSize)}`));
+      console.log(chalk.gray(`   Database:          ${chalk.white(summary.dbSize)}`));
     }
     if (summary.codemapSize) {
-      print(chalk.gray(`   Codemap:           ${chalk.white(summary.codemapSize)}`));
+      console.log(chalk.gray(`   Codemap:           ${chalk.white(summary.codemapSize)}`));
     }
 
-    print(chalk.cyan('\n🚀 Ready to use!'));
-    print(chalk.gray(`   Quick search:       ${chalk.white('codevault search "your query"')}`));
-    print(chalk.gray(`   With code chunks:   ${chalk.white('codevault search-with-code "your query"')}`));
-    print(chalk.gray(`   Ask w/ synthesis:   ${chalk.white('codevault ask "How does auth work?"')}`));
-    print(chalk.gray(`   Interactive chat:   ${chalk.white('codevault chat')}`));
-    print(chalk.gray(`   Auto-update index:  ${chalk.white('codevault watch --debounce 500')}`));
-    print(chalk.gray(`   Partial reindex:    ${chalk.white('codevault update --files src/app.ts')}`));
-    print(chalk.gray(`   MCP server:         ${chalk.white('codevault mcp (Claude Desktop, etc.)')}`));
-    print('');
+    console.log(chalk.cyan('\n🚀 Ready to use!'));
+    console.log(chalk.gray(`   Quick search:       ${chalk.white('codevault search "your query"')}`));
+    console.log(chalk.gray(`   With code chunks:   ${chalk.white('codevault search-with-code "your query"')}`));
+    console.log(chalk.gray(`   Ask w/ synthesis:   ${chalk.white('codevault ask "How does auth work?"')}`));
+    console.log(chalk.gray(`   Interactive chat:   ${chalk.white('codevault chat')}`));
+    console.log(chalk.gray(`   Auto-update index:  ${chalk.white('codevault watch --debounce 500')}`));
+    console.log(chalk.gray(`   Partial reindex:    ${chalk.white('codevault update --files src/app.ts')}`));
+    console.log(chalk.gray(`   MCP server:         ${chalk.white('codevault mcp (Claude Desktop, etc.)')}`));
+    console.log('');
   }
 
-  showError(message: string): void {
+  showError(message: string) {
     console.error(chalk.red(`\n❌ Error: ${message}\n`));
   }
 
-  cleanup(): void {
+  cleanup() {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;

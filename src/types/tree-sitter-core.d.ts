@@ -12,8 +12,13 @@ declare module 'tree-sitter' {
     rootNode: SyntaxNode;
   }
 
+  export interface Point {
+    row: number;
+    column: number;
+  }
+
   export default class Parser {
-    setLanguage(language: any): void;
-    parse(input: string | ((index: number, position?: any) => string | null)): Tree;
+    setLanguage(language: unknown): void;
+    parse(input: string | ((index: number, position?: Point) => string | null)): Tree;
   }
 }

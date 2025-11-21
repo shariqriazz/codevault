@@ -18,7 +18,7 @@ export interface IndexProjectResult {
   provider: string;
   errors: IndexError[];
   chunkingStats?: ChunkingStats;
-  tokenStats?: any;
+  tokenStats?: unknown;
 }
 
 export interface ProgressEvent {
@@ -89,7 +89,7 @@ export interface SearchCodeResult {
   intentionResults?: number;
   vectorResults?: number;
   provider: string;
-  scope?: any;
+  scope?: unknown;
   reranker?: string;
   hybrid?: {
     enabled: boolean;

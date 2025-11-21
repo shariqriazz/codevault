@@ -18,12 +18,12 @@ export interface IndexContextData {
   providerInstance: EmbeddingProvider;
   providerName: string;
   modelName: string | null;
-  modelProfile: any;
-  limits: any;
+  modelProfile: unknown;
+  limits: unknown;
   codemapPath: string;
   chunkDir: string;
   dbPath: string;
-  encryptionPreference: any;
+  encryptionPreference: unknown;
   codemap: Codemap;
   merkle: MerkleTree;
   updatedMerkle: MerkleTree;

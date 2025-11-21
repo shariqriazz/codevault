@@ -4,7 +4,7 @@ import { resolveScopeWithPack } from '../../context/packs.js';
 import { MAX_CHUNK_SIZE } from '../../config/constants.js';
 import { SearchCodeArgs, SearchCodeWithChunksArgs, GetCodeChunkArgs } from '../schemas.js';
 
-export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack: any): Promise<{ content: Array<{ type: string; text: string }> }> {
+export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack: unknown) {
   const cleanPath = resolveProjectRoot(args);
   const { scope: scopeFilters } = resolveScopeWithPack(
     {
@@ -57,7 +57,7 @@ export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack:
   };
 }
 
-export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs, sessionContextPack: any): Promise<{ content: Array<{ type: string; text: string }> }> {
+export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs, sessionContextPack: unknown) {
   const cleanPath = resolveProjectRoot(args);
   const { scope: scopeFilters } = resolveScopeWithPack(
     {
@@ -122,7 +122,7 @@ export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs,
   };
 }
 
-export async function handleGetCodeChunk(args: GetCodeChunkArgs): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+export async function handleGetCodeChunk(args: GetCodeChunkArgs) {
   const cleanPath = resolveProjectRoot(args);
   const result = await getChunk(args.sha, cleanPath);
 

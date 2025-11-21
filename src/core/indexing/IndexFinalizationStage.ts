@@ -10,6 +10,11 @@ import { PersistManager } from './PersistManager.js';
 import fs from 'fs';
 import path from 'path';
 
+interface IndexProgressEvent {
+  type: string;
+  [key: string]: unknown;
+}
+
 /**
  * IndexFinalizationStage handles the finalization of the indexing process:
  * - Flushing batch processor
@@ -23,7 +28,7 @@ export class IndexFinalizationStage {
   constructor(
     private context: IndexContextData,
     private state: IndexState,
-    private onProgress: ((event: any) => void) | null,
+    private onProgress: ((event: IndexProgressEvent) => void) | null,
     private persistManager: PersistManager
   ) {}
 
@@ -105,13 +110,13 @@ export class IndexFinalizationStage {
   /**
    * Build the final result object
    */
-  private buildResult(tokenStats: any): IndexProjectResult {
+  private buildResult(tokenStats: unknown): IndexProjectResult {
     return {
       success: true,
       processedChunks: this.state.processedChunks,
       totalChunks: Object.keys(this.state.codemap).length,
       provider: this.context.providerInstance.getName(),
-      errors: this.state.errors,
+      errors: this.state.errors as Array<{ type: string; file?: string; chunkId?: string; error: string }>,
       chunkingStats: this.state.chunkingStats,
       tokenStats: this.context.modelProfile.useTokens ? tokenStats : undefined
     };
@@ -145,7 +150,7 @@ export class IndexFinalizationStage {
     for (const rel of orphaned) {
       this.context.db.deleteChunksByFilePath(rel);
       for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
-        if ((meta as any)?.file === rel) {
+        if (meta && typeof meta === 'object' && 'file' in meta && meta.file === rel) {
           delete this.state.codemap[chunkId];
         }
       }
