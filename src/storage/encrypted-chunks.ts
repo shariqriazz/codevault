@@ -1,7 +1,9 @@
 import crypto from 'crypto';
-import fs from 'fs';
+import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import { promisify } from 'node:util';
 import { log } from '../utils/logger.js';
 import { ENCRYPTION_CONSTANTS } from '../config/constants.js';
 
@@ -19,6 +21,8 @@ const HKDF_INFO_BUFFER = Buffer.from(HKDF_INFO, 'utf8');
 const KEY_ENV_VAR = 'CODEVAULT_ENCRYPTION_KEY';
 const DEPRECATED_KEYS_ENV_VAR = 'CODEVAULT_ENCRYPTION_DEPRECATED_KEYS';
 const CURRENT_ENCRYPTION_VERSION = 1;
+const gzipAsync = promisify(zlib.gzip);
+const gunzipAsync = promisify(zlib.gunzip);
 
 type KeyDecodeResult =
   | { key: Buffer; error: null }
@@ -339,23 +343,23 @@ export interface WriteChunkResult {
   path: string;
 }
 
-export function writeChunkToDisk({ chunkDir, sha, code, encryption }: WriteChunkOptions): WriteChunkResult {
+export async function writeChunkToDisk({ chunkDir, sha, code, encryption }: WriteChunkOptions): Promise<WriteChunkResult> {
   const { plainPath, encryptedPath } = getChunkPaths(chunkDir, sha);
   const buffer = Buffer.isBuffer(code) ? code : Buffer.from(code, 'utf8');
-  const compressed = zlib.gzipSync(buffer);
+  const compressed = await gzipAsync(buffer);
 
   if (encryption && encryption.enabled && encryption.key) {
     const { payload } = encryptBuffer(compressed, encryption.key);
-    fs.writeFileSync(encryptedPath, payload);
-    if (fs.existsSync(plainPath)) {
-      fs.rmSync(plainPath, { force: true });
+    await fs.writeFile(encryptedPath, payload);
+    if (existsSync(plainPath)) {
+      await fs.rm(plainPath, { force: true });
     }
     return { encrypted: true, path: encryptedPath };
   }
 
-  fs.writeFileSync(plainPath, compressed);
-  if (fs.existsSync(encryptedPath)) {
-    fs.rmSync(encryptedPath, { force: true });
+  await fs.writeFile(plainPath, compressed);
+  if (existsSync(encryptedPath)) {
+    await fs.rm(encryptedPath, { force: true });
   }
   return { encrypted: false, path: plainPath };
 }
@@ -372,12 +376,12 @@ export interface ReadChunkResult {
   encrypted: boolean;
 }
 
-export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptions): ReadChunkResult | null {
+export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptions): Promise<ReadChunkResult | null> {
   const { plainPath, encryptedPath } = getChunkPaths(chunkDir, sha);
   const keys = keySet || getEncryptionKeySet();
   const primaryKey = key ?? keys.primary;
 
-  if (fs.existsSync(encryptedPath)) {
+  if (existsSync(encryptedPath)) {
     const candidateKeys: Buffer[] = [];
     if (primaryKey) candidateKeys.push(primaryKey);
     if (keys.deprecated.length > 0) {
@@ -390,7 +394,7 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
       throw error;
     }
 
-    const payload = fs.readFileSync(encryptedPath);
+    const payload = await fs.readFile(encryptedPath);
     let decrypted: Buffer | null = null;
     const errors: any[] = [];
     for (const candidate of candidateKeys) {
@@ -420,7 +424,8 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
     }
 
     try {
-      const code = zlib.gunzipSync(decrypted).toString('utf8');
+      const codeBuffer = await gunzipAsync(decrypted);
+      const code = codeBuffer.toString('utf8');
       return { code, encrypted: true };
     } catch (error: any) {
       const decompressionError: any = new Error(`Failed to decompress chunk ${sha}: ${error.message}`);
@@ -430,10 +435,11 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
     }
   }
 
-  if (fs.existsSync(plainPath)) {
+  if (existsSync(plainPath)) {
     try {
-      const compressed = fs.readFileSync(plainPath);
-      const code = zlib.gunzipSync(compressed).toString('utf8');
+      const compressed = await fs.readFile(plainPath);
+      const codeBuffer = await gunzipAsync(compressed);
+      const code = codeBuffer.toString('utf8');
       return { code, encrypted: false };
     } catch (error: any) {
       const readError: any = new Error(`Failed to read chunk ${sha}: ${error.message}`);
@@ -446,17 +452,17 @@ export function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChunkOptio
   return null;
 }
 
-export function removeChunkArtifacts(chunkDir: string, sha: string): void {
+export async function removeChunkArtifacts(chunkDir: string, sha: string): Promise<void> {
   const { plainPath, encryptedPath } = getChunkPaths(chunkDir, sha);
-  if (fs.existsSync(plainPath)) {
-    fs.rmSync(plainPath, { force: true });
+  if (existsSync(plainPath)) {
+    await fs.rm(plainPath, { force: true });
   }
-  if (fs.existsSync(encryptedPath)) {
-    fs.rmSync(encryptedPath, { force: true });
+  if (existsSync(encryptedPath)) {
+    await fs.rm(encryptedPath, { force: true });
   }
 }
 
 export function isChunkEncryptedOnDisk(chunkDir: string, sha: string): boolean {
   const { encryptedPath } = getChunkPaths(chunkDir, sha);
-  return fs.existsSync(encryptedPath);
+  return existsSync(encryptedPath);
 }

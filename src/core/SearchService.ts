@@ -126,7 +126,7 @@ export class SearchService {
       let bm25PrefilterResults: Array<{ id: string; score: number }> | undefined;
       let vectorCandidates = scopedChunks;
       if (hybridEnabled && bm25Enabled) {
-        const prefilter = this.fusion.prefilterCandidates({
+        const prefilter = await this.fusion.prefilterCandidates({
           hybridEnabled,
           bm25Enabled,
           query: normalizedQuery,
@@ -175,7 +175,7 @@ export class SearchService {
         fusedResults,
         bm25Fused,
         bm25CandidateCount: fusedBm25CandidateCount
-      } = this.fusion.fuseResults({
+      } = await this.fusion.fuseResults({
         hybridEnabled,
         bm25Enabled,
         selectionBudget,
@@ -332,7 +332,7 @@ export class SearchService {
     const chunkDir = path.join(basePath, '.codevault/chunks');
 
     try {
-      const result = readChunkFromDisk({ chunkDir, sha });
+      const result = await readChunkFromDisk({ chunkDir, sha });
       if (!result) {
         return { success: false, error: 'Chunk not found' };
       }

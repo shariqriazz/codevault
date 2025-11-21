@@ -234,7 +234,7 @@ export class FileProcessor {
       this.state.markIndexMutated();
 
       await fs.promises.mkdir(this.context.chunkDir, { recursive: true });
-      const writeResult = writeChunkToDisk({
+      const writeResult = await writeChunkToDisk({
         chunkDir: this.context.chunkDir,
         sha: params.sha,
         code: params.code,
@@ -285,7 +285,7 @@ export class FileProcessor {
     for (const chunkId of chunkIds) {
       const metadata = metadataLookup.get(chunkId) || this.state.codemap[chunkId];
       if (metadata && metadata.sha) {
-        removeChunkArtifacts(this.context.chunkDir, metadata.sha);
+        await removeChunkArtifacts(this.context.chunkDir, metadata.sha);
       }
       delete this.state.codemap[chunkId];
     }

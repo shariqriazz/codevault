@@ -79,8 +79,8 @@ export class ResultMapper {
     try {
       const reranked = await rerankWithAPI(query, candidates, {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
-        getText: candidate => {
-          const codeText = this.readChunkText(candidate.sha, chunkDir) || '';
+        getTextAsync: async candidate => {
+          const codeText = (await this.readChunkText(candidate.sha, chunkDir)) || '';
           return this.buildBm25Document(candidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
@@ -131,9 +131,9 @@ export class ResultMapper {
 
   // Private helpers
 
-  private readChunkText(sha: string, chunkDir: string): string | null {
+  private async readChunkText(sha: string, chunkDir: string): Promise<string | null> {
     try {
-      const result = readChunkFromDisk({ chunkDir, sha });
+      const result = await readChunkFromDisk({ chunkDir, sha });
       return result ? result.code : null;
     } catch (error) {
       return null;

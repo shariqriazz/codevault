@@ -41,7 +41,7 @@ export class HybridFusion {
   /**
    * Use BM25 to prefilter candidates before vector scoring
    */
-  prefilterCandidates(params: {
+  async prefilterCandidates(params: {
     hybridEnabled: boolean;
     bm25Enabled: boolean;
     query: string;
@@ -51,7 +51,7 @@ export class HybridFusion {
     basePath: string;
     scopedChunks: DatabaseChunk[];
     limit: number;
-  }): { candidateIds: Set<string>; bm25Results: Array<{ id: string; score: number }> } {
+  }): Promise<{ candidateIds: Set<string>; bm25Results: Array<{ id: string; score: number }> }> {
     const {
       hybridEnabled,
       bm25Enabled,
@@ -68,7 +68,7 @@ export class HybridFusion {
       return { candidateIds: new Set(), bm25Results: [] };
     }
 
-    const bm25Index = this.ensureBm25IndexForChunks(
+    const bm25Index = await this.ensureBm25IndexForChunks(
       basePath,
       chunkDir,
       providerName,
@@ -91,7 +91,7 @@ export class HybridFusion {
   /**
    * Attempt hybrid fusion of vector and BM25 results
    */
-  fuseResults(params: {
+  async fuseResults(params: {
     hybridEnabled: boolean;
     bm25Enabled: boolean;
     selectionBudget: number;
@@ -104,11 +104,11 @@ export class HybridFusion {
     chunkInfoById: Map<string, SearchCandidate>;
     vectorPool: SearchCandidate[];
     bm25ResultsOverride?: Array<{ id: string; score: number }>;
-  }): {
+  }): Promise<{
     fusedResults: SearchCandidate[];
     bm25Fused: boolean;
     bm25CandidateCount: number;
-  } {
+  }> {
     const {
       hybridEnabled,
       bm25Enabled,
@@ -129,7 +129,7 @@ export class HybridFusion {
     let bm25CandidateCount = 0;
 
     if (hybridEnabled && bm25Enabled) {
-      const bm25Index = this.ensureBm25IndexForChunks(
+      const bm25Index = await this.ensureBm25IndexForChunks(
         basePath,
         chunkDir,
         providerName,
@@ -310,13 +310,13 @@ export class HybridFusion {
 
   // Private helpers
 
-  private ensureBm25IndexForChunks(
+  private async ensureBm25IndexForChunks(
     basePath: string,
     chunkDir: string,
     providerName: string,
     dimensions: number,
     chunks: DatabaseChunk[]
-  ): BM25Index | null {
+  ): Promise<BM25Index | null> {
     if (!Array.isArray(chunks) || chunks.length === 0) return null;
 
     const key = this.getBm25CacheKey(basePath, providerName, dimensions);
@@ -331,7 +331,7 @@ export class HybridFusion {
     for (const chunk of chunks) {
       if (!chunk || !chunk.id || entry.added.has(chunk.id)) continue;
 
-      const codeText = this.readChunkTextCached(chunk.sha, chunkDir, basePath);
+      const codeText = await this.readChunkTextCached(chunk.sha, chunkDir, basePath);
       const docText = this.buildBm25Document(chunk, codeText);
 
       if (docText && docText.trim().length > 0) {
@@ -346,11 +346,11 @@ export class HybridFusion {
     return entry.index;
   }
 
-  private readChunkTextCached(
+  private async readChunkTextCached(
     sha: string,
     chunkDir: string,
     basePath: string
-  ): string | null {
+  ): Promise<string | null> {
     if (!sha) return null;
 
     const cacheKey = this.getChunkCacheKey(basePath, sha);
@@ -360,7 +360,7 @@ export class HybridFusion {
     this.chunkLoadingStats.totalAttempted++;
 
     try {
-      const result = readChunkFromDisk({ chunkDir, sha });
+      const result = await readChunkFromDisk({ chunkDir, sha });
       const code = result ? result.code : null;
       this.chunkCache.set(cacheKey, code);
 
