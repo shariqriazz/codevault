@@ -6,7 +6,6 @@ import { computeFastHash } from '../../indexer/merkle.js';
 import { ChunkPipeline } from './chunk-pipeline.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
-import type { IndexProjectOptions } from '../types.js';
 import {normalizeChunkMetadata} from '../../types/codemap.js';
 import {writeChunkToDisk, removeChunkArtifacts} from '../../storage/encrypted-chunks.js';
 import { PersistManager } from './PersistManager.js';

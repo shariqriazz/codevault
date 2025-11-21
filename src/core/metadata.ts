@@ -134,7 +134,7 @@ export function extractImportantVariables(node: TreeSitterNode, source: string, 
   return variables;
 }
 
-export function isImportantVariable(varText: string, nodeType: string): boolean {
+export function isImportantVariable(varText: string, _nodeType: string): boolean {
   const importantPatterns = [
     /const\s+\w*(config|setting|option|endpoint|url|key|secret|token)\w*/i,
     /const\s+\w*(api|service|client|provider)\w*/i,

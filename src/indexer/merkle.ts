@@ -53,7 +53,7 @@ export function loadMerkle(basePath = '.'): MerkleTree {
   try {
     const data = fs.readFileSync(merklePath, 'utf8');
     return ensureObject(JSON.parse(data));
-  } catch (error) {
+  } catch {
     return {};
   }
 }

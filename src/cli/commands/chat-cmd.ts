@@ -207,7 +207,6 @@ async function handleCommand(
       break;
 
     case '/stats': {
-      const summary = getConversationSummary(context);
       const uniqueFiles = new Set(
         Array.from(context.allChunks.values()).map(chunk => chunk.result.path)
       );

@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-import path from 'path';
-import fs from 'fs';
 import Parser, { type Tree } from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
@@ -354,7 +352,7 @@ export class ChunkPipeline {
       chunkMerkleHashes: string[],
       onProgress: ProgressCallback | null,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: any
+      _chunkingStats: any
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
     if (!symbol) return;

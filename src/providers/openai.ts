@@ -3,7 +3,6 @@ import { createRateLimiter, RateLimiter } from '../utils/rate-limiter.js';
 import {
   EmbeddingProvider,
   getModelProfile,
-  getSizeLimits,
   MAX_BATCH_TOKENS,
   MAX_ITEM_TOKENS,
   estimateTokens
@@ -60,7 +59,6 @@ export class OpenAIProvider extends EmbeddingProvider {
     await this.init();
 
     const profile = await getModelProfile(this.getName(), this.model);
-    const limits = getSizeLimits(profile);
     const maxChars = profile.maxChunkChars || 8000;
 
     return await this.rateLimiter.execute(async () => {

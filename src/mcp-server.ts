@@ -355,7 +355,7 @@ export class McpServer {
         clearTokenCache();
 
         logger.debug('Cache cleared periodically');
-      } catch (error) {
+      } catch {
         // Ignore errors during cleanup
       }
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
