@@ -130,6 +130,9 @@ export class CodeVaultDatabase {
   private getChunksStmt!: Database.Statement;
   private deleteChunksStmt: Database.Statement | null = null;
   private insertManyStmt: ((chunks: InsertChunkParams[]) => void) | null = null;
+  // Prepared statements for orphan cleanup
+  private getAllPathsStmt: Database.Statement | null = null;
+  private deleteByPathStmt: Database.Statement | null = null;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -236,6 +239,14 @@ export class CodeVaultDatabase {
     for (const sql of indexes) {
       this.db.exec(sql);
     }
+
+    this.getAllPathsStmt = this.db.prepare(`
+      SELECT DISTINCT file_path FROM code_chunks ORDER BY file_path
+    `);
+
+    this.deleteByPathStmt = this.db.prepare(`
+      DELETE FROM code_chunks WHERE file_path = ?
+    `);
   }
 
   /**
@@ -538,6 +549,21 @@ export class CodeVaultDatabase {
     } catch (error) {
       log.error('Failed to close database', error);
     }
+  }
+
+  getAllFilePaths(): string[] {
+    if (!this.getAllPathsStmt) {
+      return [];
+    }
+    const rows = this.getAllPathsStmt.all();
+    return Array.isArray(rows) ? rows.map((row: any) => row.file_path).filter(Boolean) : [];
+  }
+
+  deleteChunksByFilePath(filePath: string): void {
+    if (!this.deleteByPathStmt) {
+      return;
+    }
+    this.deleteByPathStmt.run(filePath);
   }
 
   /**

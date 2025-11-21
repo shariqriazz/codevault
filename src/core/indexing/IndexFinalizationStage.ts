@@ -7,6 +7,8 @@ import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
 import type { IndexProjectResult } from '../types.js';
 import { PersistManager } from './PersistManager.js';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * IndexFinalizationStage handles the finalization of the indexing process:
@@ -41,6 +43,8 @@ export class IndexFinalizationStage {
       // Build symbol graph and write codemap
       attachSymbolGraphToCodemap(this.state.codemap);
       this.state.markIndexMutated();
+
+      await this.cleanupOrphanedChunks();
 
       // Persist any pending data (debounced during processing)
       await this.persistManager.flush();
@@ -111,6 +115,47 @@ export class IndexFinalizationStage {
       chunkingStats: this.state.chunkingStats,
       tokenStats: this.context.modelProfile.useTokens ? tokenStats : undefined
     };
+  }
+
+  /**
+   * Remove orphaned chunks whose source files no longer exist
+   */
+  private async cleanupOrphanedChunks(): Promise<void> {
+    if (!this.context.db) return;
+
+    const paths = this.context.db.getAllFilePaths();
+    if (!Array.isArray(paths) || paths.length === 0) return;
+
+    const base = this.context.repo;
+    const orphaned: string[] = [];
+
+    for (const rel of paths) {
+      const full = path.join(base, rel);
+      if (!fs.existsSync(full)) {
+        orphaned.push(rel);
+      }
+    }
+
+    if (orphaned.length === 0) {
+      return;
+    }
+
+    logger.info(`Removing ${orphaned.length} orphaned files from index`);
+
+    for (const rel of orphaned) {
+      this.context.db.deleteChunksByFilePath(rel);
+      for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
+        if ((meta as any)?.file === rel) {
+          delete this.state.codemap[chunkId];
+        }
+      }
+      delete this.state.updatedMerkle[rel];
+    }
+
+    this.state.markIndexMutated();
+    this.state.markMerkleDirty();
+    this.persistManager.scheduleCodemapSave();
+    this.persistManager.scheduleMerkleSave();
   }
 
   /**
