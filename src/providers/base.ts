@@ -140,6 +140,36 @@ export const MODEL_PROFILES: Record<string, Omit<ModelProfile, 'tokenCounter'>> 
     tokenizerType: 'tiktoken',
     encoding: 'cl100k_base'
   },
+  'gemini-embedding-001': {
+    maxTokens: 2048,
+    optimalTokens: 1600,
+    minChunkTokens: 200,
+    maxChunkTokens: 1800,
+    overlapTokens: 50,
+    optimalChars: 6400,
+    minChunkChars: 800,
+    maxChunkChars: 7200,
+    overlapChars: 200,
+    dimensions: 768,
+    useTokens: true,
+    tokenizerType: 'tiktoken',
+    encoding: 'cl100k_base'
+  },
+  'google/gemini-embedding-001': {
+    maxTokens: 2048,
+    optimalTokens: 1600,
+    minChunkTokens: 200,
+    maxChunkTokens: 1800,
+    overlapTokens: 50,
+    optimalChars: 6400,
+    minChunkChars: 800,
+    maxChunkChars: 7200,
+    overlapChars: 200,
+    dimensions: 768,
+    useTokens: true,
+    tokenizerType: 'tiktoken',
+    encoding: 'cl100k_base'
+  },
   'default': {
     maxTokens: 512,
     optimalTokens: 400,
