@@ -157,8 +157,16 @@ export const MODEL_PROFILES: Record<string, Omit<ModelProfile, 'tokenCounter'>> 
 };
 
 export async function getModelProfile(providerName: string, modelName: string | null): Promise<ModelProfile> {
-  let baseProfile = modelName ? MODEL_PROFILES[modelName] : undefined;
-  
+  let baseProfile: Omit<ModelProfile, 'tokenCounter'> | undefined;
+
+  // Case-insensitive model name lookup
+  if (modelName) {
+    const modelKey = Object.keys(MODEL_PROFILES).find(
+      key => key.toLowerCase() === modelName.toLowerCase()
+    );
+    baseProfile = modelKey ? MODEL_PROFILES[modelKey] : undefined;
+  }
+
   if (!baseProfile) {
     const providerDefaults: Record<string, Omit<ModelProfile, 'tokenCounter'>> = {
       'OpenAI': MODEL_PROFILES['text-embedding-3-large']
