@@ -154,10 +154,16 @@ This is a TypeScript/Node.js project (v1.8.3) that provides:
 ## Code Standards
 
 ### TypeScript Guidelines
-- Use strict TypeScript with proper types (no `any` unless absolutely necessary)
-- Prefer interfaces for public APIs, types for internal use
-- Use async/await over promises
-- Export types alongside implementations
+- **No `any` type**: Use strict types everywhere (no `any` unless absolutely necessary with `@ts-expect-error` comment explaining why)
+- **Explicit return types**: All functions must have explicit return type annotations (including `Promise<T>` for async functions)
+- **No unsafe type operations**: Avoid `@ts-ignore`, non-null assertions (`!`), and unsafe casts
+- **No unsafe calls/arguments**: Ensure all function calls have proper type checking via `@typescript-eslint/no-unsafe-call` and `@typescript-eslint/no-unsafe-argument`
+- **No unsafe returns**: All return values must be properly typed via `@typescript-eslint/no-unsafe-return`
+- **No unsafe member access**: Access object properties only with known types, no bracket notation on unknown objects
+- **Prefer interfaces for public APIs**, types for internal use
+- **Use async/await** over promises (never mix promise chains with async/await)
+- **Export types alongside implementations** in the same file
+- **Type all async functions** explicitly with `async function name(): Promise<T>`
 
 ### Error Handling
 - Use try/catch for async operations
