@@ -378,8 +378,9 @@ codevault config set rateLimit.tpm 10000
 
 **"Out of memory during indexing"**
 ```bash
-# Reduce batch size via environment
-export BATCH_SIZE=25
+# Adjust batch size (default 100) via environment
+export BATCH_SIZE=50   # Moderate
+export BATCH_SIZE=25   # Conservative
 codevault index
 ```
 

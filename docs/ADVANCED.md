@@ -360,12 +360,13 @@ Efficient API usage through batching.
 ### Configuration
 
 ```bash
-# Batch size (default: 50)
-export BATCH_SIZE=50
+# Batch size (default: 100)
+export BATCH_SIZE=100
 
-# Adjust based on API limits
+# Adjust based on API limits or provider guidance
+export BATCH_SIZE=50  # Moderate
 export BATCH_SIZE=25  # Conservative
-export BATCH_SIZE=100 # Aggressive (if supported)
+export BATCH_SIZE=200 # Aggressive (only if provider supports)
 ```
 
 ### Example
