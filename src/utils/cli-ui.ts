@@ -35,7 +35,7 @@ export class IndexerUI {
   };
 
   showHeader() {
-    console.log(chalk.cyan.bold('\n🔍 CodeVault Indexer'));
+    process.stdout.write(`${chalk.cyan.bold('\n🔍 CodeVault Indexer')  }\n`);
   }
 
   showConfiguration(config: {
@@ -45,12 +45,12 @@ export class IndexerUI {
     chunkSize: { min: number; max: number; optimal: number };
     rateLimit?: { rpm: number; tpm?: number };
   }) {
-    console.log(chalk.white('\n📊 Configuration'));
-    console.log(chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`));
-    console.log(chalk.gray(`   Dimensions:  ${config.dimensions}`));
-    console.log(chalk.gray(`   Chunk size:  ${Math.floor(config.chunkSize.min / 1000)}K-${Math.floor(config.chunkSize.max / 1000)}K tokens (optimal: ${Math.floor(config.chunkSize.optimal / 1000)}K)`));
+    process.stdout.write(`${chalk.white('\n📊 Configuration')  }\n`);
+    process.stdout.write(`${chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Dimensions:  ${config.dimensions}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Chunk size:  ${Math.floor(config.chunkSize.min / 1000)}K-${Math.floor(config.chunkSize.max / 1000)}K tokens (optimal: ${Math.floor(config.chunkSize.optimal / 1000)}K)`)  }\n`);
     if (config.rateLimit) {
-      console.log(chalk.gray(`   Rate limit:  ${config.rateLimit.rpm.toLocaleString()} req/min`));
+      process.stdout.write(`${chalk.gray(`   Rate limit:  ${config.rateLimit.rpm.toLocaleString()} req/min`)  }\n`);
     }
   }
 
@@ -72,9 +72,9 @@ export class IndexerUI {
   startIndexing() {
     this.startTime = Date.now();
     this.processedFiles = 0;
-    
-    console.log(chalk.white('\n⚡ Indexing files'));
-    
+
+    process.stdout.write(`${chalk.white('\n⚡ Indexing files')  }\n`);
+
     if (this.totalFiles > 0) {
       this.progressBar = new cliProgress.SingleBar({
         format: `${chalk.cyan('   [{bar}]')  } {percentage}% | {value}/{total} files | ETA {eta_manual}`,
@@ -142,10 +142,10 @@ export class IndexerUI {
       const minutes = Math.floor(duration / 60000);
       const seconds = Math.floor((duration % 60000) / 1000);
       const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-      
-      console.log(chalk.green(`\n✅ Indexing complete in ${timeStr}!`));
+
+      process.stdout.write(`${chalk.green(`\n✅ Indexing complete in ${timeStr}!`)  }\n`);
     } else {
-      console.log(chalk.green(`\n✅ Indexing complete!`));
+      process.stdout.write(`${chalk.green(`\n✅ Indexing complete!`)  }\n`);
     }
   }
 
@@ -155,35 +155,35 @@ export class IndexerUI {
     codemapSize?: string;
     tokenStats?: Record<string, unknown>;
   }) {
-    console.log(chalk.white('\n📊 Summary'));
-    console.log(chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`));
-    
+    process.stdout.write(`${chalk.white('\n📊 Summary')  }\n`);
+    process.stdout.write(`${chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`)  }\n`);
+
     if (this.stats.merged > 0) {
-      console.log(chalk.gray(`   Merged small:      ${chalk.white(this.stats.merged)}`));
+      process.stdout.write(`${chalk.gray(`   Merged small:      ${chalk.white(this.stats.merged)}`)  }\n`);
     }
     if (this.stats.subdivided > 0) {
-      console.log(chalk.gray(`   Subdivided large:  ${chalk.white(this.stats.subdivided)}`));
+      process.stdout.write(`${chalk.gray(`   Subdivided large:  ${chalk.white(this.stats.subdivided)}`)  }\n`);
     }
     if (this.stats.skipped > 0) {
-      console.log(chalk.gray(`   Skipped (small):   ${chalk.white(this.stats.skipped)}`));
-    }
-    
-    if (summary.dbSize) {
-      console.log(chalk.gray(`   Database:          ${chalk.white(summary.dbSize)}`));
-    }
-    if (summary.codemapSize) {
-      console.log(chalk.gray(`   Codemap:           ${chalk.white(summary.codemapSize)}`));
+      process.stdout.write(`${chalk.gray(`   Skipped (small):   ${chalk.white(this.stats.skipped)}`)  }\n`);
     }
 
-    console.log(chalk.cyan('\n🚀 Ready to use!'));
-    console.log(chalk.gray(`   Quick search:       ${chalk.white('codevault search "your query"')}`));
-    console.log(chalk.gray(`   With code chunks:   ${chalk.white('codevault search-with-code "your query"')}`));
-    console.log(chalk.gray(`   Ask w/ synthesis:   ${chalk.white('codevault ask "How does auth work?"')}`));
-    console.log(chalk.gray(`   Interactive chat:   ${chalk.white('codevault chat')}`));
-    console.log(chalk.gray(`   Auto-update index:  ${chalk.white('codevault watch --debounce 500')}`));
-    console.log(chalk.gray(`   Partial reindex:    ${chalk.white('codevault update --files src/app.ts')}`));
-    console.log(chalk.gray(`   MCP server:         ${chalk.white('codevault mcp (Claude Desktop, etc.)')}`));
-    console.log('');
+    if (summary.dbSize) {
+      process.stdout.write(`${chalk.gray(`   Database:          ${chalk.white(summary.dbSize)}`)  }\n`);
+    }
+    if (summary.codemapSize) {
+      process.stdout.write(`${chalk.gray(`   Codemap:           ${chalk.white(summary.codemapSize)}`)  }\n`);
+    }
+
+    process.stdout.write(`${chalk.cyan('\n🚀 Ready to use!')  }\n`);
+    process.stdout.write(`${chalk.gray(`   Quick search:       ${chalk.white('codevault search "your query"')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   With code chunks:   ${chalk.white('codevault search-with-code "your query"')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Ask w/ synthesis:   ${chalk.white('codevault ask "How does auth work?"')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Interactive chat:   ${chalk.white('codevault chat')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Auto-update index:  ${chalk.white('codevault watch --debounce 500')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   Partial reindex:    ${chalk.white('codevault update --files src/app.ts')}`)  }\n`);
+    process.stdout.write(`${chalk.gray(`   MCP server:         ${chalk.white('codevault mcp (Claude Desktop, etc.)')}`)  }\n`);
+    process.stdout.write('\n');
   }
 
   showError(message: string) {
