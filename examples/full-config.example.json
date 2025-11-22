@@ -31,5 +31,20 @@
     "apiUrl": "https://api.novita.ai/openai/v1/rerank",
     "apiKey": "your-novita-api-key-here",
     "model": "qwen/qwen3-reranker-8b"
+  },
+  "comment_routing": "Optional: Add provider routing when using OpenRouter (see examples/openrouter-routing.example.json)",
+  "routing_example_embeddings": {
+    "routing": {
+      "only": ["nebius"],
+      "allow_fallbacks": false,
+      "data_collection": "deny",
+      "zdr": true
+    }
+  },
+  "routing_example_chat": {
+    "routing": {
+      "sort": "throughput",
+      "allow_fallbacks": true
+    }
   }
 }

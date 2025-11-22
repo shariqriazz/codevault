@@ -1,10 +1,16 @@
 {
   "comment": "Claude Desktop with Ollama (local, privacy-focused, free)",
+  "note": "Provider routing is not applicable for local Ollama - all requests go directly to your local server",
+  "requirements": {
+    "ollama": "Install from https://ollama.ai",
+    "models_to_pull": "ollama pull nomic-embed-text && ollama pull qwen2.5-coder:7b"
+  },
   "mcpServers": {
     "codevault": {
       "command": "npx",
       "args": ["-y", "codevault", "mcp"],
       "env": {
+        "comment": "No API keys required - all processing is local",
         "CODEVAULT_EMBEDDING_BASE_URL": "http://localhost:11434/v1",
         "CODEVAULT_EMBEDDING_MODEL": "nomic-embed-text",
         "CODEVAULT_EMBEDDING_DIMENSIONS": "768",
@@ -14,5 +20,14 @@
         "CODEVAULT_CHAT_MAX_TOKENS": "32000"
       }
     }
+  },
+  "benefits": {
+    "privacy": "No data leaves your machine",
+    "cost": "Free - runs on your hardware",
+    "offline": "Works without internet connection",
+    "customizable": "Easy to swap models"
+  },
+  "advanced": {
+    "note": "For cloud-based provider routing, use claude-desktop-config.example.json instead"
   }
 }

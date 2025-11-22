@@ -1,15 +1,19 @@
 {
   "comment": "CodeVault MCP with NPX (no installation required) - Recommended Setup",
+  "note": "For provider routing configuration, create ~/.codevault/config.json with routing settings (see nebius-openrouter.example.json or openrouter-routing.example.json)",
   "mcpServers": {
     "codevault": {
       "command": "npx",
       "args": ["-y", "codevault", "mcp"],
       "env": {
+        "comment_direct_nebius": "Option 1: Direct connection to Nebius (no routing overhead)",
         "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-api-token-here",
         "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
         "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
         "CODEVAULT_EMBEDDING_DIMENSIONS": "4096",
         "CODEVAULT_EMBEDDING_MAX_TOKENS": "32000",
+        "comment_or_openrouter": "Option 2: Use OpenRouter to enable provider routing (change baseUrl and apiKey to OpenRouter)",
+        "comment_openrouter_baseurl": "To use OpenRouter: https://openrouter.ai/api/v1",
         "CODEVAULT_CHAT_API_KEY": "your-openrouter-api-key-here",
         "CODEVAULT_CHAT_BASE_URL": "https://openrouter.ai/api/v1",
         "CODEVAULT_CHAT_MODEL": "anthropic/claude-sonnet-4.5",
@@ -18,5 +22,11 @@
         "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b"
       }
     }
+  },
+  "setup_instructions": {
+    "step_1": "Create ~/.codevault/config.json with your provider configuration",
+    "step_2": "For provider routing: Use the config options in nebius-openrouter.example.json",
+    "step_3": "Environment variables here override config.json settings",
+    "step_4": "Routing can only be set in config.json, not via environment variables"
   }
 }
