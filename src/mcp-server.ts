@@ -61,6 +61,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   const normalizedError = error instanceof Error ? error : new Error(String(error));
   const errorObj = error as Record<string, unknown>;
   const code = typeof errorObj?.code === 'string' ? errorObj.code : undefined;
+  const includeStack = process.env.CODEVAULT_MCP_DEBUG === 'true';
 
   if (code === 'ENCRYPTION_KEY_REQUIRED') {
     return {
@@ -93,7 +94,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
     code: code || 'RUNTIME_ERROR',
     type: 'runtime',
     message: normalizedError.message,
-    details: normalizedError.stack ? { stack: normalizedError.stack } : undefined
+    details: includeStack && normalizedError.stack ? { stack: normalizedError.stack } : undefined
   };
 }
 
