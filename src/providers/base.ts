@@ -40,7 +40,9 @@ export abstract class EmbeddingProvider {
 }
 
 // Batching constants
-export const BATCH_SIZE = 100; // Number of chunks per batch
+const DEFAULT_BATCH_SIZE = 50;
+const envBatchSize = Number.parseInt(process.env.BATCH_SIZE || process.env.CODEVAULT_BATCH_SIZE || '', 10);
+export const BATCH_SIZE = Number.isFinite(envBatchSize) && envBatchSize > 0 ? envBatchSize : DEFAULT_BATCH_SIZE; // Number of chunks per batch
 export const MAX_BATCH_TOKENS = 100000; // Total tokens per API batch (OpenAI limit)
 export const MAX_ITEM_TOKENS = 8191; // Default per-item token limit (fallback for models without profiles)
 

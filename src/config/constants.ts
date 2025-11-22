@@ -145,7 +145,7 @@ export const BATCH_CONSTANTS = {
   MAX_ITEM_TOKENS: 8191,
 
   /** Default batch size for embedding generation */
-  DEFAULT_BATCH_SIZE: 100,
+  DEFAULT_BATCH_SIZE: 50,
 } as const;
 
 /**
