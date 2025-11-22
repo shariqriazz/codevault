@@ -68,6 +68,18 @@ export class SearchService {
   ): Promise<SearchCodeResult> {
     const basePath = path.resolve(workingPath);
     const normalizedQuery = this.normalizeQuery(query);
+    const MAX_QUERY_CHARS = Number.parseInt(process.env.CODEVAULT_MAX_QUERY_CHARS || '5000', 10);
+    if (Number.isFinite(MAX_QUERY_CHARS) && normalizedQuery.length > MAX_QUERY_CHARS) {
+      return this.createErrorResult(
+        'query_too_long',
+        `Query exceeds maximum length of ${MAX_QUERY_CHARS} characters`,
+        provider,
+        normalizeScopeFilters(scopeOptions),
+        true,
+        true,
+        true
+      );
+    }
 
     if (!normalizedQuery) {
       return this.getOverview(limit, workingPath);

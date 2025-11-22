@@ -82,6 +82,19 @@ export async function synthesizeAnswer(
   } = options;
 
   try {
+    const MAX_QUERY_CHARS = Number.parseInt(process.env.CODEVAULT_MAX_QUERY_CHARS || '5000', 10);
+    const normalizedQuery = query.toLowerCase().trim();
+    if (Number.isFinite(MAX_QUERY_CHARS) && normalizedQuery.length > MAX_QUERY_CHARS) {
+      return {
+        success: false,
+        error: `Query exceeds maximum length of ${MAX_QUERY_CHARS} characters`,
+        query,
+        chunksAnalyzed: 0,
+        chatProvider: chatProvider,
+        embeddingProvider: provider
+      };
+    }
+
     const providerContext = resolveProviderContext(workingPath);
     const chatLLM = createChatLLMProvider(chatProvider, providerContext.chat);
     if (chatLLM.init) {
