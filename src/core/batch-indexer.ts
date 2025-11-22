@@ -283,14 +283,16 @@ export class BatchEmbeddingProcessor {
 
         if (nextAttempt > MAX_ANY_RETRIES) {
           log.debug(
-            `Batch retry cap reached (${nextAttempt - 1}). Continuing to retry with capped backoff; investigate provider errors.`,
+            `Batch retry cap reached (${nextAttempt - 1}). Falling back to per-chunk processing; investigate provider errors.`,
             { batchSize: currentBatch.length }
           );
-        } else {
-          log.debug(
-            `Batch will be retried after backoff (${delay}ms) (attempt ${nextAttempt}/${MAX_ANY_RETRIES})`
-          );
+          await this.fallbackToIndividualProcessing(currentBatch);
+          return;
         }
+
+        log.debug(
+          `Batch will be retried after backoff (${delay}ms) (attempt ${nextAttempt}/${MAX_ANY_RETRIES})`
+        );
 
         await new Promise(resolve => setTimeout(resolve, delay));
         await this.processBatchWithRetry(
@@ -299,22 +301,8 @@ export class BatchEmbeddingProcessor {
           depth,
           fatalApi || fatalSeen
         );
+        return;
       }
-
-      // Other errors or max retries reached - fall back to individual processing
-      // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
-       
-      log.debug(
-        `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
-        {
-          batchSize: currentBatch.length,
-          error: serializeErrorForLog(error)
-        }
-      );
-      log.info('Falling back to individual processing (this will be slower)');
-
-      await this.fallbackToIndividualProcessing(currentBatch);
-      return;
     }
   }
 
