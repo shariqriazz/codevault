@@ -4,8 +4,24 @@ import { resolveScopeWithPack } from '../../context/packs.js';
 import { MAX_CHUNK_SIZE } from '../../config/constants.js';
 import { SearchCodeArgs, SearchCodeWithChunksArgs, GetCodeChunkArgs } from '../schemas.js';
 
-export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack: unknown) {
+type SessionPackInput = {
+  key: string;
+  name: string;
+  description: string | null;
+  scope: Record<string, unknown>;
+  path: string;
+  invalid?: boolean;
+  basePath: string;
+};
+
+export async function handleSearchCode(
+  args: SearchCodeArgs,
+  sessionContextPack: SessionPackInput | null
+): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
+  const sessionPack = sessionContextPack && typeof sessionContextPack === 'object'
+    ? sessionContextPack
+    : null;
   const { scope: scopeFilters } = resolveScopeWithPack(
     {
       path_glob: args.path_glob,
@@ -16,7 +32,7 @@ export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack:
       bm25: args.bm25,
       symbol_boost: args.symbol_boost,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack as any }
+    { basePath: cleanPath, sessionPack }
   );
 
   const results = await searchCode(
@@ -57,8 +73,14 @@ export async function handleSearchCode(args: SearchCodeArgs, sessionContextPack:
   };
 }
 
-export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs, sessionContextPack: unknown) {
+export async function handleSearchCodeWithChunks(
+  args: SearchCodeWithChunksArgs,
+  sessionContextPack: SessionPackInput | null
+): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
+  const sessionPack = sessionContextPack && typeof sessionContextPack === 'object'
+    ? sessionContextPack
+    : null;
   const { scope: scopeFilters } = resolveScopeWithPack(
     {
       path_glob: args.path_glob,
@@ -69,7 +91,7 @@ export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs,
       bm25: args.bm25,
       symbol_boost: args.symbol_boost,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack as any }
+    { basePath: cleanPath, sessionPack }
   );
 
   const searchResults = await searchCode(
@@ -122,7 +144,7 @@ export async function handleSearchCodeWithChunks(args: SearchCodeWithChunksArgs,
   };
 }
 
-export async function handleGetCodeChunk(args: GetCodeChunkArgs) {
+export async function handleGetCodeChunk(args: GetCodeChunkArgs): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
   const result = await getChunk(args.sha, cleanPath);
 

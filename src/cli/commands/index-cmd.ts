@@ -8,6 +8,15 @@ import { log, print } from '../../utils/logger.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from '../../providers/index.js';
 import { resolveProviderContext } from '../../config/resolver.js';
 
+interface IndexCommandOptions {
+  provider?: string;
+  project?: string;
+  directory?: string;
+  encrypt?: string;
+  concurrency?: string | number;
+  verbose?: boolean;
+}
+
 export function registerIndexCommand(program: Command): void {
   program
     .command('index [path]')
@@ -18,7 +27,7 @@ export function registerIndexCommand(program: Command): void {
     .option('--encrypt <mode>', 'encrypt chunk payloads (on|off)')
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
-    .action(async (projectPath = '.', options) => {
+    .action(async (projectPath: string = '.', options: IndexCommandOptions) => {
       const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
                                     (typeof options.directory === 'string' ? options.directory : null) ||
                                     (typeof projectPath === 'string' ? projectPath : null) ||
@@ -72,7 +81,9 @@ export function registerIndexCommand(program: Command): void {
 
         const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
         const encryptMode: string | undefined = typeof options.encrypt === 'string' ? options.encrypt : undefined;
-        const concurrency = options.concurrency ? parseInt(String(options.concurrency), 10) : undefined;
+        const concurrency = options.concurrency !== undefined
+          ? parseInt(String(options.concurrency), 10)
+          : undefined;
 
         if (!options.verbose) {
           result = await indexProjectWithProgress({

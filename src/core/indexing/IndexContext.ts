@@ -152,7 +152,7 @@ export class IndexContext {
 
     const db = new Database(dbPath);
     try {
-      const existingDimensions = await db.getExistingDimensions();
+      const existingDimensions = db.getExistingDimensions();
 
       if (existingDimensions.length > 0) {
         const currentProvider = embeddingProvider.getName();

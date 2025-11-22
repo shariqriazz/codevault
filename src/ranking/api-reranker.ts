@@ -55,6 +55,15 @@ interface RerankResult {
   logit?: number;
 }
 
+function isRerankResult(value: unknown): value is RerankResult {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    'index' in value &&
+    typeof (value as { index?: unknown }).index === 'number'
+  );
+}
+
 function isResultsResponse(data: unknown): data is { results: RerankResult[] } {
   return Boolean(
     data &&
@@ -113,17 +122,17 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
   // Handle standard reranking response format
   // Most providers (Novita, Cohere, Jina AI, Voyage AI) use this format
   if (isResultsResponse(data)) {
-    return data.results;
+    return data.results.filter(isRerankResult);
   }
 
   // Alternative response format (some providers use data array)
   if (hasDataArray(data)) {
-    return data.data;
+    return data.data.filter(isRerankResult);
   }
 
   // Fallback for direct array response
   if (Array.isArray(data)) {
-    return data;
+    return data.filter(isRerankResult);
   }
 
   throw new Error(`Unexpected rerank API response format. Expected {results: [...]} but got: ${JSON.stringify(data).slice(0, 200)}`);

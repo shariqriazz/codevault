@@ -4,6 +4,21 @@ import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 import { print } from '../../utils/logger.js';
 
+interface SearchWithCodeOptions extends Record<string, unknown> {
+  limit?: string;
+  provider?: string;
+  project?: string;
+  directory?: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker?: string;
+  hybrid?: string;
+  bm25?: string;
+  symbol_boost?: string;
+  maxCodeSize?: string | number;
+}
+
 export function registerSearchWithCodeCommand(program: Command): void {
   program
     .command('search-with-code <query> [path]')
@@ -20,7 +35,7 @@ export function registerSearchWithCodeCommand(program: Command): void {
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
     .option('--max-code-size <bytes>', 'max code size to display per chunk', '100000')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath: string = '.', options: SearchWithCodeOptions) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
@@ -33,7 +48,7 @@ export function registerSearchWithCodeCommand(program: Command): void {
         const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
         const providerOptionTyped: string = providerOption;
 
-        const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
+        const { scope: scopeFilters } = resolveScopeWithPack(options as Record<string, unknown>, { basePath: resolvedPath });
         const scopeFiltersTyped: import('../../types/search.js').ScopeFilters = scopeFilters;
         const results = await searchCode(query, limit, providerOptionTyped, resolvedPath, scopeFiltersTyped);
 

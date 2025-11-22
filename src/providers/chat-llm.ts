@@ -64,6 +64,7 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
       this.openai = new OpenAI(config);
     }
+    await Promise.resolve();
   }
 
   async generateCompletion(messages: ChatMessage[], options: ChatCompletionOptions = {}): Promise<string> {
@@ -88,7 +89,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
         ...(this.routingConfig && this.isOpenRouter() ? { provider: this.routingConfig } : {})
       };
 
-      const completion = await this.openai!.chat.completions.create(requestBody);
+      if (!this.openai) {
+        throw new Error('OpenAI client not initialized');
+      }
+      const completion = await this.openai.chat.completions.create(requestBody);
 
       return completion.choices[0]?.message?.content || '';
     });
@@ -119,7 +123,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
       ...(this.routingConfig && this.isOpenRouter() ? { provider: this.routingConfig } : {})
     };
 
-    const stream = await this.openai!.chat.completions.create(requestBody) as AsyncIterable<{
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+    const stream = await this.openai.chat.completions.create(requestBody) as AsyncIterable<{
       choices: Array<{ delta?: { content?: string } }>;
     }>;
 

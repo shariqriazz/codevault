@@ -241,7 +241,7 @@ export class SearchService {
         sortedResults.length > 0 &&
         sortedResults[0].meta.score > 0.8
       ) {
-        await context.db.recordIntention(
+        context.db.recordIntention(
           normalizedQuery,
           query,
           sortedResults[0].sha,
@@ -256,7 +256,7 @@ export class SearchService {
         .replace(/\b\w+Controller\b/gi, '[CONTROLLER]')
         .trim();
 
-      await context.db.recordQueryPattern(pattern);
+      context.db.recordQueryPattern(pattern);
 
       return {
         success: true,
@@ -300,6 +300,7 @@ export class SearchService {
   }
 
   public async getOverview(limit: number = 20, workingPath: string = '.'): Promise<SearchCodeResult> {
+    await Promise.resolve();
     const basePath = path.resolve(workingPath);
     const dbPath = path.join(basePath, '.codevault/codevault.db');
 
@@ -309,7 +310,7 @@ export class SearchService {
       }
 
       const db = new Database(dbPath);
-      const chunks = await db.getOverviewChunks(limit);
+      const chunks = db.getOverviewChunks(limit);
       db.close();
 
       const results: SearchResult[] = chunks.map(chunk => ({
@@ -347,7 +348,15 @@ export class SearchService {
 
   // Helpers
 
-  private createErrorResult(error: string, message: string, provider: string, scope: ScopeFilters, hybrid: boolean, bm25: boolean, symbolBoost: boolean) {
+  private createErrorResult(
+    error: string,
+    message: string,
+    provider: string,
+    scope: ScopeFilters,
+    hybrid: boolean,
+    bm25: boolean,
+    symbolBoost: boolean
+  ): SearchCodeResult {
     return {
       success: false,
       error,

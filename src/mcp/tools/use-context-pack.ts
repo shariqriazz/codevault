@@ -32,7 +32,7 @@ interface CreateHandlerOptions {
 export function createUseContextPackHandler(options: CreateHandlerOptions) {
   const { getWorkingPath, setSessionPack, clearSessionPack, errorLogger } = options;
 
-  return async ({ name, path: explicitPath }: { name: string; path?: string }) => {
+  return ({ name, path: explicitPath }: { name: string; path?: string }) => {
     const basePath = explicitPath && explicitPath.trim().length > 0
       ? explicitPath.trim()
       : (typeof getWorkingPath === 'function' ? getWorkingPath() : '.');
@@ -95,7 +95,10 @@ interface MCPServer {
   tool: (name: string, schema: Record<string, unknown>, handler: (params: unknown) => Promise<unknown>) => void;
 }
 
-export function registerUseContextPackTool(server: MCPServer, options: CreateHandlerOptions) {
+export function registerUseContextPackTool(
+  server: MCPServer,
+  options: CreateHandlerOptions
+): ReturnType<typeof createUseContextPackHandler> {
   const handler = createUseContextPackHandler(options);
 
   server.tool(
@@ -105,7 +108,8 @@ export function registerUseContextPackTool(server: MCPServer, options: CreateHan
       path: z.string().optional().describe('PROJECT ROOT directory path (defaults to ".")')
     },
     async (params: unknown) => {
-      const result = await handler(params as { name: string; path?: string });
+      await Promise.resolve();
+      const result = handler(params as { name: string; path?: string });
       return {
         content: [
           {

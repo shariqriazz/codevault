@@ -1,7 +1,6 @@
 import crypto from 'crypto';
-import path from 'path';
-import fs from 'fs';
 import Parser from 'tree-sitter';
+import type { Tree } from 'tree-sitter';
 import { analyzeNodeForChunking, batchAnalyzeNodes, yieldStatementChunks } from '../../chunking/semantic-chunker.js';
 import { groupNodesForChunking, createCombinedChunk, type NodeGroup } from '../../chunking/file-grouper.js';
 import { extractSymbolName } from '../symbol-extractor.js';
@@ -94,18 +93,39 @@ export class ASTTraverser {
 
   collectNodesForFile(source: string, rule: LanguageRule): TreeSitterNode[] {
     this.parser.setLanguage(rule.ts);
-    const tree = this.buildTree(source);
-    if (!tree?.rootNode) {
+    const treeUnknown: unknown = this.buildTree(source);
+
+    const isTree = (value: unknown): value is Tree =>
+      Boolean(
+        value &&
+        typeof value === 'object' &&
+        'rootNode' in (value as Record<string, unknown>)
+      );
+
+    if (!isTree(treeUnknown)) {
       throw new Error('Failed to create syntax tree');
     }
+    const isSyntaxNode = (node: unknown): node is TreeSitterNode =>
+      Boolean(
+        node &&
+        typeof node === 'object' &&
+        'type' in (node as Record<string, unknown>) &&
+        'childCount' in (node as Record<string, unknown>)
+      );
+
+    const rootNodeUnknown = (treeUnknown as { rootNode?: unknown }).rootNode;
+    if (!isSyntaxNode(rootNodeUnknown)) {
+      throw new Error('Failed to create syntax tree');
+    }
+    const rootNode = rootNodeUnknown;
 
     const collectedNodes: TreeSitterNode[] = [];
-    const collectNodes = (node: TreeSitterNode) => {
+    const collectNodes = (node: TreeSitterNode): void => {
       if (node.type === 'export_statement') {
         let hasDeclaration = false;
         for (let i = 0; i < node.childCount; i++) {
           const child = node.child(i);
-          if (child && ['function_declaration', 'class_declaration', 'method_definition'].includes(child.type)) {
+          if (isSyntaxNode(child) && ['function_declaration', 'class_declaration', 'method_definition'].includes(child.type)) {
             hasDeclaration = true;
             break;
           }
@@ -132,17 +152,17 @@ export class ASTTraverser {
       }
       for (let i = 0; i < node.childCount; i++) {
         const child = node.child(i);
-        if (child) {
+        if (isSyntaxNode(child)) {
           collectNodes(child);
         }
       }
     };
 
-    collectNodes(tree.rootNode);
+    collectNodes(rootNode);
     return collectedNodes;
   }
 
-  private buildTree(source: string) {
+  private buildTree(source: string): Tree {
     if (source.length > SIZE_THRESHOLD) {
       return this.parser.parse((index: number) => {
         if (index < source.length) {
@@ -206,12 +226,12 @@ export class ChunkPipeline {
     this.overlapStrategy = deps.overlapStrategy ?? new StatementOverlapStrategy();
   }
 
-  async collectNodesForFile(source: string, rule: LanguageRule) {
+  collectNodesForFile(source: string, rule: LanguageRule): TreeSitterNode[] {
     return this.traverser.collectNodesForFile(source, rule);
   }
 
-  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule) {
-    return this.chunkGrouper.groupNodes(nodes, source, profile, rule);
+  async groupNodes(nodes: TreeSitterNode[], source: string, profile: ModelProfile, rule: LanguageRule): Promise<NodeGroup[]> {
+    return await this.chunkGrouper.groupNodes(nodes, source, profile, rule);
   }
 
   async processGroups(
@@ -382,7 +402,7 @@ export class ChunkPipeline {
       chunkMerkleHashes: string[],
       onProgress: ProgressCallback,
       embedAndStore: (params: EmbedStoreParams) => Promise<void>,
-      chunkingStats: ChunkingStats
+      _chunkingStats: ChunkingStats
   ): Promise<void> {
     let symbol = extractSymbolName(node, source);
     if (!symbol) return;

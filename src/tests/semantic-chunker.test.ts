@@ -69,7 +69,7 @@ test('yieldStatementChunks batches token counting once per line', async () => {
   const node = makeNode('function', [], 0, source.length);
 
   let tokenCounterCalls = 0;
-  const tokenCounter = (text: string) => {
+  const tokenCounter = (text: string): number => {
     tokenCounterCalls++;
     return text.length;
   };

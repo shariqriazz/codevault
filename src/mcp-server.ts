@@ -29,6 +29,15 @@ import { logger } from './utils/logger.js';
 import { ZodError } from 'zod';
 
 type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
+type SessionPackInput = {
+  key: string;
+  name: string;
+  description: string | null;
+  scope: Record<string, unknown>;
+  path: string;
+  invalid?: boolean;
+  basePath: string;
+};
 
 interface MCPErrorPayload {
   code: string;
@@ -88,7 +97,7 @@ function formatMcpError(error: unknown): MCPErrorPayload {
   };
 }
 
-function buildMcpErrorResponse(error: unknown) {
+function buildMcpErrorResponse(error: unknown): { content: Array<{ type: 'text'; text: string }>; isError: true } {
   const payload = formatMcpError(error);
   return {
     content: [
@@ -104,7 +113,9 @@ function buildMcpErrorResponse(error: unknown) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')
+) as { version?: string };
 
 /**
  * Minimal MCP server exposing CodeVault tools over stdio for AI assistants.
@@ -114,14 +125,14 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
  */
 export class McpServer {
   private server: Server;
-  private sessionContextPack: unknown = null;
+  private sessionContextPack: SessionPackInput | null = null;
   private cacheCleanupTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.server = new Server(
       {
         name: 'codevault-code-memory',
-        version: packageJson.version,
+        version: packageJson.version ?? '0.0.0',
       },
       {
         capabilities: {
@@ -133,8 +144,8 @@ export class McpServer {
     this.setupHandlers();
   }
 
-  private setupHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+  private setupHandlers(): void {
+    this.server.setRequestHandler(ListToolsRequestSchema, () => {
       const tools: Tool[] = [
         {
           name: 'search_code',
@@ -298,8 +309,8 @@ export class McpServer {
 
           case 'use_context_pack': {
             const validArgs = UseContextPackArgsSchema.parse(rawArgs);
-            return await handlers.handleUseContextPack(validArgs, (pack) => {
-              this.sessionContextPack = pack;
+            return await handlers.handleUseContextPack(validArgs, (pack: unknown) => {
+              this.sessionContextPack = pack as SessionPackInput | null;
             });
           }
 
@@ -328,7 +339,7 @@ export class McpServer {
     });
   }
 
-  public async start() {
+  public async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
@@ -338,7 +349,7 @@ export class McpServer {
     this.setupShutdownHandlers();
   }
 
-  private scheduleCacheCleanup() {
+  private scheduleCacheCleanup(): void {
     if (this.cacheCleanupTimer) {
       clearInterval(this.cacheCleanupTimer);
     }
@@ -347,16 +358,16 @@ export class McpServer {
       try {
         clearSearchCaches();
         clearTokenCache();
-        
+
         logger.debug('Cache cleared periodically');
-      } catch (error) {
+      } catch {
         // Ignore errors during cleanup
       }
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
   }
 
-  private setupShutdownHandlers() {
-    const cleanup = async () => {
+  private setupShutdownHandlers(): void {
+    const cleanup = (): void => {
       if (this.cacheCleanupTimer) {
         clearInterval(this.cacheCleanupTimer);
         this.cacheCleanupTimer = null;
@@ -368,11 +379,13 @@ export class McpServer {
     };
     
     process.on('SIGINT', () => {
-      void cleanup().then(() => process.exit(0));
+      cleanup();
+      process.exit(0);
     });
 
     process.on('SIGTERM', () => {
-      void cleanup().then(() => process.exit(0));
+      cleanup();
+      process.exit(0);
     });
   }
 }

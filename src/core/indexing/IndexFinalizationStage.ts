@@ -119,7 +119,7 @@ export class IndexFinalizationStage {
       provider: this.context.providerInstance.getName(),
       errors: this.state.errors as Array<{ type: string; file?: string; chunkId?: string; error: string }>,
       chunkingStats: this.state.chunkingStats,
-      tokenStats: this.context.modelProfile.useTokens ? (tokenStats as any) : undefined
+      tokenStats: this.context.modelProfile.useTokens ? tokenStats : undefined
     };
   }
 

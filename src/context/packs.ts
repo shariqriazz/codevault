@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ContextPackSchema, extractScopeFromPackDefinition, type ContextPack } from '../types/context-pack.js';
+import { ContextPackSchema, extractScopeFromPackDefinition } from '../types/context-pack.js';
 import { normalizeScopeFilters } from '../search/scope.js';
 import type { ScopeFilters } from '../types/search.js';
 
@@ -167,7 +167,7 @@ export function getActiveContextPack(basePath = '.'): (PackInfo & { appliedAt: s
       ...pack,
       appliedAt: (state.appliedAt as string | null) || null
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }

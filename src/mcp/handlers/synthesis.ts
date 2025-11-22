@@ -4,8 +4,24 @@ import { resolveProjectRoot } from '../../utils/path-helpers.js';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { AskCodebaseArgs } from '../schemas.js';
 
-export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPack: unknown) {
+type SessionPackInput = {
+  key: string;
+  name: string;
+  description: string | null;
+  scope: Record<string, unknown>;
+  path: string;
+  invalid?: boolean;
+  basePath: string;
+};
+
+export async function handleAskCodebase(
+  args: AskCodebaseArgs,
+  sessionContextPack: SessionPackInput | null
+): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const cleanPath = resolveProjectRoot(args);
+  const sessionPack = sessionContextPack && typeof sessionContextPack === 'object'
+    ? sessionContextPack
+    : null;
   
   // Use resolveScopeWithPack like other search tools for consistency
   const { scope: scopeFilters } = resolveScopeWithPack(
@@ -15,7 +31,7 @@ export async function handleAskCodebase(args: AskCodebaseArgs, sessionContextPac
       lang: args.lang,
       reranker: args.reranker,
     },
-    { basePath: cleanPath, sessionPack: sessionContextPack as any }
+    { basePath: cleanPath, sessionPack }
   );
 
   try {

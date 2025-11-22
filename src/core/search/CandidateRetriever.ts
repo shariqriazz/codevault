@@ -71,7 +71,7 @@ export class CandidateRetriever {
       // Tag boost
       if (chunk.codevault_tags) {
         try {
-          const tags = JSON.parse(chunk.codevault_tags || '[]');
+          const tags: unknown = JSON.parse(chunk.codevault_tags || '[]');
           if (Array.isArray(tags)) {
             tags.forEach((tag: unknown) => {
               if (typeof tag === 'string' && query.includes(tag.toLowerCase())) {

@@ -34,7 +34,7 @@ export class IndexerUI {
     skipped: 0
   };
 
-  showHeader() {
+  showHeader(): void {
     process.stdout.write(`${chalk.cyan.bold('\n🔍 CodeVault Indexer')  }\n`);
   }
 
@@ -44,7 +44,7 @@ export class IndexerUI {
     dimensions: number;
     chunkSize: { min: number; max: number; optimal: number };
     rateLimit?: { rpm: number; tpm?: number };
-  }) {
+  }): void {
     process.stdout.write(`${chalk.white('\n📊 Configuration')  }\n`);
     process.stdout.write(`${chalk.gray(`   Provider:    ${config.provider}${config.model ? ` (${config.model})` : ''}`)  }\n`);
     process.stdout.write(`${chalk.gray(`   Dimensions:  ${config.dimensions}`)  }\n`);
@@ -54,14 +54,14 @@ export class IndexerUI {
     }
   }
 
-  startScanning() {
+  startScanning(): void {
     this.spinner = ora({
       text: chalk.white('Scanning project...'),
       color: 'cyan'
     }).start();
   }
 
-  finishScanning(fileCount: number, languages: number) {
+  finishScanning(fileCount: number, languages: number): void {
     if (this.spinner) {
       this.spinner.succeed(chalk.white(`Found ${chalk.cyan(fileCount)} files across ${chalk.cyan(languages)}+ languages`));
       this.spinner = null;
@@ -69,7 +69,7 @@ export class IndexerUI {
     this.totalFiles = fileCount;
   }
 
-  startIndexing() {
+  startIndexing(): void {
     this.startTime = Date.now();
     this.processedFiles = 0;
 
@@ -89,7 +89,7 @@ export class IndexerUI {
     }
   }
 
-  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true) {
+  updateProgress(fileName: string, current?: number, total?: number, etaMs?: number | null, countFile: boolean = true): void {
     if (countFile) {
       this.processedFiles++;
     }
@@ -107,14 +107,14 @@ export class IndexerUI {
     }
   }
 
-  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }) {
+  updateStats(stats: { chunks?: number; merged?: number; subdivided?: number; skipped?: number }): void {
     if (stats.chunks !== undefined) this.stats.chunks = stats.chunks;
     if (stats.merged !== undefined) this.stats.merged = stats.merged;
     if (stats.subdivided !== undefined) this.stats.subdivided = stats.subdivided;
     if (stats.skipped !== undefined) this.stats.skipped = stats.skipped;
   }
 
-  showFinalizing() {
+  showFinalizing(): void {
     if (this.progressBar) {
       this.progressBar.stop();
       this.progressBar = null;
@@ -126,7 +126,7 @@ export class IndexerUI {
     }).start();
   }
 
-  finishIndexing() {
+  finishIndexing(): void {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;
@@ -154,7 +154,7 @@ export class IndexerUI {
     dbSize?: string;
     codemapSize?: string;
     tokenStats?: Record<string, unknown>;
-  }) {
+  }): void {
     process.stdout.write(`${chalk.white('\n📊 Summary')  }\n`);
     process.stdout.write(`${chalk.gray(`   Total chunks:      ${chalk.white(summary.totalChunks)}`)  }\n`);
 
@@ -186,11 +186,11 @@ export class IndexerUI {
     process.stdout.write('\n');
   }
 
-  showError(message: string) {
+  showError(message: string): void {
     console.error(chalk.red(`\n❌ Error: ${message}\n`));
   }
 
-  cleanup() {
+  cleanup(): void {
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;

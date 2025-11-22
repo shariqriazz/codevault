@@ -104,7 +104,7 @@ export function applyScope(chunks: DatabaseChunk[], scope: ScopeFilters = {}): D
       }
 
       try {
-        const tags = JSON.parse(chunk.codevault_tags || '[]');
+        const tags: unknown = JSON.parse(chunk.codevault_tags || '[]');
         if (!Array.isArray(tags)) {
           return false;
         }

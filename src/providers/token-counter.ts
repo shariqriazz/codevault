@@ -14,12 +14,16 @@ export async function getTokenCounter(modelName: string): Promise<((text: string
         tiktokenEncoder = {
           encode: (text: string) => Array.from(encoder.encode(text))
         };
-      } catch (error) {
+      } catch {
         console.warn('tiktoken not available, falling back to character estimation');
         return null;
       }
     }
-    return (text: string) => tiktokenEncoder!.encode(text).length;
+    const encoder = tiktokenEncoder;
+    if (!encoder) {
+      return null;
+    }
+    return (text: string) => encoder.encode(text).length;
   }
 
   return (text: string) => Math.ceil(text.length / 4);

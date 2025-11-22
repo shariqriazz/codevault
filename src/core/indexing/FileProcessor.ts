@@ -6,13 +6,11 @@ import { computeFastHash } from '../../indexer/merkle.js';
 import { ChunkPipeline } from './chunk-pipeline.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
-import type { IndexProjectOptions } from '../types.js';
 import { normalizeChunkMetadata, type CodemapChunk } from '../../types/codemap.js';
 import { writeChunkToDisk, removeChunkArtifacts, type EncryptionPreference } from '../../storage/encrypted-chunks.js';
 import { PersistManager } from './PersistManager.js';
 import type { CodevaultMetadata, ImportantVariable } from '../metadata.js';
 import type { SymbolMetadata } from '../../symbols/extract.js';
-import type { ModelProfile } from '../../providers/base.js';
 
 /**
  * FileProcessor handles the processing of individual files:
@@ -87,7 +85,7 @@ export class FileProcessor {
       }
 
       // Collect and group nodes
-      const collectedNodes = await this.chunkPipeline.collectNodesForFile(source, rule);
+      const collectedNodes = this.chunkPipeline.collectNodesForFile(source, rule);
       const nodeGroups = await this.chunkPipeline.groupNodes(
         collectedNodes,
         source,
@@ -331,7 +329,7 @@ export class FileProcessor {
     }
 
     if (this.context.db) {
-      await this.context.db.deleteChunks(chunkIds);
+      this.context.db.deleteChunks(chunkIds);
     }
 
     for (const chunkId of chunkIds) {

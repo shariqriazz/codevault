@@ -11,10 +11,23 @@ interface QueueItem<T> {
   estimatedTokens: number;
 }
 
+function extractTokensUsed(value: unknown): number {
+  if (value && typeof value === 'object' && 'usage' in value) {
+    const usage = (value as { usage?: unknown }).usage;
+    if (usage && typeof usage === 'object' && 'total_tokens' in usage) {
+      const total = (usage as { total_tokens?: unknown }).total_tokens;
+      if (typeof total === 'number') {
+        return total;
+      }
+    }
+  }
+  return 0;
+}
+
 export class RateLimiter {
   private rpm: number | null;
   private tpm: number | null;
-  private queue: QueueItem<any>[] = [];
+  private queue: QueueItem<unknown>[] = [];
   private processing = false;
   private requestTimes: number[] = [];
   private tokenUsage: TokenUsageEntry[] = [];
@@ -113,7 +126,13 @@ export class RateLimiter {
         return;
       }
       
-      this.queue.push({ fn, resolve, reject, retryCount, estimatedTokens });
+      this.queue.push({
+        fn,
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        retryCount,
+        estimatedTokens
+      });
       void this.processQueue();
     });
   }
@@ -141,7 +160,7 @@ export class RateLimiter {
       try {
         const result = await fn();
 
-        const tokensUsed = estimatedTokens || (result && typeof result === 'object' && 'usage' in result && result.usage && typeof result.usage === 'object' && 'total_tokens' in result.usage ? Number(result.usage.total_tokens) : 0) || 0;
+        const tokensUsed = estimatedTokens || extractTokensUsed(result) || 0;
         this.recordRequest(tokensUsed);
 
         resolve(result);
@@ -181,7 +200,18 @@ export class RateLimiter {
            message.includes('too many requests');
   }
 
-  getStats() {
+  getStats(): {
+    rpm: number | null;
+    tpm: number | null;
+    queueLength: number;
+    maxQueueSize: number;
+    queueUtilization: string;
+    requestsInLastMinute: number;
+    tokensInLastMinute: number;
+    isRpmLimited: boolean;
+    isTpmLimited: boolean;
+    isLimited: boolean;
+  } {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     const tokensInLastMinute = this.tokenUsage

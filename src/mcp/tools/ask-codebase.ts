@@ -39,7 +39,7 @@ interface CreateHandlerOptions {
 }
 
 export function createAskCodebaseHandler(options: CreateHandlerOptions = {}) {
-  const { sessionPack, errorLogger } = options;
+  const { errorLogger } = options;
 
   return async (params: {
     question: string;
@@ -147,7 +147,10 @@ interface MCPServer {
   tool: (name: string, schema: Record<string, unknown>, handler: (params: unknown) => Promise<unknown>) => void;
 }
 
-export function registerAskCodebaseTool(server: MCPServer, options: CreateHandlerOptions = {}) {
+export function registerAskCodebaseTool(
+  server: MCPServer,
+  options: CreateHandlerOptions = {}
+): ReturnType<typeof createAskCodebaseHandler> {
   const handler = createAskCodebaseHandler(options);
 
   server.tool(

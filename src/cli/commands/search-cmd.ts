@@ -5,6 +5,20 @@ import { searchCode } from '../../core/search.js';
 import { print } from '../../utils/logger.js';
 import type { ScopeFilters } from '../../types/search.js';
 
+interface SearchCommandOptions extends Record<string, unknown> {
+  limit?: string;
+  provider?: string;
+  project?: string;
+  directory?: string;
+  path_glob?: string[];
+  tags?: string[];
+  lang?: string[];
+  reranker?: string;
+  hybrid?: string;
+  bm25?: string;
+  symbol_boost?: string;
+}
+
 export function registerSearchCommand(program: Command): void {
   program
     .command('search <query> [path]')
@@ -20,7 +34,7 @@ export function registerSearchCommand(program: Command): void {
     .option('--hybrid <mode>', 'hybrid search (on|off)', 'on')
     .option('--bm25 <mode>', 'BM25 (on|off)', 'on')
     .option('--symbol_boost <mode>', 'symbol boost (on|off)', 'on')
-    .action(async (query, projectPath = '.', options) => {
+    .action(async (query: string, projectPath: string = '.', options: SearchCommandOptions) => {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
@@ -32,7 +46,7 @@ export function registerSearchCommand(program: Command): void {
         const limit = parseInt(limitStr);
 
         const providerStr: string = typeof options.provider === 'string' ? options.provider : 'auto';
-        const { scope: scopeFilters } = resolveScopeWithPack(options, { basePath: resolvedPath });
+        const { scope: scopeFilters } = resolveScopeWithPack(options as Record<string, unknown>, { basePath: resolvedPath });
         const scopeFiltersTyped: ScopeFilters = scopeFilters;
         const results = await searchCode(query, limit, providerStr, resolvedPath, scopeFiltersTyped);
 

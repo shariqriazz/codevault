@@ -3,7 +3,6 @@ import { createRateLimiter, RateLimiter } from '../utils/rate-limiter.js';
 import {
   EmbeddingProvider,
   getModelProfile,
-  getSizeLimits,
   MAX_BATCH_TOKENS,
   MAX_ITEM_TOKENS,
   estimateTokens
@@ -54,13 +53,13 @@ export class OpenAIProvider extends EmbeddingProvider {
 
       this.openai = new OpenAI(config);
     }
+    await Promise.resolve();
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     await this.init();
 
     const profile = await getModelProfile(this.getName(), this.model);
-    const limits = getSizeLimits(profile);
     const maxChars = profile.maxChunkChars || 8000;
 
     return await this.rateLimiter.execute(async () => {
@@ -78,7 +77,10 @@ export class OpenAIProvider extends EmbeddingProvider {
         requestBody.provider = this.routingConfig;
       }
 
-      const response = await this.openai!.embeddings.create(requestBody);
+      if (!this.openai) {
+        throw new Error('OpenAI client not initialized');
+      }
+      const response = await this.openai.embeddings.create(requestBody);
 
       // Validate response structure
       if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
@@ -131,10 +133,8 @@ export class OpenAIProvider extends EmbeddingProvider {
 
     const allEmbeddings: number[][] = [];
     const remainingTexts = [...texts];
-    let batchCount = 0;
 
     while (remainingTexts.length > 0) {
-      batchCount++;
       const currentBatch: string[] = [];
       let currentBatchTokens = 0;
       const processedIndices: number[] = [];
@@ -186,7 +186,10 @@ export class OpenAIProvider extends EmbeddingProvider {
             requestBody.provider = this.routingConfig;
           }
 
-          const response = await this.openai!.embeddings.create(requestBody);
+          if (!this.openai) {
+            throw new Error('OpenAI client not initialized');
+          }
+          const response = await this.openai.embeddings.create(requestBody);
 
           // Validate response structure
           if (!response || !response.data || !Array.isArray(response.data)) {

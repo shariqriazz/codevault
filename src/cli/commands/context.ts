@@ -51,7 +51,7 @@ export function registerContextCommands(program: Command): void {
   contextCommand
     .command('list [path]')
     .description('List available context packs')
-    .action((projectPath = '.') => {
+    .action((projectPath: string = '.') => {
       const resolvedPath = resolveProjectPath(projectPath);
       const packs = listContextPacks(resolvedPath);
       const active = getActiveContextPack(resolvedPath);
@@ -81,7 +81,7 @@ export function registerContextCommands(program: Command): void {
   contextCommand
     .command('show <name> [path]')
     .description('Show context pack definition')
-    .action((name, projectPath = '.') => {
+    .action((name: string, projectPath: string = '.') => {
       const resolvedPath = resolveProjectPath(projectPath);
       try {
         const pack = loadContextPack(name, resolvedPath);
@@ -99,7 +99,7 @@ export function registerContextCommands(program: Command): void {
   contextCommand
     .command('use <name> [path]')
     .description('Activate a context pack')
-    .action((name, projectPath = '.') => {
+    .action((name: string, projectPath: string = '.') => {
       const resolvedPath = resolveProjectPath(projectPath);
       try {
         const pack = setActiveContextPack(name, resolvedPath);
