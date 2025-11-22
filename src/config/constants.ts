@@ -164,6 +164,9 @@ export const ENCRYPTION_CONSTANTS = {
   /** Authentication tag length in bytes */
   TAG_LENGTH: 16,
 
+  /** Identifier length (bytes) stored alongside encrypted payloads */
+  KEY_ID_LENGTH: 8,
+
   /** HKDF info string for key derivation */
   HKDF_INFO: 'codevault-chunk-v1',
 

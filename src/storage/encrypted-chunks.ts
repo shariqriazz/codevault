@@ -13,14 +13,15 @@ const {
   IV_LENGTH,
   TAG_LENGTH,
   HKDF_INFO,
-  REQUIRED_KEY_LENGTH
+  REQUIRED_KEY_LENGTH,
+  KEY_ID_LENGTH
 } = ENCRYPTION_CONSTANTS;
 const MAGIC_HEADER_BUFFER = Buffer.from(MAGIC_HEADER, 'utf8');
 const HKDF_INFO_BUFFER = Buffer.from(HKDF_INFO, 'utf8');
 
 const KEY_ENV_VAR = 'CODEVAULT_ENCRYPTION_KEY';
 const DEPRECATED_KEYS_ENV_VAR = 'CODEVAULT_ENCRYPTION_DEPRECATED_KEYS';
-const CURRENT_ENCRYPTION_VERSION = 1;
+const CURRENT_ENCRYPTION_VERSION = 2;
 const gzipAsync = promisify(zlib.gzip);
 const gunzipAsync = promisify(zlib.gunzip);
 
@@ -172,6 +173,15 @@ export function resetEncryptionCacheForTests(): void {
   EncryptionKeyManager.resetForTests();
 }
 
+export function resetEncryptionGuardsForTests(): void {
+  usedNonces.clear();
+  randomBytesFn = crypto.randomBytes;
+}
+
+export function setEncryptionRandomBytes(randomFn: typeof crypto.randomBytes): void {
+  randomBytesFn = randomFn;
+}
+
 export function getActiveEncryptionKey(): Buffer | null {
   return EncryptionKeyManager.getInstance().getPrimaryKey();
 }
@@ -240,9 +250,44 @@ function deriveChunkKey(masterKey: Buffer, salt: Buffer): Buffer {
   );
 }
 
-function encryptBuffer(plaintext: Buffer, masterKey: Buffer): { payload: Buffer; salt: Buffer; iv: Buffer; tag: Buffer } {
-  const salt = crypto.randomBytes(SALT_LENGTH);
-  const iv = crypto.randomBytes(IV_LENGTH);
+function computeKeyId(masterKey: Buffer): Buffer {
+  return crypto.createHash('sha256').update(masterKey).digest().subarray(0, KEY_ID_LENGTH);
+}
+
+const usedNonces = new Set<string>();
+const MAX_IV_GENERATION_ATTEMPTS = 3;
+let randomBytesFn: typeof crypto.randomBytes = crypto.randomBytes;
+
+function buildNonceKey(keyId: Buffer, salt: Buffer, iv: Buffer): string {
+  return `${keyId.toString('hex')}:${salt.toString('hex')}:${iv.toString('hex')}`;
+}
+
+function generateUniqueIv(keyId: Buffer, salt: Buffer): Buffer {
+  for (let attempt = 0; attempt < MAX_IV_GENERATION_ATTEMPTS; attempt += 1) {
+    const iv = randomBytesFn(IV_LENGTH);
+    const nonceKey = buildNonceKey(keyId, salt, iv);
+    if (!usedNonces.has(nonceKey)) {
+      usedNonces.add(nonceKey);
+      return iv;
+    }
+  }
+
+  throw createEncryptionError(
+    'IV reuse detected while encrypting chunk; aborting to protect confidentiality.',
+    'ENCRYPTION_IV_REUSE'
+  );
+}
+
+function encryptBuffer(plaintext: Buffer, masterKey: Buffer): {
+  payload: Buffer;
+  salt: Buffer;
+  iv: Buffer;
+  tag: Buffer;
+  keyId: Buffer;
+} {
+  const salt = randomBytesFn(SALT_LENGTH);
+  const keyId = computeKeyId(masterKey);
+  const iv = generateUniqueIv(keyId, salt);
   const derivedKey = deriveChunkKey(masterKey, salt);
 
   const cipher = crypto.createCipheriv('aes-256-gcm', derivedKey, iv);
@@ -250,19 +295,73 @@ function encryptBuffer(plaintext: Buffer, masterKey: Buffer): { payload: Buffer;
   const tag = cipher.getAuthTag();
 
   const versionByte = Buffer.from([CURRENT_ENCRYPTION_VERSION]);
-  const payload = Buffer.concat([MAGIC_HEADER_BUFFER, versionByte, salt, iv, encrypted, tag]);
-  return { payload, salt, iv, tag };
+  const payload = Buffer.concat([MAGIC_HEADER_BUFFER, versionByte, keyId, salt, iv, encrypted, tag]);
+  return { payload, salt, iv, tag, keyId };
 }
 
-function buildDecryptionAttempts(payload: Buffer): Array<{ version: number; offset: number }> {
-  const attempts: Array<{ version: number; offset: number }> = [];
+interface DecryptionAttempt {
+  version: number;
+  offset: number;
+  includesKeyId: boolean;
+  keyId: Buffer | null;
+}
+
+function buildDecryptionAttempts(payload: Buffer): DecryptionAttempt[] {
+  const attempts: DecryptionAttempt[] = [];
   const versionCandidate = payload[MAGIC_HEADER_BUFFER.length];
-  if (versionCandidate >= 1 && versionCandidate <= CURRENT_ENCRYPTION_VERSION) {
-    attempts.push({ version: versionCandidate, offset: MAGIC_HEADER_BUFFER.length + 1 });
+  const keyIdStart = MAGIC_HEADER_BUFFER.length + 1;
+  const keyIdEnd = keyIdStart + KEY_ID_LENGTH;
+
+  if (versionCandidate === 2) {
+    if (payload.length >= keyIdEnd + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1) {
+      const keyId = payload.subarray(keyIdStart, keyIdEnd);
+      attempts.push({
+        version: 2,
+        offset: keyIdEnd,
+        includesKeyId: true,
+        keyId
+      });
+    }
+  } else if (versionCandidate === 1) {
+    attempts.push({
+      version: 1,
+      offset: MAGIC_HEADER_BUFFER.length + 1,
+      includesKeyId: false,
+      keyId: null
+    });
+  } else if (versionCandidate > CURRENT_ENCRYPTION_VERSION) {
+    attempts.push({
+      version: versionCandidate,
+      offset: MAGIC_HEADER_BUFFER.length + 1,
+      includesKeyId: false,
+      keyId: null
+    });
   }
+
   // Always include legacy offset (no version byte) for backward compatibility
-  attempts.push({ version: 1, offset: MAGIC_HEADER_BUFFER.length });
+  attempts.push({ version: 1, offset: MAGIC_HEADER_BUFFER.length, includesKeyId: false, keyId: null });
   return attempts;
+}
+
+function extractPayloadKeyId(payload: Buffer): Buffer | null {
+  const header = payload.subarray(0, MAGIC_HEADER_BUFFER.length);
+  if (!header.equals(MAGIC_HEADER_BUFFER)) {
+    return null;
+  }
+
+  const versionCandidate = payload[MAGIC_HEADER_BUFFER.length];
+  if (versionCandidate !== 2) {
+    return null;
+  }
+
+  const keyIdStart = MAGIC_HEADER_BUFFER.length + 1;
+  const keyIdEnd = keyIdStart + KEY_ID_LENGTH;
+  const minimumLength = keyIdEnd + SALT_LENGTH + IV_LENGTH + TAG_LENGTH + 1;
+  if (payload.length < minimumLength) {
+    return null;
+  }
+
+  return payload.subarray(keyIdStart, keyIdEnd);
 }
 
 interface EncryptionError extends Error {
@@ -290,14 +389,25 @@ function decryptBuffer(payload: Buffer, masterKey: Buffer): Buffer {
 
   const attempts = buildDecryptionAttempts(payload);
   const errors: EncryptionError[] = [];
+  const keyIdForKey = computeKeyId(masterKey);
 
   for (const attempt of attempts) {
-    const { version, offset } = attempt;
+    const { version, offset, includesKeyId, keyId } = attempt;
     if (version > CURRENT_ENCRYPTION_VERSION) {
       errors.push(
         createEncryptionError(
           `Unsupported encryption version ${version}`,
           'ENCRYPTION_VERSION_UNSUPPORTED'
+        )
+      );
+      continue;
+    }
+
+    if (includesKeyId && keyId && !keyId.equals(keyIdForKey)) {
+      errors.push(
+        createEncryptionError(
+          'Key identifier in payload does not match provided key.',
+          'ENCRYPTION_KEY_ID_MISMATCH'
         )
       );
       continue;
@@ -396,10 +506,14 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
   const primaryKey = key ?? keys.primary;
 
   if (existsSync(encryptedPath)) {
-    const candidateKeys: Buffer[] = [];
-    if (primaryKey) candidateKeys.push(primaryKey);
+    const candidateKeys: Array<{ key: Buffer; keyId: Buffer }> = [];
+    if (primaryKey) {
+      candidateKeys.push({ key: primaryKey, keyId: computeKeyId(primaryKey) });
+    }
     if (keys.deprecated.length > 0) {
-      candidateKeys.push(...keys.deprecated);
+      for (const deprecatedKey of keys.deprecated) {
+        candidateKeys.push({ key: deprecatedKey, keyId: computeKeyId(deprecatedKey) });
+      }
     }
 
     if (candidateKeys.length === 0) {
@@ -410,11 +524,20 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     }
 
     const payload = await fs.readFile(encryptedPath);
+    const payloadKeyId = extractPayloadKeyId(payload);
+    const matchingKeys = payloadKeyId
+      ? candidateKeys.filter(entry => entry.keyId.equals(payloadKeyId))
+      : candidateKeys;
+    const fallbackKeys = payloadKeyId
+      ? candidateKeys.filter(entry => !entry.keyId.equals(payloadKeyId))
+      : [];
+
+    const orderedKeys = payloadKeyId ? [...matchingKeys, ...fallbackKeys] : candidateKeys;
     let decrypted: Buffer | null = null;
     const errors: EncryptionError[] = [];
-    for (const candidate of candidateKeys) {
+    for (const candidate of orderedKeys) {
       try {
-        decrypted = decryptBuffer(payload, candidate);
+        decrypted = decryptBuffer(payload, candidate.key);
         break;
       } catch (error) {
         errors.push(error as EncryptionError);
@@ -423,6 +546,13 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
     }
 
     if (!decrypted) {
+      if (payloadKeyId && matchingKeys.length === 0) {
+        throw createEncryptionError(
+          `Chunk ${sha} was encrypted with key id ${payloadKeyId.toString('hex')} but no matching key is configured.`,
+          'ENCRYPTION_KEY_NOT_FOUND'
+        );
+      }
+
       const lastError = errors[errors.length - 1];
       if (lastError && lastError.code === 'ENCRYPTION_AUTH_FAILED') {
         throw createEncryptionError(
@@ -431,8 +561,9 @@ export async function readChunkFromDisk({ chunkDir, sha, key, keySet }: ReadChun
           lastError
         );
       }
+      const contextHint = payloadKeyId ? ` (key id ${payloadKeyId.toString('hex')})` : '';
       throw createEncryptionError(
-        `Failed to decrypt chunk ${sha}: ${lastError?.message || 'unknown error'}`,
+        `Failed to decrypt chunk ${sha}${contextHint}: ${lastError?.message || 'unknown error'}`,
         lastError?.code || 'ENCRYPTION_DECRYPT_FAILED',
         lastError
       );
