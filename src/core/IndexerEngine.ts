@@ -30,40 +30,8 @@ export class IndexerEngine {
 
     const repo = path.resolve(repoPath);
 
-    // Normalize file paths
-    const normalizedChanged = Array.isArray(changedFiles)
-      ? Array.from(new Set(
-          changedFiles
-            .map(file => normalizeToProjectPath(repo, file))
-            .filter(Boolean) as string[]
-        ))
-      : null;
-
-    const normalizedDeleted = Array.from(new Set(
-      (Array.isArray(deletedFiles) ? deletedFiles : [])
-        .map(file => normalizeToProjectPath(repo, file))
-        .filter(Boolean) as string[]
-    ));
-
-    const deletedSet = new Set(normalizedDeleted);
-
-    // Scan for files to process
-    const scanner = new FileScanner();
-    const { files, toDelete } = await scanner.scan(repo, normalizedChanged);
-
-    if (onProgress) {
-      onProgress({
-        type: 'scan_complete',
-        fileCount: files.length,
-        totalFiles: files.length
-      });
-    }
-
-    for (const file of toDelete) {
-      deletedSet.add(file);
-    }
-
-    const isPartialUpdate = normalizedChanged !== null;
+    const { normalizedChanged, deletedSet, isPartialUpdate } = this.normalizeFileLists(repo, changedFiles, deletedFiles);
+    const { files, deletedSetWithOrphans } = await this.scanFiles(repo, normalizedChanged, deletedSet, onProgress);
 
     // Stage 1: Setup and initialization
     const context = await IndexContext.prepare(this.options);
@@ -79,12 +47,12 @@ export class IndexerEngine {
     // Stage 2: Process files
     const concurrency = this.resolveConcurrency();
     await this.runWithConcurrency(files, concurrency, async rel => {
-      deletedSet.delete(rel);
+      deletedSetWithOrphans.delete(rel);
       await fileProcessor.processFile(rel);
     });
 
     // Stage 3: Handle deleted files
-    for (const fileRel of deletedSet) {
+    for (const fileRel of deletedSetWithOrphans) {
       await fileProcessor.removeFileArtifacts(fileRel);
     }
 
@@ -101,6 +69,56 @@ export class IndexerEngine {
     // Stage 4: Finalization
     const finalizer = new IndexFinalizationStage(context, state, onProgress, persistManager);
     return await finalizer.finalize();
+  }
+
+  private normalizeFileLists(
+    repo: string,
+    changedFiles: string[] | null,
+    deletedFiles: string[]
+  ): { normalizedChanged: string[] | null; deletedSet: Set<string>; isPartialUpdate: boolean } {
+    const normalizedChanged = Array.isArray(changedFiles)
+      ? Array.from(new Set(
+          changedFiles
+            .map(file => normalizeToProjectPath(repo, file))
+            .filter(Boolean) as string[]
+        ))
+      : null;
+
+    const normalizedDeleted = Array.from(new Set(
+      (Array.isArray(deletedFiles) ? deletedFiles : [])
+        .map(file => normalizeToProjectPath(repo, file))
+        .filter(Boolean) as string[]
+    ));
+
+    return {
+      normalizedChanged,
+      deletedSet: new Set(normalizedDeleted),
+      isPartialUpdate: normalizedChanged !== null
+    };
+  }
+
+  private async scanFiles(
+    repo: string,
+    normalizedChanged: string[] | null,
+    deletedSet: Set<string>,
+    onProgress: IndexProjectOptions['onProgress']
+  ): Promise<{ files: string[]; deletedSetWithOrphans: Set<string> }> {
+    const scanner = new FileScanner();
+    const { files, toDelete } = await scanner.scan(repo, normalizedChanged);
+
+    if (onProgress) {
+      onProgress({
+        type: 'scan_complete',
+        fileCount: files.length,
+        totalFiles: files.length
+      });
+    }
+
+    for (const file of toDelete) {
+      deletedSet.add(file);
+    }
+
+    return { files, deletedSetWithOrphans: deletedSet };
   }
 
   private resolveConcurrency(): number {
