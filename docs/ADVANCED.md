@@ -575,5 +575,5 @@ export CODEVAULT_CHAT_MODEL=anthropic/claude-sonnet-4.5
 
 ---
 
-**Version:** 1.8.3
+**Version:** 1.8.4
 **Last Updated:** November 2025

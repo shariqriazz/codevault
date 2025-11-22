@@ -422,6 +422,6 @@ Built with:
 
 ---
 
-**Version**: 1.8.3
+**Version**: 1.8.4
 **Built by**: Shariq Riaz
 **Last Updated**: November 2025

@@ -487,5 +487,5 @@ ollama pull nomic-embed-text
 
 ---
 
-**Version:** 1.8.3
+**Version:** 1.8.4
 **Last Updated:** November 2025

@@ -509,5 +509,5 @@ codevault ask "What are all the payment integrations and how do they work?" \
 
 ---
 
-**Version:** 1.8.3
+**Version:** 1.8.4
 **Last Updated:** November 2025
