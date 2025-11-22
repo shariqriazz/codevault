@@ -12,6 +12,11 @@ function getModel(): string {
   return process.env.CODEVAULT_RERANK_MODEL || 'rerank-v3.5';
 }
 
+function getTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.CODEVAULT_RERANK_TIMEOUT_MS || '15000', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15000;
+}
+
 function getMaxFromEnv(): number {
   const envMax = Number.parseInt(process.env.CODEVAULT_RERANKER_MAX || String(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES), 10);
   return Number.isFinite(envMax) && envMax > 0 ? envMax : SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES;
@@ -86,6 +91,7 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
   const apiUrl = config.apiUrl || getAPIUrl();
   const apiKey = config.apiKey || getAPIKey();
   const model = config.model || getModel();
+  const timeoutMs = getTimeoutMs();
 
   if (!apiUrl) {
     throw new Error('CODEVAULT_RERANK_API_URL is not configured');
@@ -103,14 +109,28 @@ async function callRerankAPI(query: string, documents: string[], config: RerankA
     top_n: documents.length
   };
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(requestBody)
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+  } catch (error) {
+    clearTimeout(timer);
+    if (error && typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError') {
+      throw new Error(`Rerank API request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+  clearTimeout(timer);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
