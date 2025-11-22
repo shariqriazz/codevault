@@ -30,16 +30,22 @@ export interface SearchContext {
 export class SearchContextManager {
   private context: SearchContext | null = null;
   private lastProvider: string | null = null;
+  private contextInitializedAt: number | null = null;
+  private readonly ttlMs: number;
 
-  constructor(private basePath: string) {}
+  constructor(private basePath: string) {
+    const defaultTtl = 5 * 60 * 1000; // 5 minutes
+    const envTtl = Number.parseInt(process.env.CODEVAULT_SEARCH_CONTEXT_TTL_MS || '', 10);
+    this.ttlMs = Number.isFinite(envTtl) && envTtl > 0 ? envTtl : defaultTtl;
+  }
 
   /**
    * Get or create the search context
    * Caches and reuses context unless provider changes
    */
   async getContext(providerName: string = 'auto'): Promise<SearchContext> {
-    // If provider changed, invalidate cached context
-    if (this.context && this.lastProvider !== providerName) {
+    // If provider changed or cache expired, invalidate cached context
+    if (this.context && (this.lastProvider !== providerName || this.isExpired())) {
       this.cleanup();
     }
 
@@ -87,6 +93,7 @@ export class SearchContextManager {
     };
 
     this.lastProvider = providerName;
+    this.contextInitializedAt = Date.now();
     return this.context;
   }
 
@@ -170,6 +177,7 @@ export class SearchContextManager {
     }
     this.context = null;
     this.lastProvider = null;
+    this.contextInitializedAt = null;
   }
 
   /**
@@ -177,5 +185,12 @@ export class SearchContextManager {
    */
   isInitialized(): boolean {
     return this.context !== null;
+  }
+
+  private isExpired(): boolean {
+    if (this.contextInitializedAt === null) {
+      return false;
+    }
+    return Date.now() - this.contextInitializedAt > this.ttlMs;
   }
 }
