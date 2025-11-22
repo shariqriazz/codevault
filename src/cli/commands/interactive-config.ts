@@ -32,7 +32,7 @@ class InteractivePrompt {
         if (result === true) {
           return value;
         } else if (typeof result === 'string') {
-          console.log(chalk.red(`  ✗ ${result}`));
+          process.stdout.write(`${chalk.red(`  ✗ ${result}`)  }\n`);
           continue;
         }
       }
@@ -63,24 +63,24 @@ class InteractivePrompt {
       throw new Error('Choices required for select prompt');
     }
 
-    console.log(`${chalk.cyan('?')  } ${  options.message}`);
-    
+    process.stdout.write(`${chalk.cyan('?')  } ${  options.message}` + '\n');
+
     options.choices.forEach((choice, index) => {
       const number = chalk.gray(`${index + 1}.`);
       const description = choice.description ? chalk.gray(` - ${choice.description}`) : '';
-      console.log(`  ${number} ${choice.title}${description}`);
+      process.stdout.write(`  ${number} ${choice.title}${description}` + '\n');
     });
-    
+
     while (true) {
       const prompt = chalk.gray(`  Select (1-${options.choices.length}): `);
       const answer = await this.rl.question(prompt);
       const num = parseInt(answer.trim(), 10);
-      
+
       if (num >= 1 && num <= options.choices.length) {
         return options.choices[num - 1].value;
       }
-      
-      console.log(chalk.red(`  ✗ Please enter a number between 1 and ${options.choices.length}`));
+
+      process.stdout.write(`${chalk.red(`  ✗ Please enter a number between 1 and ${options.choices.length}`)  }\n`);
     }
   }
 
@@ -93,22 +93,22 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
   const prompt = new InteractivePrompt();
 
   try {
-    console.log(chalk.bold.cyan('\n🚀 CodeVault Interactive Configuration\n'));
+    process.stdout.write(`${chalk.bold.cyan('\n🚀 CodeVault Interactive Configuration\n')  }\n`);
 
     // Check if config exists
     if (hasGlobalConfig() && !force) {
-      console.log(chalk.yellow('⚠️  Global configuration already exists.\n'));
+      process.stdout.write(`${chalk.yellow('⚠️  Global configuration already exists.\n')  }\n`);
       const overwrite = await prompt.confirm({
         message: 'Do you want to overwrite it?',
         default: 'n'
       });
-      
+
       if (!overwrite) {
-        console.log(chalk.gray('\nConfiguration unchanged.'));
+        process.stdout.write(`${chalk.gray('\nConfiguration unchanged.')  }\n`);
         prompt.close();
         return;
       }
-      console.log('');
+      process.stdout.write('\n');
     }
 
     const config: CodevaultConfig = {
@@ -128,7 +128,7 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
 
     // OpenAI / Custom configuration
     if (provider === 'openai' || provider === 'custom') {
-      console.log(chalk.bold('\n📝 OpenAI Configuration\n'));
+      process.stdout.write(`${chalk.bold('\n📝 OpenAI Configuration\n')  }\n`);
 
       if (!config.providers) {
         config.providers = {};
@@ -207,8 +207,8 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
 
 
     // Advanced settings
-    console.log(chalk.bold('\n⚙️  Advanced Settings\n'));
-    
+    process.stdout.write(`${chalk.bold('\n⚙️  Advanced Settings\n')  }\n`);
+
     const configAdvanced = await prompt.confirm({
       message: 'Configure advanced settings? (rate limits, tokens, etc.)',
       default: 'n'
@@ -312,15 +312,15 @@ export async function runInteractiveConfig(force: boolean = false): Promise<void
     }
 
     // Save configuration
-    console.log('');
+    process.stdout.write('\n');
     saveGlobalConfig(config);
 
-    console.log(chalk.green('\n✓ Configuration saved successfully!\n'));
-    console.log(chalk.gray('Location: ~/.codevault/config.json\n'));
-    console.log('Next steps:');
-    console.log(chalk.cyan('  codevault index') + chalk.gray(' - Index your project'));
-    console.log(chalk.cyan('  codevault config list') + chalk.gray(' - View your configuration'));
-    console.log('');
+    process.stdout.write(`${chalk.green('\n✓ Configuration saved successfully!\n')  }\n`);
+    process.stdout.write(`${chalk.gray('Location: ~/.codevault/config.json\n')  }\n`);
+    process.stdout.write('Next steps:' + '\n');
+    process.stdout.write(`${chalk.cyan('  codevault index') + chalk.gray(' - Index your project')  }\n`);
+    process.stdout.write(`${chalk.cyan('  codevault config list') + chalk.gray(' - View your configuration')  }\n`);
+    process.stdout.write('\n');
 
   } catch (error) {
     console.error(chalk.red('\n✗ Error:'), (error as Error).message);

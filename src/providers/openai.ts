@@ -82,12 +82,6 @@ export class OpenAIProvider extends EmbeddingProvider {
 
       // Validate response structure
       if (!response || !response.data || !Array.isArray(response.data) || response.data.length === 0) {
-        const meta = {
-          topLevelKeys: response ? Object.keys(response as unknown as Record<string, unknown>) : [],
-          dataType: typeof response?.data,
-          dataLength: Array.isArray(response?.data) ? response.data.length : undefined
-        };
-        console.debug('[codevault] Invalid API response (single)', meta);
         throw new Error(`Invalid API response: expected data array with at least one item, got ${typeof response?.data}`);
       }
 
@@ -177,10 +171,6 @@ export class OpenAIProvider extends EmbeddingProvider {
       
       // Process current batch if not empty
       if (currentBatch.length > 0) {
-        if (!process.env.CODEVAULT_QUIET) {
-          console.log(`  → API call ${batchCount}: ${currentBatch.length} items (${currentBatchTokens} tokens)`);
-        }
-
         const batchEmbeddings = await this.rateLimiter.execute(async () => {
           const requestBody: {
             model: string;
@@ -232,10 +222,6 @@ export class OpenAIProvider extends EmbeddingProvider {
 
         allEmbeddings.push(...batchEmbeddings);
       }
-    }
-    
-    if (!process.env.CODEVAULT_QUIET) {
-      console.log(`  ✓ Batch complete: ${texts.length} embeddings from ${batchCount} API call(s)\n`);
     }
 
     return allEmbeddings;

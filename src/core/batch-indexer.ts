@@ -309,7 +309,7 @@ export class BatchEmbeddingProcessor {
 
       // Other errors or max retries reached - fall back to individual processing
       // This path usually succeeds via per-chunk retries, so keep noise low unless individual retries fail.
-      // eslint-disable-next-line no-unreachable
+       
       log.debug(
         `Batch processing failed for ${currentBatch.length} chunks; falling back to individual processing`,
         {

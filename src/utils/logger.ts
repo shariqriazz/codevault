@@ -65,12 +65,12 @@ class Logger {
 
   debug(message: string, meta?: LogMetadata): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
-    process.stdout.write(this.formatMessage('DEBUG', message, meta) + '\n');
+    process.stdout.write(`${this.formatMessage('DEBUG', message, meta)  }\n`);
   }
 
   info(message: string, meta?: LogMetadata): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
-    process.stdout.write(this.formatMessage('INFO', message, meta) + '\n');
+    process.stdout.write(`${this.formatMessage('INFO', message, meta)  }\n`);
   }
 
   warn(message: string, meta?: LogMetadata): void {
@@ -135,7 +135,7 @@ export const logger = new Logger();
  * Use this for user-facing CLI output
  */
 export function print(message: string): void {
-  process.stdout.write(message + '\n');
+  process.stdout.write(`${message  }\n`);
 }
 
 // Export convenience functions
