@@ -42,10 +42,50 @@ class InteractivePrompt {
   }
 
   async password(options: PromptOptions): Promise<string> {
-    // Simple password input (shown as text, but labeled as sensitive)
     const prompt = `${chalk.cyan('?')} ${options.message} ${chalk.gray('(input hidden)')}: `;
-    const answer = await this.rl.question(prompt);
-    return answer.trim();
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+    const state = { password: '' };
+
+    await new Promise<void>((resolve, reject) => {
+      const onData = (chunk: Buffer): void => {
+        const char = chunk.toString('utf8');
+        if (char === '\r' || char === '\n') {
+          stdout.write('\n');
+          cleanup();
+          resolve();
+          return;
+        }
+        if (char === '\u0003') { // Ctrl+C
+          cleanup();
+          reject(new Error('Input cancelled'));
+          return;
+        }
+        if (char === '\u0008' || char === '\u007f') { // Backspace
+          state.password = state.password.slice(0, -1);
+          return;
+        }
+        state.password += char;
+      };
+
+      const cleanup = (): void => {
+        stdin.removeListener('data', onData);
+        stdin.setRawMode?.(false);
+        stdin.pause();
+      };
+
+      try {
+        stdout.write(prompt);
+        stdin.setRawMode?.(true);
+        stdin.resume();
+        stdin.on('data', onData);
+      } catch (error) {
+        cleanup();
+        reject(error as Error);
+      }
+    });
+
+    return state.password.trim();
   }
 
   async confirm(options: PromptOptions): Promise<boolean> {
