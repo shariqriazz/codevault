@@ -100,7 +100,32 @@ codevault config set reranker.apiKey your-novita-api-key
 codevault config set reranker.model qwen/qwen3-reranker-8b
 ```
 
-#### Option 3: Environment Variables (MCP / CI/CD)
+#### Option 3: OpenRouter with Provider Routing
+
+```bash
+# Use OpenRouter with provider routing to control which providers handle requests
+# Force Nebius for embeddings (ZDR + best quality)
+codevault config set providers.openai.apiKey your-openrouter-api-key
+codevault config set providers.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set providers.openai.model qwen/qwen3-embedding-8b
+codevault config set providers.openai.dimensions 4096
+codevault config set providers.openai.routing.only '["nebius"]'
+codevault config set providers.openai.routing.allow_fallbacks false
+
+# Prioritize throughput for chat
+codevault config set chatLLM.openai.apiKey your-openrouter-api-key
+codevault config set chatLLM.openai.baseUrl https://openrouter.ai/api/v1
+codevault config set chatLLM.openai.model anthropic/claude-sonnet-4.5
+codevault config set chatLLM.openai.routing.sort throughput
+
+# Optional: Enforce ZDR (Zero Data Retention) + deny data collection
+codevault config set providers.openai.routing.zdr true
+codevault config set providers.openai.routing.data_collection deny
+```
+
+See [Provider Routing Guide](PROVIDER_ROUTING.md) for all available options.
+
+#### Option 4: Environment Variables (MCP / CI/CD)
 
 ```bash
 # Embedding Provider (Nebius + Qwen)
@@ -304,6 +329,8 @@ codevault mcp                            # Start MCP server
 | **Chat LLM** | Ollama | qwen2.5-coder:7b | 32K | Local, code-specialized |
 | **Reranking** | Novita | qwen/qwen3-reranker-8b | 32K | Best for code reranking |
 
+**Advanced:** Use [OpenRouter Provider Routing](PROVIDER_ROUTING.md) to control which providers handle your requests (cost, throughput, data retention, etc.)
+
 ## 🔧 Performance & Optimization
 
 ### Memory Management
@@ -395,6 +422,6 @@ Built with:
 
 ---
 
-**Version**: 1.6.0  
-**Built by**: Shariq Riaz  
+**Version**: 1.8.4
+**Built by**: Shariq Riaz
 **Last Updated**: November 2025

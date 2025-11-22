@@ -1,22 +1,27 @@
 {
-  "comment": "CodeVault MCP configuration for Claude Desktop - Recommended Setup",
+  "comment": "CodeVault MCP configuration for Claude Desktop - Recommended Setup with Provider Routing",
   "mcpServers": {
     "codevault": {
       "command": "npx",
       "args": ["-y", "codevault", "mcp"],
       "env": {
-        "CODEVAULT_EMBEDDING_API_KEY": "your-nebius-api-token-here",
-        "CODEVAULT_EMBEDDING_BASE_URL": "https://api.studio.nebius.com/v1",
-        "CODEVAULT_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-8B",
+        "comment_embeddings": "Use OpenRouter with provider routing to force Nebius",
+        "CODEVAULT_EMBEDDING_API_KEY": "your-openrouter-api-key-here",
+        "CODEVAULT_EMBEDDING_BASE_URL": "https://openrouter.ai/api/v1",
+        "CODEVAULT_EMBEDDING_MODEL": "qwen/qwen3-embedding-8b",
         "CODEVAULT_EMBEDDING_DIMENSIONS": "4096",
         "CODEVAULT_EMBEDDING_MAX_TOKENS": "32000",
         "CODEVAULT_EMBEDDING_RATE_LIMIT_RPM": "10000",
         "CODEVAULT_EMBEDDING_RATE_LIMIT_TPM": "600000",
+        "comment_routing_embeddings": "Set provider routing for embeddings via config JSON instead of env vars",
+        "comment_chat": "Chat LLM with throughput optimization",
         "CODEVAULT_CHAT_API_KEY": "your-openrouter-api-key-here",
         "CODEVAULT_CHAT_BASE_URL": "https://openrouter.ai/api/v1",
         "CODEVAULT_CHAT_MODEL": "anthropic/claude-sonnet-4.5",
         "CODEVAULT_CHAT_MAX_TOKENS": "32000",
         "CODEVAULT_CHAT_TEMPERATURE": "0.1",
+        "comment_routing_chat": "Routing config is set in ~/.codevault/config.json",
+        "comment_reranking": "Novita for best code reranking",
         "CODEVAULT_RERANK_API_URL": "https://api.novita.ai/openai/v1/rerank",
         "CODEVAULT_RERANK_API_KEY": "your-novita-api-key-here",
         "CODEVAULT_RERANK_MODEL": "qwen/qwen3-reranker-8b"
@@ -32,6 +37,26 @@
         "ask_codebase"
       ],
       "timeout": 3600
+    }
+  },
+  "comment_provider_routing_setup": "To enable provider routing, add to ~/.codevault/config.json or ~/.codevault/config.json:",
+  "example_config_for_routing": {
+    "providers": {
+      "openai": {
+        "routing": {
+          "only": ["nebius"],
+          "allow_fallbacks": false,
+          "zdr": true,
+          "data_collection": "deny"
+        }
+      }
+    },
+    "chatLLM": {
+      "openai": {
+        "routing": {
+          "sort": "throughput"
+        }
+      }
     }
   }
 }

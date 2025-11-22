@@ -1,12 +1,19 @@
 {
-  "comment": "Recommended setup: Nebius (embeddings) + OpenRouter (chat) + Novita (reranking)",
+  "comment": "Recommended setup: Nebius (embeddings) + OpenRouter (chat) + Novita (reranking) with Provider Routing",
   "defaultProvider": "openai",
   "providers": {
     "openai": {
-      "apiKey": "your-nebius-api-token-here",
-      "baseUrl": "https://api.studio.nebius.com/v1",
-      "model": "Qwen/Qwen3-Embedding-8B",
-      "dimensions": 4096
+      "apiKey": "your-openrouter-api-key-here",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "qwen/qwen3-embedding-8b",
+      "dimensions": 4096,
+      "comment": "Use OpenRouter with provider routing to force Nebius provider",
+      "routing": {
+        "only": ["nebius"],
+        "allow_fallbacks": false,
+        "data_collection": "deny",
+        "zdr": true
+      }
     }
   },
   "chatLLM": {
@@ -15,7 +22,12 @@
       "baseUrl": "https://openrouter.ai/api/v1",
       "model": "anthropic/claude-sonnet-4.5",
       "maxTokens": 32000,
-      "temperature": 0.1
+      "temperature": 0.1,
+      "comment": "Sort by throughput for chat performance",
+      "routing": {
+        "sort": "throughput",
+        "allow_fallbacks": true
+      }
     }
   },
   "maxTokens": 32000,
@@ -31,5 +43,9 @@
   "encryption": {
     "enabled": false,
     "key": ""
+  },
+  "comment_alternatives": {
+    "direct_nebius": "To use Nebius directly (no routing), set baseUrl to https://api.studio.nebius.com/v1 and remove routing config",
+    "provider_routing_options": "See PROVIDER_ROUTING.md for all available routing options: sort (price/throughput/latency), order (provider list), max_price, quantizations, etc."
   }
 }
