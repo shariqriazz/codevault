@@ -85,18 +85,7 @@ export class SearchService {
       return this.getOverview(limit, workingPath);
     }
 
-    // Initialize context manager for this workspace if needed
-    if (!this.contextManager || this.lastWorkingPath !== basePath) {
-      if (this.contextManager) {
-        this.contextManager.cleanup();
-      }
-      this.contextManager = new SearchContextManager(basePath);
-      this.lastWorkingPath = basePath;
-    }
-    const contextManager = this.contextManager;
-    if (!contextManager) {
-      throw new Error('Search context manager failed to initialize');
-    }
+    const contextManager = this.ensureContextManager(basePath);
 
     // Reset stats for this search
     this.fusion.resetChunkLoadingStats();
@@ -170,11 +159,11 @@ export class SearchService {
 
       // Apply symbol boost
       if (symbolBoostEnabled) {
-        try {
-          applySymbolBoost(vectorPool, {
-            query: normalizedQuery,
-            codemap: context.codemap
-          });
+      try {
+        applySymbolBoost(vectorPool, {
+          query: normalizedQuery,
+          codemap: context.codemap
+        });
         } catch (error) {
           logger.warn('Symbol boost failed, continuing without boost', {
             error: error instanceof Error ? error.message : String(error)
@@ -359,6 +348,20 @@ export class SearchService {
   }
 
   // Helpers
+
+  private ensureContextManager(basePath: string): SearchContextManager {
+    if (!this.contextManager || this.lastWorkingPath !== basePath) {
+      if (this.contextManager) {
+        this.contextManager.cleanup();
+      }
+      this.contextManager = new SearchContextManager(basePath);
+      this.lastWorkingPath = basePath;
+    }
+    if (!this.contextManager) {
+      throw new Error('Search context manager failed to initialize');
+    }
+    return this.contextManager;
+  }
 
   private createErrorResult(
     error: string,
