@@ -3,6 +3,7 @@ import { writeCodemapAsync } from '../../codemap/io.js';
 import { attachSymbolGraphToCodemap } from '../../symbols/graph.js';
 import { getTokenCountStats, type TokenCountStats } from '../../chunking/token-counter.js';
 type TokenStats = TokenCountStats;
+import { removeChunkArtifacts } from '../../storage/encrypted-chunks.js';
 import { logger } from '../../utils/logger.js';
 import type { IndexContextData } from './IndexContext.js';
 import type { IndexState } from './IndexState.js';
@@ -50,7 +51,7 @@ export class IndexFinalizationStage {
       attachSymbolGraphToCodemap(this.state.codemap);
       this.state.markIndexMutated();
 
-      this.cleanupOrphanedChunks();
+      await this.cleanupOrphanedChunks();
 
       // Persist any pending data (debounced during processing)
       await this.persistManager.flush();
@@ -126,7 +127,7 @@ export class IndexFinalizationStage {
   /**
    * Remove orphaned chunks whose source files no longer exist
    */
-  private cleanupOrphanedChunks(): void {
+  private async cleanupOrphanedChunks(): Promise<void> {
     if (!this.context.db) return;
 
     const paths = this.context.db.getAllFilePaths();
@@ -134,6 +135,7 @@ export class IndexFinalizationStage {
 
     const base = this.context.repo;
     const orphaned: string[] = [];
+    const orphanedShas: string[] = [];
 
     for (const rel of paths) {
       const full = path.join(base, rel);
@@ -152,10 +154,27 @@ export class IndexFinalizationStage {
       this.context.db.deleteChunksByFilePath(rel);
       for (const [chunkId, meta] of Object.entries(this.state.codemap)) {
         if (meta && typeof meta === 'object' && 'file' in meta && meta.file === rel) {
+          if (typeof meta.sha === 'string' && meta.sha.length > 0) {
+            orphanedShas.push(meta.sha);
+          }
           delete this.state.codemap[chunkId];
         }
       }
       delete this.state.updatedMerkle[rel];
+    }
+
+    if (orphanedShas.length > 0) {
+      const tasks = orphanedShas.map(async sha => {
+        try {
+          await removeChunkArtifacts(this.context.chunkDir, sha);
+        } catch (error) {
+          logger.warn('Failed to remove orphaned chunk artifacts', {
+            sha,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      });
+      await Promise.all(tasks);
     }
 
     this.state.markIndexMutated();
