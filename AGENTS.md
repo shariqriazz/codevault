@@ -4,7 +4,7 @@ CodeVault is an intelligent code indexing and search system that enables AI assi
 
 ## Project Overview
 
-This is a TypeScript/Node.js project (v1.7.3) that provides:
+This is a TypeScript/Node.js project (v1.8.3) that provides:
 - **Semantic code search** using vector embeddings with 25+ languages
 - **MCP (Model Context Protocol)** integration for AI assistants
 - **Symbol-aware ranking** for better code understanding
@@ -21,29 +21,56 @@ This is a TypeScript/Node.js project (v1.7.3) that provides:
 ### Core Components
 
 - `src/core/` - Core indexing and search functionality
-  - `indexer.ts` - Code indexing with Tree-sitter parsing, Merkle tree for incremental updates
-  - `search.ts` - Hybrid search (vector + BM25) with LRU caching, symbol boost, API reranking
-  - `symbol-extractor.ts` - Extract functions, classes, types with parameter/signature analysis
+  - `IndexerEngine.ts` - Stage-based indexing orchestrator (File → Process → Persist → Finalize)
+  - `SearchService.ts` - Unified search interface combining vector + BM25
   - `batch-indexer.ts` - Efficient batch embedding generation (50 chunks/batch) with retry logic
-  - `metadata.ts` - Chunk metadata and file information management
-  - `types.ts` - Core type definitions
+
+  **Indexing Pipeline** (`/indexing/`):
+  - `FileProcessor.ts` - Parse and chunk individual source files
+  - `IndexContext.ts` - Setup, database initialization, provider selection
+  - `IndexState.ts` - Mutable state tracking during indexing
+  - `IndexFinalizationStage.ts` - Cleanup, statistics, database optimization
+  - `PersistManager.ts` - Save chunks and embeddings to database
+  - `chunk-pipeline.ts` - Semantic chunking with AST subdivision
+  - `file-scanner.ts` - Identify indexable files via glob patterns
+
+  **Search Pipeline** (`/search/`):
+  - `CandidateRetriever.ts` - Vector + BM25 candidate retrieval
+  - `HybridFusion.ts` - Reciprocal Rank Fusion (RRF) combining scores
+  - `ResultMapper.ts` - Map database chunks to search results
+  - `SearchContextManager.ts` - Cache search results and context
 
 - `src/database/` - SQLite storage layer
   - `db.ts` - Database operations for chunks, embeddings, metadata; binary embeddings, PRAGMAs configurable
 
 - `src/indexer/` - Incremental indexing system
-  - `merkle.ts` - Merkle tree for detecting file changes and deletions (path-safe)
+  - `merkle.ts` - Merkle tree hashing (SHA-256) for file change detection
   - `update.ts` - Partial re-indexing for changed/deleted files
-  - `watch.ts` - File watching with debounced change detection and provider reuse
+  - `watch.ts` - File system watcher integration
+  - `ChangeQueue.ts` - Queue and batch changed files
+  - `ProviderManager.ts` - Manage embedding provider lifecycle
+  - `WatchService.ts` - Debounced change detection with provider reuse
 
 - `src/mcp/` - Model Context Protocol server
-  - `tools/ask-codebase.ts` - LLM-synthesized Q&A with Zod validation
-  - `tools/use-context-pack.ts` - Context management for saved scopes
+
+  **Handlers** (`/handlers/`):
+  - `search.ts` - Vector + BM25 hybrid search
+  - `synthesis.ts` - LLM-powered Q&A generation
+  - `project.ts` - Project indexing orchestration
+  - `context.ts` - Context pack loading
+
+  **Tools** (`/tools/`):
+  - `ask-codebase.ts` - Multi-turn Q&A with code synthesis
+  - `use-context-pack.ts` - Load pre-saved search scopes
+
+  **Schemas** (`schemas.ts`):
+  - Zod validation schemas for all MCP inputs/outputs
 
 - `src/synthesis/` - LLM answer generation
-  - `synthesizer.ts` - Generate natural language answers with multi-query support and prompt-injection hardening
+  - `synthesizer.ts` - Core synthesis with multi-query support
+  - `conversational-synthesizer.ts` - Multi-turn conversation with history
   - `prompt-builder.ts` - Build context-aware prompts with code citations
-  - `markdown-formatter.ts` - Format responses with file references
+  - `markdown-formatter.ts` - Format responses with file citations
 
 - `src/chunking/` - Smart code chunking
   - `semantic-chunker.ts` - AST-based semantic splitting with overlap (20%)
@@ -80,16 +107,49 @@ This is a TypeScript/Node.js project (v1.7.3) that provides:
 
 - `src/utils/` - Utility functions
   - `cli-ui.ts` - CLI progress bars and spinners
-  - `indexer-with-progress.ts` - Indexing with progress tracking
-  - `rate-limiter.ts` - RPM/TPM-based rate limiting with retry
+  - `logger.ts` - Logging with levels
+  - `rate-limiter.ts` - RPM/TPM rate limiting with queue management
+  - `simple-lru.ts` - LRU cache with configurable size
+  - `path-helpers.ts` - Path normalization and manipulation
+  - `mutex.ts` - Async mutex for concurrent access control
 
 - `src/config/` - Configuration management
-  - `loader.ts` - Load config from env/project/global
+  - `loader.ts` - Load from environment, project, or global config
+  - `resolver.ts` - Resolve config source priority
   - `apply-env.ts` - Apply environment variable overrides
   - `types.ts` - Configuration type definitions
+  - `constants.ts` - System-wide constants (batch sizes, cache limits)
 
 - `src/context/` - Context pack management
-  - `packs.ts` - Save/load search scopes for reuse
+  - `packs.ts` - Save/load search scopes for reusable context
+
+- `src/cli/` - CLI Layer (12 commands)
+  - `index-cmd.ts` - Index a codebase with vector embeddings
+  - `update-cmd.ts` - Incrementally update changed files only
+  - `watch-cmd.ts` - Monitor files and auto-update indexes
+  - `search-cmd.ts` - Semantic search with result ranking
+  - `ask-cmd.ts` - Natural language Q&A using LLM synthesis
+  - `chat-cmd.ts` - Interactive multi-turn conversation
+  - `config-cmd.ts` - Configuration management (get/set/show)
+  - `context.ts` - Save/load search scope context packs
+  - `info-cmd.ts` - Display project indexing statistics
+  - `mcp-cmd.ts` - Launch MCP server
+  - `search-with-code-cmd.ts` - Search with inline source display
+  - `interactive-config.ts` - Guided configuration builder
+
+- `src/types/` - Core TypeScript type definitions
+  - Tree-sitter AST types
+  - Codemap symbol type definitions
+
+- `src/codemap/` - Symbol relationship maps
+  - Read/write symbol relationship maps for code navigation
+
+- `src/tests/` - Integration and Unit Tests
+  - Chunking tests
+  - Symbol boost tests
+  - Rate limiting tests
+  - LRU cache tests
+  - End-to-end integration tests
 
 ## Code Standards
 
@@ -343,6 +403,49 @@ if (text.length > MAX_CHARS * 4) return; // Definitely oversized
 // Batch token counting for multiple texts
 const counts = await batchCountTokens(texts, modelProfile);
 ```
+
+## Entry Point Flows
+
+### CLI Entry Flow
+```
+bin: codevault
+    → src/cli.ts
+        → src/cli/index.ts (runCli function)
+            → Register 12 commands
+            → Parse argv
+            → Execute selected command
+```
+
+### MCP Server Entry Flow
+```
+bin: codevault-mcp
+    → src/mcp-server.ts
+        → Initialize stdio transport
+        → Register handlers (search, synthesis, project, context)
+        → Listen for tool calls
+        → Route to handlers → tools
+```
+
+### Key Architectural Patterns
+
+1. **Stage-Based Indexing**: FileScanner → FileProcessor → Persist → Finalize
+2. **Hybrid Search**: Vector (0.7 weight) + BM25 (0.3 weight) via RRF
+3. **Incremental Updates**: Merkle trees detect changes, only process changed files
+4. **Batch Processing**: 50 chunks/batch with 3 retries for efficiency (~98% API call reduction)
+5. **Symbol-Aware Ranking**: Boost results matching signatures, parameters, neighbors
+6. **LRU Caching**: BM25 indices (10 max), chunks (1000 max), tokens (hits ~80%)
+7. **Rate Limiting**: RPM/TPM-based throttling with exponential backoff
+8. **Modular Providers**: Pluggable embedding/chat providers with fallbacks
+
+### Build & Distribution
+
+- **TypeScript** compiled to `/dist` directory
+- **Node.js** >=18.0.0 required
+- **npm publish** triggered on version bumps with NPM_TOKEN
+- **CLI & MCP** accessible as `codevault` and `codevault-mcp` commands
+
+### Configuration Hierarchy
+Environment Variables (highest) → Project Config → Global Config → Defaults (lowest)
 
 ## Development Workflow
 

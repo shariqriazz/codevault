@@ -708,5 +708,5 @@ codevault ask "What languages are used?" --stream --no-metadata
 
 ---
 
-**Version:** 1.6.0  
+**Version:** 1.8.3
 **Last Updated:** November 2025

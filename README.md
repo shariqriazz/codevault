@@ -395,6 +395,6 @@ Built with:
 
 ---
 
-**Version**: 1.6.0  
-**Built by**: Shariq Riaz  
+**Version**: 1.8.3
+**Built by**: Shariq Riaz
 **Last Updated**: November 2025
