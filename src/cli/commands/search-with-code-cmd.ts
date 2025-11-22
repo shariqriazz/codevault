@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 import { print } from '../../utils/logger.js';
+import { resolveProjectRoot } from '../../utils/path-helpers.js';
 
 interface SearchWithCodeOptions extends Record<string, unknown> {
   limit?: string;
@@ -39,10 +40,11 @@ export function registerSearchWithCodeCommand(program: Command): void {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
-                                      (typeof options.directory === 'string' ? options.directory : null) ||
-                                      (typeof projectPath === 'string' ? projectPath : null) ||
-                                      '.';
+        const rawPath: string = (typeof options.project === 'string' ? options.project : null) ||
+                                (typeof options.directory === 'string' ? options.directory : null) ||
+                                (typeof projectPath === 'string' ? projectPath : null) ||
+                                '.';
+        const resolvedPath = resolveProjectRoot({ project: rawPath });
         const limit = parseInt(String(options.limit || '5'));
         const maxCodeSize = parseInt(String(options.maxCodeSize || '100000'));
         const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
