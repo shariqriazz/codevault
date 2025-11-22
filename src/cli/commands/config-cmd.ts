@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import util from 'node:util';
 import {
   loadConfig,
   readGlobalConfig,
@@ -154,11 +155,26 @@ export function registerConfigCommands(program: Command): void {
 
       if (value === undefined) {
         process.stdout.write(`${chalk.yellow(`Key '${key}' not found`)  }\n`);
-      } else if (typeof value === 'object' && value !== null) {
-        process.stdout.write(`${JSON.stringify(value, null, 2)  }\n`);
-      } else {
-        process.stdout.write(`${String(value)  }\n`);
+        return;
       }
+
+      if (typeof value === 'object' && value !== null) {
+        process.stdout.write(`${JSON.stringify(value, null, 2)  }\n`);
+        return;
+      }
+
+      if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean' ||
+        typeof value === 'bigint'
+      ) {
+        process.stdout.write(`${value.toString()}\n`);
+        return;
+      }
+
+      // Fallback to util.inspect for symbols/functions/etc. to avoid implicit Object stringification
+      process.stdout.write(`${util.inspect(value)}\n`);
     });
 
   // config list - List all configuration
