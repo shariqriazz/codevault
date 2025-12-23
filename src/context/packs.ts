@@ -3,6 +3,7 @@ import path from 'path';
 import { ContextPackSchema, extractScopeFromPackDefinition } from '../types/context-pack.js';
 import { normalizeScopeFilters } from '../search/scope.js';
 import type { ScopeFilters } from '../types/search.js';
+import { SimpleLRU } from '../utils/simple-lru.js';
 
 const CONTEXT_PACK_DIR = '.codevault/contextpacks';
 const ACTIVE_STATE_FILENAME = 'active-pack.json';
@@ -21,7 +22,8 @@ interface SessionPack extends PackInfo {
   basePath: string;
 }
 
-const packCache = new Map<string, { pack: PackInfo; mtimeMs: number }>();
+// Use SimpleLRU to prevent unbounded memory growth in long-running processes
+const packCache = new SimpleLRU<string, { pack: PackInfo; mtimeMs: number }>(100);
 
 function resolveBasePath(basePath = '.'): string {
   return path.resolve(basePath || '.');

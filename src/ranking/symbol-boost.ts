@@ -1,5 +1,6 @@
 import type { Codemap, CodemapChunk } from '../types/codemap.js';
 import { SYMBOL_BOOST_CONSTANTS } from '../config/constants.js';
+import { SimpleLRU } from '../utils/simple-lru.js';
 
 const SIGNATURE_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.SIGNATURE_MATCH_BOOST;
 const NEIGHBOR_MATCH_BOOST = SYMBOL_BOOST_CONSTANTS.NEIGHBOR_MATCH_BOOST;
@@ -15,9 +16,8 @@ interface SearchResult {
   symbolNeighborStrength?: number;
 }
 
-// Regex cache for performance
-const regexCache = new Map<string, RegExp>();
-const MAX_CACHE_SIZE = 1000;
+// LRU regex cache for performance (replaces FIFO to keep hot patterns)
+const regexCache = new SimpleLRU<string, RegExp>(1000);
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -37,14 +37,7 @@ function buildQueryTokenRegex(token: string): RegExp | null {
   const escaped = escapeRegex(token.toLowerCase());
   const regex = new RegExp(`\\b${escaped}[a-z0-9_]*\\b`, 'i');
 
-  // Add to cache with size limit
-  if (regexCache.size >= MAX_CACHE_SIZE) {
-    // Clear oldest entries (simple FIFO)
-    const firstKey = regexCache.keys().next().value;
-    if (firstKey !== undefined) {
-      regexCache.delete(firstKey);
-    }
-  }
+  // SimpleLRU handles eviction automatically
   regexCache.set(token, regex);
 
   return regex;

@@ -5,9 +5,16 @@
  * concurrency control patterns.
  */
 
+export class MutexTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Mutex acquire timed out after ${timeoutMs}ms`);
+    this.name = 'MutexTimeoutError';
+  }
+}
+
 export class Mutex {
   private locked = false;
-  private queue: Array<() => void> = [];
+  private queue: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
 
   /**
    * Check if the mutex is currently locked
@@ -18,17 +25,37 @@ export class Mutex {
 
   /**
    * Acquire the mutex lock
-   * Waits if already locked
+   * Waits if already locked. Optional timeout prevents indefinite waiting.
+   * @param timeoutMs Optional timeout in milliseconds. If not provided, waits indefinitely.
+   * @throws MutexTimeoutError if timeout is exceeded
    */
-  async acquire(): Promise<void> {
+  async acquire(timeoutMs?: number): Promise<void> {
     if (!this.locked) {
       this.locked = true;
       return;
     }
 
     // Wait for lock to be released
-    await new Promise<void>((resolve) => {
-      this.queue.push(resolve);
+    return new Promise<void>((resolve, reject) => {
+      const entry = { resolve, reject };
+      this.queue.push(entry);
+
+      if (timeoutMs !== undefined && timeoutMs > 0) {
+        const timeoutId = setTimeout(() => {
+          const idx = this.queue.indexOf(entry);
+          if (idx >= 0) {
+            this.queue.splice(idx, 1);
+            reject(new MutexTimeoutError(timeoutMs));
+          }
+        }, timeoutMs);
+
+        // Wrap resolve to clear timeout
+        const originalResolve = entry.resolve;
+        entry.resolve = (): void => {
+          clearTimeout(timeoutId);
+          originalResolve();
+        };
+      }
     });
   }
 
@@ -38,9 +65,9 @@ export class Mutex {
    */
   release(): void {
     if (this.queue.length > 0) {
-      const resolve = this.queue.shift();
-      if (resolve) {
-        resolve();
+      const entry = this.queue.shift();
+      if (entry) {
+        entry.resolve();
       }
     } else {
       this.locked = false;

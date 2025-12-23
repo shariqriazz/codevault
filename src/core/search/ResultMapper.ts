@@ -5,6 +5,7 @@ import { readChunkFromDisk } from '../../storage/encrypted-chunks.js';
 import { SEARCH_CONSTANTS } from '../../config/constants.js';
 import { logger } from '../../utils/logger.js';
 import { resolveProviderContext } from '../../config/resolver.js';
+import { buildBm25Document } from '../../search/bm25.js';
 
 /**
  * ResultMapper handles:
@@ -81,7 +82,7 @@ export class ResultMapper {
         max: Math.min(SEARCH_CONSTANTS.RERANKER_MAX_CANDIDATES, candidates.length),
         getTextAsync: async candidate => {
           const codeText = (await this.readChunkText(candidate.sha as string, chunkDir)) || '';
-          return this.buildBm25Document(candidate as SearchCandidate, codeText);
+          return buildBm25Document(candidate as SearchCandidate, codeText);
         },
         apiUrl: providerContext.reranker.apiUrl,
         apiKey: providerContext.reranker.apiKey,
@@ -138,19 +139,5 @@ export class ResultMapper {
     } catch {
       return null;
     }
-  }
-
-  private buildBm25Document(chunk: SearchCandidate, codeText: string | null): string {
-    if (!chunk) return '';
-
-    const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
-      codeText
-    ].filter(value => typeof value === 'string' && value.trim().length > 0);
-
-    return parts.join('\n');
   }
 }

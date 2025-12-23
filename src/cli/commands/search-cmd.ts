@@ -4,6 +4,7 @@ import { resolveScopeWithPack } from '../../context/packs.js';
 import { searchCode } from '../../core/search.js';
 import { print } from '../../utils/logger.js';
 import type { ScopeFilters } from '../../types/search.js';
+import { parseIntOption, resolveProjectPath, ExitCode } from '../utils.js';
 
 interface SearchCommandOptions extends Record<string, unknown> {
   limit?: string;
@@ -38,12 +39,15 @@ export function registerSearchCommand(program: Command): void {
       try {
         process.env.CODEVAULT_QUIET = 'true';
 
-        const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
-                                      (typeof options.directory === 'string' ? options.directory : null) ||
-                                      (typeof projectPath === 'string' ? projectPath : null) ||
-                                      '.';
-        const limitStr: string = typeof options.limit === 'string' ? options.limit : '10';
-        const limit = parseInt(limitStr);
+        const resolvedPath = resolveProjectPath(options, projectPath);
+
+        let limit: number;
+        try {
+          limit = parseIntOption(options.limit, 'limit', { min: 1, max: 200, default: 10 });
+        } catch (validationError) {
+          console.error(chalk.red(`\n❌ ${(validationError as Error).message}`));
+          process.exit(ExitCode.INVALID_ARGS);
+        }
 
         const providerStr: string = typeof options.provider === 'string' ? options.provider : 'auto';
         const { scope: scopeFilters } = resolveScopeWithPack(options as Record<string, unknown>, { basePath: resolvedPath });
@@ -75,7 +79,7 @@ export function registerSearchCommand(program: Command): void {
         delete process.env.CODEVAULT_QUIET;
       } catch (error) {
         console.error(chalk.red('\n❌ Search error:'), (error as Error).message);
-        process.exit(1);
+        process.exit(ExitCode.ERROR);
       }
     });
 }

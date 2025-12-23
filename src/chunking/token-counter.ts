@@ -62,21 +62,26 @@ function preFilterByChars(code: string, limits: SizeLimits): PreFilterResult {
 
 async function countTokensWithCache(code: string, tokenCounter: (text: string) => number | Promise<number>): Promise<number> {
   stats.totalRequests++;
-  
-  const cacheKey = await computeFastHash(code);
-  const cached = tokenCountCache.get(cacheKey);
-  if (cached !== undefined) {
-    stats.cacheHits++;
-    return cached;
+
+  try {
+    const cacheKey = await computeFastHash(code);
+    const cached = tokenCountCache.get(cacheKey);
+    if (cached !== undefined) {
+      stats.cacheHits++;
+      return cached;
+    }
+
+    stats.actualTokenizations++;
+    const result = tokenCounter(code);
+    const count = result instanceof Promise ? await result : result;
+
+    tokenCountCache.set(cacheKey, count);
+
+    return count;
+  } catch (error) {
+    // Fallback to character estimation when tokenization fails
+    return estimateTokensFromChars(code.length);
   }
-  
-  stats.actualTokenizations++;
-  const result = tokenCounter(code);
-  const count = result instanceof Promise ? await result : result;
-  
-  tokenCountCache.set(cacheKey, count);
-  
-  return count;
 }
 
 async function batchCountTokens(codeSnippets: string[], tokenCounter: (text: string) => number | Promise<number>): Promise<number[]> {

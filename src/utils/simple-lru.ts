@@ -20,6 +20,7 @@ export class SimpleLRU<K, V> {
   private map: Map<K, LRUNode<K, V>>;
   private head: LRUNode<K, V> | null = null;
   private tail: LRUNode<K, V> | null = null;
+  private pendingFetches: Map<K, Promise<V>> = new Map();
 
   constructor(max: number, options: LRUOptions = {}) {
     if (!Number.isFinite(max) || max <= 0) {
@@ -86,6 +87,32 @@ export class SimpleLRU<K, V> {
     this.map.clear();
     this.head = null;
     this.tail = null;
+    this.pendingFetches.clear();
+  }
+
+  /**
+   * Get a value from cache, or compute and cache it if missing.
+   * Coalesces concurrent requests for the same key to prevent thundering herd.
+   */
+  async getOrSet(key: K, factory: () => Promise<V>): Promise<V> {
+    const existing = this.get(key);
+    if (existing !== undefined) return existing;
+
+    // Check if there's already a pending fetch for this key
+    const pending = this.pendingFetches.get(key);
+    if (pending) return pending;
+
+    // Start new fetch and track it
+    const promise = factory();
+    this.pendingFetches.set(key, promise);
+
+    try {
+      const value = await promise;
+      this.set(key, value);
+      return value;
+    } finally {
+      this.pendingFetches.delete(key);
+    }
   }
 
   get size(): number {

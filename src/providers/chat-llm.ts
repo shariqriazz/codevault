@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
 import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions';
-import { createRateLimiter } from '../utils/rate-limiter.js';
+import { createRateLimiter, type RateLimiter } from '../utils/rate-limiter.js';
 import type { ChatOptions } from '../config/resolver.js';
 import type { ProviderRoutingConfig } from '../config/types.js';
 
@@ -22,7 +22,7 @@ export abstract class ChatLLMProvider {
   abstract getModelName?(): string;
   abstract init?(): Promise<void>;
 
-  rateLimiter?: unknown;
+  rateLimiter?: RateLimiter;
 }
 
 export class OpenAIChatProvider extends ChatLLMProvider {
@@ -52,7 +52,10 @@ export class OpenAIChatProvider extends ChatLLMProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: { apiKey?: string; baseURL?: string } = {};
+      const config: { apiKey?: string; baseURL?: string; timeout?: number; maxRetries?: number } = {
+        timeout: 120000, // 120 second timeout for chat (longer responses)
+        maxRetries: 0    // We handle retries ourselves
+      };
 
       if (this.apiKey) {
         config.apiKey = this.apiKey;

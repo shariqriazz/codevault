@@ -1,11 +1,12 @@
 import { searchCode, getChunk } from '../core/search.js';
 import { createChatLLMProvider, type ChatMessage } from '../providers/chat-llm.js';
-import { 
-  buildSystemPrompt, 
-  buildUserPrompt, 
-  buildMultiQueryPrompt, 
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  buildMultiQueryPrompt,
   parseMultiQueryResponse,
-  type CodeContext 
+  sanitizeUserInput,
+  type CodeContext
 } from './prompt-builder.js';
 import type { ScopeFilters } from '../types/search.js';
 import type { SearchResult } from '../core/types.js';
@@ -301,7 +302,7 @@ export async function* synthesizeAnswerStreaming(
   const searchResult = await searchCode(query, maxChunks, provider, workingPath, searchScope);
 
   if (!searchResult.success || searchResult.results.length === 0) {
-    yield `**No relevant code found for:** "${query}"\n\n`;
+    yield `**No relevant code found for:** "${sanitizeUserInput(query, 200)}"\n\n`;
     yield `Please ensure the project is indexed and try rephrasing your question.`;
     return;
   }

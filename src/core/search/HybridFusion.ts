@@ -1,6 +1,6 @@
 import type { DatabaseChunk } from '../../database/db.js';
 import type { SearchCandidate } from './CandidateRetriever.js';
-import { BM25Index } from '../../search/bm25.js';
+import { BM25Index, buildBm25Document } from '../../search/bm25.js';
 import { reciprocalRankFusion } from '../../search/hybrid.js';
 import { SimpleLRU } from '../../utils/simple-lru.js';
 import { readChunkFromDisk } from '../../storage/encrypted-chunks.js';
@@ -332,7 +332,7 @@ export class HybridFusion {
       if (!chunk || !chunk.id || entry.added.has(chunk.id)) continue;
 
       const codeText = await this.readChunkTextCached(chunk.sha, chunkDir, basePath);
-      const docText = this.buildBm25Document(chunk, codeText);
+      const docText = buildBm25Document(chunk, codeText);
 
       if (docText && docText.trim().length > 0) {
         toAdd.push({ id: chunk.id, text: docText });
@@ -390,20 +390,6 @@ export class HybridFusion {
       this.chunkCache.set(cacheKey, null);
       return null;
     }
-  }
-
-  private buildBm25Document(chunk: DatabaseChunk, codeText: string | null): string {
-    if (!chunk) return '';
-
-    const parts = [
-      chunk.symbol,
-      chunk.file_path,
-      chunk.codevault_description,
-      chunk.codevault_intent,
-      codeText
-    ].filter(value => typeof value === 'string' && value.trim().length > 0);
-
-    return parts.join('\n');
   }
 
   private getBm25CacheKey(

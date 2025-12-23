@@ -1,3 +1,5 @@
+import type { RateLimiter } from '../utils/rate-limiter.js';
+
 export interface ModelProfile {
   maxTokens: number;
   optimalTokens: number;
@@ -36,7 +38,7 @@ export abstract class EmbeddingProvider {
     return embeddings;
   }
   
-  rateLimiter?: unknown;
+  rateLimiter?: RateLimiter;
 }
 
 // Batching constants

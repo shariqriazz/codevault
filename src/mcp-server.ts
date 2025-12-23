@@ -25,8 +25,12 @@ import {
 import { CACHE_CONSTANTS } from './config/constants.js';
 import { clearSearchCaches } from './core/search.js';
 import { clearTokenCache } from './chunking/token-counter.js';
-import { logger } from './utils/logger.js';
+import { logger, LogLevel } from './utils/logger.js';
 import { ZodError } from 'zod';
+
+// Set logger to SILENT for MCP to avoid corrupting stdio transport
+// All output must go through MCP protocol, not stdout
+logger.setLevel(LogLevel.SILENT);
 
 type MCPErrorType = 'validation' | 'runtime' | 'configuration' | 'permission' | 'unknown';
 type SessionPackInput = {
@@ -343,9 +347,10 @@ export class McpServer {
   public async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    logger.info('CodeVault MCP Server started', { version: packageJson.version });
-    
+
+    // Write to stderr to avoid corrupting MCP protocol on stdout
+    process.stderr.write(`CodeVault MCP Server v${packageJson.version ?? 'unknown'} started\n`);
+
     this.scheduleCacheCleanup();
     this.setupShutdownHandlers();
   }
@@ -354,45 +359,50 @@ export class McpServer {
     if (this.cacheCleanupTimer) {
       clearInterval(this.cacheCleanupTimer);
     }
-    
+
     this.cacheCleanupTimer = setInterval(() => {
       try {
         clearSearchCaches();
         clearTokenCache();
-
-        logger.debug('Cache cleared periodically');
       } catch {
         // Ignore errors during cleanup
       }
     }, CACHE_CONSTANTS.CACHE_CLEAR_INTERVAL_MS);
   }
 
-  private setupShutdownHandlers(): void {
-    const cleanup = (): void => {
-      if (this.cacheCleanupTimer) {
-        clearInterval(this.cacheCleanupTimer);
-        this.cacheCleanupTimer = null;
-      }
-      
-      this.sessionContextPack = null;
-      clearSearchCaches();
-      clearTokenCache();
-    };
-    
-    process.on('SIGINT', () => {
-      cleanup();
-      process.exit(0);
-    });
+  private async cleanup(): Promise<void> {
+    if (this.cacheCleanupTimer) {
+      clearInterval(this.cacheCleanupTimer);
+      this.cacheCleanupTimer = null;
+    }
 
-    process.on('SIGTERM', () => {
-      cleanup();
-      process.exit(0);
-    });
+    this.sessionContextPack = null;
+    clearSearchCaches();
+    clearTokenCache();
+
+    // Properly close the MCP server connection
+    try {
+      await this.server.close();
+    } catch {
+      // Ignore errors during server close
+    }
+  }
+
+  private setupShutdownHandlers(): void {
+    const handleShutdown = (): void => {
+      void this.cleanup().finally(() => {
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGINT', handleShutdown);
+    process.on('SIGTERM', handleShutdown);
   }
 }
 
 const server = new McpServer();
 server.start().catch((error) => {
-  logger.error('Fatal error', error);
+  // Write to stderr since logger is silenced
+  process.stderr.write(`Fatal error: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);
 });

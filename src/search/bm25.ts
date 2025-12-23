@@ -16,6 +16,27 @@ function defaultPrep(text: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Builds a BM25 document from chunk metadata and code text.
+ * Used by both HybridFusion and ResultMapper for consistent document formatting.
+ */
+export function buildBm25Document(
+  chunk: { symbol?: string; file_path?: string; codevault_description?: string; codevault_intent?: string } | null,
+  codeText: string | null
+): string {
+  if (!chunk) return '';
+
+  const parts = [
+    chunk.symbol,
+    chunk.file_path,
+    chunk.codevault_description,
+    chunk.codevault_intent,
+    codeText
+  ].filter(value => typeof value === 'string' && value.trim().length > 0);
+
+  return parts.join('\n');
+}
+
 export class BM25Index {
   private engine: ReturnType<typeof bm25Factory>;
   private documents = new Set<string>();

@@ -89,15 +89,24 @@ export const LANG_RULES: Record<string, LanguageRule> = {
   '.go': {
     lang: 'go',
     ts: RESOLVED_LANGUAGES.go,
-    nodeTypes: ['function_declaration', 'method_declaration'],
-    variableTypes: ['const_declaration', 'var_declaration'],
-    commentPattern: /\/\*[\s\S]*?\*\//g
+    nodeTypes: ['function_declaration', 'method_declaration', 'type_declaration'],
+    subdivisionTypes: {
+      'type_declaration': ['method_declaration', 'function_declaration'],
+      'function_declaration': ['if_statement', 'for_statement', 'switch_statement']
+    },
+    variableTypes: ['const_declaration', 'var_declaration', 'short_var_declaration'],
+    commentPattern: /\/\*[\s\S]*?\*\/|\/\/.*$/gm
   },
   '.java': {
     lang: 'java',
     ts: RESOLVED_LANGUAGES.java,
-    nodeTypes: ['method_declaration', 'class_declaration'],
-    variableTypes: ['variable_declaration', 'field_declaration'],
+    nodeTypes: ['method_declaration', 'class_declaration', 'interface_declaration'],
+    subdivisionTypes: {
+      'class_declaration': ['method_declaration', 'constructor_declaration', 'field_declaration'],
+      'interface_declaration': ['method_declaration'],
+      'method_declaration': ['if_statement', 'try_statement', 'for_statement']
+    },
+    variableTypes: ['variable_declaration', 'field_declaration', 'local_variable_declaration'],
     commentPattern: /\/\*\*[\s\S]*?\*\//g
   },
   '.cs': {

@@ -41,7 +41,10 @@ export class OpenAIProvider extends EmbeddingProvider {
 
   async init(): Promise<void> {
     if (!this.openai) {
-      const config: { apiKey?: string; baseURL?: string } = {};
+      const config: { apiKey?: string; baseURL?: string; timeout?: number; maxRetries?: number } = {
+        timeout: 60000, // 60 second timeout to prevent hung requests
+        maxRetries: 0   // We handle retries ourselves in batch-indexer
+      };
 
       if (this.apiKey) {
         config.apiKey = this.apiKey;

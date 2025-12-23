@@ -7,6 +7,7 @@ import { indexProjectWithProgress } from '../../utils/indexer-with-progress.js';
 import { log, print } from '../../utils/logger.js';
 import { createEmbeddingProvider, getModelProfile, getSizeLimits } from '../../providers/index.js';
 import { resolveProviderContext } from '../../config/resolver.js';
+import { parseIntOption, resolveProjectPath, withGracefulShutdown, ExitCode } from '../utils.js';
 
 interface IndexCommandOptions {
   provider?: string;
@@ -28,62 +29,68 @@ export function registerIndexCommand(program: Command): void {
     .option('--concurrency <number>', 'number of files to process concurrently (default: 200, max: 1000)')
     .option('--verbose', 'show verbose output')
     .action(async (projectPath: string = '.', options: IndexCommandOptions) => {
-      const resolvedPath: string = (typeof options.project === 'string' ? options.project : null) ||
-                                    (typeof options.directory === 'string' ? options.directory : null) ||
-                                    (typeof projectPath === 'string' ? projectPath : null) ||
-                                    '.';
+      const resolvedPath = resolveProjectPath(options, projectPath);
       const ui = new IndexerUI();
 
-      try {
-        if (!options.verbose) {
-          process.env.CODEVAULT_QUIET = 'true';
-          process.env.CODEVAULT_MODEL_PROFILE_CACHED = 'true';
-          log.setQuiet(true);
-
-          ui.showHeader();
-
-          const providerContext = resolveProviderContext(resolvedPath);
-          const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
-          const embeddingProvider = createEmbeddingProvider(providerOption, providerContext.embedding);
-          if (embeddingProvider.init) {
-            await embeddingProvider.init();
-          }
-          const providerName = embeddingProvider.getName();
-          const modelName = embeddingProvider.getModelName ? embeddingProvider.getModelName() : null;
-          const profile = await getModelProfile(providerName, modelName || providerName);
-          const limits = getSizeLimits(profile);
-
-          ui.showConfiguration({
-            provider: providerName,
-            model: modelName || undefined,
-            dimensions: embeddingProvider.getDimensions(),
-            chunkSize: {
-              min: limits.min,
-              max: limits.max,
-              optimal: limits.optimal
-            },
-            rateLimit: (() => {
-              if (embeddingProvider.rateLimiter && typeof embeddingProvider.rateLimiter === 'object' && 'getStats' in embeddingProvider.rateLimiter) {
-                const stats = (embeddingProvider.rateLimiter as { getStats: () => { rpm?: number | null } }).getStats();
-                return { rpm: stats.rpm ?? 0 };
-              }
-              return undefined;
-            })()
-          });
-
-          ui.startScanning();
-        } else {
-          print('Starting project indexing...');
-          print(`Provider: ${typeof options.provider === 'string' ? options.provider : 'auto'}`);
+      // Validate concurrency option
+      let concurrency: number | undefined;
+      if (options.concurrency !== undefined) {
+        try {
+          concurrency = parseIntOption(String(options.concurrency), 'concurrency', { min: 1, max: 1000 });
+        } catch (validationError) {
+          console.error(`ERROR: ${(validationError as Error).message}`);
+          process.exit(ExitCode.INVALID_ARGS);
         }
+      }
 
-        let result;
+      try {
+        await withGracefulShutdown(async () => {
+          if (!options.verbose) {
+            process.env.CODEVAULT_QUIET = 'true';
+            process.env.CODEVAULT_MODEL_PROFILE_CACHED = 'true';
+            log.setQuiet(true);
 
-        const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
-        const encryptMode: string | undefined = typeof options.encrypt === 'string' ? options.encrypt : undefined;
-        const concurrency = options.concurrency !== undefined
-          ? parseInt(String(options.concurrency), 10)
-          : undefined;
+            ui.showHeader();
+
+            const providerContext = resolveProviderContext(resolvedPath);
+            const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
+            const embeddingProvider = createEmbeddingProvider(providerOption, providerContext.embedding);
+            if (embeddingProvider.init) {
+              await embeddingProvider.init();
+            }
+            const providerName = embeddingProvider.getName();
+            const modelName = embeddingProvider.getModelName ? embeddingProvider.getModelName() : null;
+            const profile = await getModelProfile(providerName, modelName || providerName);
+            const limits = getSizeLimits(profile);
+
+            ui.showConfiguration({
+              provider: providerName,
+              model: modelName || undefined,
+              dimensions: embeddingProvider.getDimensions(),
+              chunkSize: {
+                min: limits.min,
+                max: limits.max,
+                optimal: limits.optimal
+              },
+              rateLimit: (() => {
+                if (embeddingProvider.rateLimiter && typeof embeddingProvider.rateLimiter === 'object' && 'getStats' in embeddingProvider.rateLimiter) {
+                  const stats = (embeddingProvider.rateLimiter as { getStats: () => { rpm?: number | null } }).getStats();
+                  return { rpm: stats.rpm ?? 0 };
+                }
+                return undefined;
+              })()
+            });
+
+            ui.startScanning();
+          } else {
+            print('Starting project indexing...');
+            print(`Provider: ${typeof options.provider === 'string' ? options.provider : 'auto'}`);
+          }
+
+          let result;
+
+          const providerOption: string = typeof options.provider === 'string' ? options.provider : 'auto';
+          const encryptMode: string | undefined = typeof options.encrypt === 'string' ? options.encrypt : undefined;
 
         if (!options.verbose) {
           result = await indexProjectWithProgress({
@@ -92,21 +99,21 @@ export function registerIndexCommand(program: Command): void {
             encryptMode,
             concurrency,
             callbacks: {
-            onScanComplete: (fileCount) => {
-              ui.finishScanning(fileCount, 25);
-              ui.startIndexing();
-            },
-            onFileProgress: (current, total, fileName, etaMs, _avgPerFileMs, countFile = true) => {
-              ui.updateProgress(fileName, current, total, etaMs ?? null, countFile);
-            },
-            onChunkHeartbeat: (etaMs) => {
-              ui.updateProgress('processing...', undefined, undefined, etaMs ?? null, false);
-            },
-            onFinalizing: () => {
-              ui.showFinalizing();
+              onScanComplete: (fileCount) => {
+                ui.finishScanning(fileCount, 25);
+                ui.startIndexing();
+              },
+              onFileProgress: (current, total, fileName, etaMs, _avgPerFileMs, countFile = true) => {
+                ui.updateProgress(fileName, current, total, etaMs ?? null, countFile);
+              },
+              onChunkHeartbeat: (etaMs) => {
+                ui.updateProgress('processing...', undefined, undefined, etaMs ?? null, false);
+              },
+              onFinalizing: () => {
+                ui.showFinalizing();
+              }
             }
-          }
-        });
+          });
 
           ui.cleanup();
           ui.finishIndexing();
@@ -143,6 +150,10 @@ export function registerIndexCommand(program: Command): void {
           });
           print('Indexing completed successfully');
         }
+        }, () => {
+          // Cleanup function for graceful shutdown
+          ui.cleanup();
+        });
       } catch (error) {
         if (!options.verbose) {
           ui.cleanup();
@@ -150,7 +161,7 @@ export function registerIndexCommand(program: Command): void {
         } else {
           console.error('ERROR during indexing:', (error as Error).message);
         }
-        process.exit(1);
+        process.exit(ExitCode.ERROR);
       }
     });
 }

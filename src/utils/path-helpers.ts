@@ -27,13 +27,16 @@ export function resolveProjectRoot(input?: {
   const absolute = path.resolve(trimmed.length > 0 ? trimmed : '.');
   const validation = validatePathSafety(process.cwd(), absolute);
 
-  if (!validation.safe || !validation.normalized) {
+  if (!validation.safe || validation.normalized === null) {
     const error = new Error(`Path "${absolute}" is outside the project root`) as Error & { code: string };
     error.code = 'PATH_VALIDATION_FAILED';
     throw error;
   }
 
-  const resolved = path.join(process.cwd(), validation.normalized);
+  // If normalized is empty string, the path IS the project root
+  const resolved = validation.normalized === ''
+    ? process.cwd()
+    : path.join(process.cwd(), validation.normalized);
   try {
     return fs.realpathSync(resolved);
   } catch {

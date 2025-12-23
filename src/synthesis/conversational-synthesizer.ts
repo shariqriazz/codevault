@@ -366,12 +366,18 @@ export function createConversationContext(): ConversationContext {
 
 /**
  * Add a turn to the conversation history
+ * Automatically prunes old turns to prevent unbounded memory growth
  */
 export function addConversationTurn(
   context: ConversationContext,
-  turn: ConversationTurn
+  turn: ConversationTurn,
+  maxTurns = 50
 ): void {
   context.turns.push(turn);
+  // Prune old turns to prevent unbounded growth
+  if (context.turns.length > maxTurns) {
+    context.turns = context.turns.slice(-maxTurns);
+  }
 }
 
 /**

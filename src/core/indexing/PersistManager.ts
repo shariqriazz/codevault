@@ -12,7 +12,7 @@ export class PersistManager {
   private codemapTask: DebouncedTask = { timer: null, pending: false };
   private merkleTask: DebouncedTask = { timer: null, pending: false };
   private readonly debounceMs: number;
-  private saving = false;
+  private savePromise: Promise<void> = Promise.resolve();
 
   constructor(
     private context: IndexContextData,
@@ -59,22 +59,24 @@ export class PersistManager {
   }
 
   private async saveNow(): Promise<void> {
-    if (this.saving) return;
-    this.saving = true;
-    try {
-      if (this.state.indexMutated && this.codemapTask.pending) {
-        await writeCodemapAsync(this.context.codemapPath, this.state.codemap);
-        this.state.indexMutated = false;
-      }
+    // Chain onto existing promise to ensure serialization and prevent race conditions
+    this.savePromise = this.savePromise.then(async () => {
+      try {
+        if (this.state.indexMutated && this.codemapTask.pending) {
+          await writeCodemapAsync(this.context.codemapPath, this.state.codemap);
+          this.state.indexMutated = false;
+        }
 
-      if (this.state.merkleDirty && this.merkleTask.pending) {
-        await saveMerkleAsync(this.context.repo, this.state.updatedMerkle);
-        this.state.merkleDirty = false;
+        if (this.state.merkleDirty && this.merkleTask.pending) {
+          await saveMerkleAsync(this.context.repo, this.state.updatedMerkle);
+          this.state.merkleDirty = false;
+        }
+      } finally {
+        this.codemapTask.pending = false;
+        this.merkleTask.pending = false;
       }
-    } finally {
-      this.codemapTask.pending = false;
-      this.merkleTask.pending = false;
-      this.saving = false;
-    }
+    });
+
+    return this.savePromise;
   }
 }

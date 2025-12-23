@@ -6,6 +6,7 @@ import zlib from 'zlib';
 import { promisify } from 'node:util';
 import { log } from '../utils/logger.js';
 import { ENCRYPTION_CONSTANTS } from '../config/constants.js';
+import { SimpleLRU } from '../utils/simple-lru.js';
 
 const {
   MAGIC_HEADER,
@@ -254,7 +255,7 @@ function computeKeyId(masterKey: Buffer): Buffer {
   return crypto.createHash('sha256').update(masterKey).digest().subarray(0, KEY_ID_LENGTH);
 }
 
-const usedNonces = new Set<string>();
+const usedNonces = new SimpleLRU<string, boolean>(100000); // LRU cache to prevent unbounded growth
 const MAX_IV_GENERATION_ATTEMPTS = 3;
 let randomBytesFn: typeof crypto.randomBytes = crypto.randomBytes;
 
@@ -266,8 +267,8 @@ function generateUniqueIv(keyId: Buffer, salt: Buffer): Buffer {
   for (let attempt = 0; attempt < MAX_IV_GENERATION_ATTEMPTS; attempt += 1) {
     const iv = randomBytesFn(IV_LENGTH);
     const nonceKey = buildNonceKey(keyId, salt, iv);
-    if (!usedNonces.has(nonceKey)) {
-      usedNonces.add(nonceKey);
+    if (!usedNonces.get(nonceKey)) {
+      usedNonces.set(nonceKey, true);
       return iv;
     }
   }
