@@ -28,6 +28,7 @@ async function writeProviderConfig(root: string, dimensions: number): Promise<vo
 beforeEach(() => {
   envSnapshot = { ...process.env };
   process.env.CODEVAULT_QUIET = 'true';
+  process.env.CODEVAULT_TEST_MODE = 'true';
 });
 
 afterEach(async () => {
