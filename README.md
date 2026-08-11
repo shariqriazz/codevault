@@ -409,6 +409,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **GitHub**: https://github.com/shariqriazz/codevault
 - **NPM**: https://www.npmjs.com/package/codevault
 - **Issues**: https://github.com/shariqriazz/codevault/issues
+- **Engineering notes**: [What building seven MCP servers taught me about production MCP](https://www.orchestriai.com/blog/lessons-building-seven-mcp-servers) explains how CodeVault's MCP boundary fits around its larger indexing and retrieval application.
 
 ## 🙏 Acknowledgments
 
@@ -423,6 +424,6 @@ Built with:
 
 ---
 
-**Version**: 1.8.4
+**Version**: 1.8.5
 **Built by**: Shariq Riaz
-**Last Updated**: November 2025
+**Last Updated**: August 2026
